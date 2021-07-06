@@ -48,7 +48,7 @@ def find_audio_files(path, exts=[".wav"], progress=True):
 
 class Audioset:
     def __init__(self, files=None, length=None, stride=None,
-                 pad=True, with_path=False, sample_rate=None):
+                 pad=True, with_path=False, sample_rate=None, upsampled = False):
         """
         files should be a list [(file, length)]
         """
@@ -58,7 +58,10 @@ class Audioset:
         self.stride = stride or length
         self.with_path = with_path
         self.sample_rate = sample_rate
+        self.upsampled = upsampled
         for file, file_length in self.files:
+            if upsampled:
+                file_length = math.ceil(file_length/2)
             if length is None:
                 examples = 1
             elif file_length < length:
@@ -82,6 +85,8 @@ class Audioset:
             if self.length is not None:
                 offset = self.stride * index
                 num_frames = self.length
+                if self.upsampled:
+                    num_frames *= 2
             if torchaudio.get_audio_backend() in ['soundfile', 'sox_io']:
                 out, sr = torchaudio.load(str(file),
                                           frame_offset=offset,

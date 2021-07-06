@@ -19,9 +19,19 @@ from .enhance import enhance
 from .evaluate import evaluate
 from .stft_loss import MultiResolutionSTFTLoss
 from .utils import bold, copy_state, pull_metric, serialize_model, swap_state, LogProgress
+from .resample import downsample2
 
 logger = logging.getLogger(__name__)
 
+
+class MultipleInputsSequential(torch.nn.Sequential):
+    def forward(self, *inputs):
+        for module in self._modules.values():
+            if type(inputs) == tuple:
+                inputs = module(*inputs)
+            else:
+                inputs = module(inputs)
+        return inputs
 
 class Solver(object):
     def __init__(self, data, model, optimizer, args):
@@ -43,7 +53,7 @@ class Solver(object):
         if args.revecho:
             augments.append(
                 augment.RevEcho(args.revecho))
-        self.augment = torch.nn.Sequential(*augments)
+        self.augment = MultipleInputsSequential(*augments)
 
         # Training config
         self.device = args.device
@@ -199,12 +209,20 @@ class Solver(object):
         logprog = LogProgress(logger, data_loader, updates=self.num_prints, name=name)
         for i, data in enumerate(logprog):
             noisy, clean = [x.to(self.device) for x in data]
+            clean_downsampled = downsample2(clean)
             if not cross_valid:
-                sources = torch.stack([noisy - clean, clean])
-                sources = self.augment(sources)
-                noise, clean = sources
-                noisy = noise + clean
+                logger.info(f"noisy shape:{noisy.shape}")
+                logger.info(f"clean shape:{clean.shape}")
+                logger.info(f"clean downsampled shape:{clean_downsampled.shape}")
+                sources = torch.stack([noisy - clean_downsampled, clean_downsampled])
+                sources, clean = self.augment(sources, clean)
+                noise, clean_downsampled = sources
+                noisy = noise + clean_downsampled
             estimate = self.dmodel(noisy)
+            logger.info(f"estimate shape:{estimate.shape}")
+            logger.info(f"noisy shape:{noisy.shape}")
+            logger.info(f"clean shape:{clean.shape}")
+            logger.info(f"clean_downsampled shape:{clean_downsampled.shape}")
             # apply a loss function after each layer
             with torch.autograd.set_detect_anomaly(True):
                 if self.args.loss == 'l1':

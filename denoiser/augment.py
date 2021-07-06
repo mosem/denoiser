@@ -9,6 +9,7 @@ import random
 import torch as th
 from torch import nn
 from torch.nn import functional as F
+from .resample import downsample2
 
 from . import dsp
 
@@ -18,12 +19,13 @@ class Remix(nn.Module):
     Mixes different noises with clean speech within a given batch
     """
 
-    def forward(self, sources):
-        noise, clean = sources
+    def forward(self, sources, targets):
+        noise, clean_downsampled = sources
+        clean = targets
         bs, *other = noise.shape
         device = noise.device
         perm = th.argsort(th.rand(bs, device=device), dim=0)
-        return th.stack([noise[perm], clean])
+        return th.stack([noise[perm], clean_downsampled]), clean
 
 
 class RevEcho(nn.Module):
@@ -110,10 +112,11 @@ class RevEcho(nn.Module):
                 frac *= attenuation
         return reverb
 
-    def forward(self, wav):
+    def forward(self, sources, targets):
         if random.random() >= self.proba:
-            return wav
-        noise, clean = wav
+            return sources, targets
+        noise, clean_downsampled = sources
+        clean = targets
         # Sample characteristics for the reverb
         initial = random.random() * self.initial
         first_delay = random.uniform(*self.first_delay)
@@ -123,11 +126,13 @@ class RevEcho(nn.Module):
         # Reverb for the noise is always added back to the noise
         noise += reverb_noise
         reverb_clean = self._reverb(clean, initial, first_delay, rt60)
+        reverb_clean_downsampled = downsample2(reverb_clean)
         # Split clean reverb among the clean speech and noise
         clean += self.keep_clean * reverb_clean
-        noise += (1 - self.keep_clean) * reverb_clean
+        clean_downsampled += self.keep_clean * reverb_clean_downsampled
+        noise += (1 - self.keep_clean) * reverb_clean_downsampled
 
-        return th.stack([noise, clean])
+        return th.stack([noise, clean_downsampled]), clean
 
 
 class BandMask(nn.Module):
@@ -149,17 +154,20 @@ class BandMask(nn.Module):
         self.bands = bands
         self.sample_rate = sample_rate
 
-    def forward(self, wav):
+    def forward(self, sources, targets):
         bands = self.bands
         bandwidth = int(abs(self.maxwidth) * bands)
         mels = dsp.mel_frequencies(bands, 40, self.sample_rate/2) / self.sample_rate
         low = random.randrange(bands)
         high = random.randrange(low, min(bands, low + bandwidth))
-        filters = dsp.LowPassFilters([mels[low], mels[high]]).to(wav.device)
-        low, midlow = filters(wav)
+        filters = dsp.LowPassFilters([mels[low], mels[high]]).to(sources.device)
+        sources_low, sources_midlow = filters(sources)
         # band pass filtering
-        out = wav - midlow + low
-        return out
+        sources_out = sources - sources_midlow + sources_low
+
+        targets_low, targets_midlow = filters(targets)
+        targets_out = targets - targets_midlow + targets_low
+        return sources_out, targets_out
 
 
 class Shift(nn.Module):
@@ -175,17 +183,26 @@ class Shift(nn.Module):
         self.shift = shift
         self.same = same
 
-    def forward(self, wav):
-        sources, batch, channels, length = wav.shape
+    def forward(self, sources, targets):
+        n_sources, batch, channels, length = sources.shape
+        _ , _, targets_length = targets.shape
         length = length - self.shift
+        targets_length = targets_length - self.shift
         if self.shift > 0:
             if not self.training:
-                wav = wav[..., :length]
+                sources = sources[..., :length]
+                targets = targets[..., :targets_length]
             else:
                 offsets = th.randint(
                     self.shift,
-                    [1 if self.same else sources, batch, 1, 1], device=wav.device)
-                offsets = offsets.expand(sources, -1, channels, -1)
-                indexes = th.arange(length, device=wav.device)
-                wav = wav.gather(3, indexes + offsets)
-        return wav
+                    [1 if self.same else n_sources, batch, 1, 1], device=sources.device)
+                sources_offsets = offsets.expand(n_sources, -1, channels, -1)
+                sources_indexes = th.arange(length, device=sources.device)
+                sources = sources.gather(3, sources_indexes + sources_offsets)
+
+                targets_offsets = offsets.squeeze(dim=0) if self.same else th.randint(self.shift, [batch,1,1], device=targets.device)
+                targets_offsets = targets_offsets.expand(-1,channels, -1)
+                targets_indexes = th.arange(targets_length, device=targets.device)
+                targets = targets.gather(2, targets_indexes + targets_offsets)
+
+        return sources, targets

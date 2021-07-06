@@ -93,6 +93,7 @@ def _main(args):
     logger.info("For logs, checkpoints and samples check %s", os.getcwd())
     logger.debug(args)
     if args.ddp and args.rank is None:
+        logger.info("starting ddp workers")
         start_ddp_workers()
     else:
         run(args)

@@ -86,13 +86,21 @@ class NoisyCleanSet:
             clean = json.load(f)
 
         match_files(noisy, clean, matching)
-        kw = {'length': length, 'stride': stride, 'pad': pad, 'sample_rate': sample_rate}
-        self.clean_set = Audioset(clean, **kw)
-        self.noisy_set = Audioset(noisy, **kw)
+        kw = {'length': length, 'stride': stride, 'pad': pad}
+        self.clean_set = Audioset(clean, sample_rate=sample_rate*2, upsampled=True, **kw)
+        self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw)
 
-        assert len(self.clean_set) == len(self.noisy_set)
+        logger.info(f"args:{kw}")
+        logger.info(f"clean set size:{len(self.clean_set)}")
+        logger.info(f"noisy set size:{len(self.noisy_set)}")
+
+        assert len(self.clean_set) == len(self.noisy_set) # added scalar multiply for upsampling from 8k to 16k
 
     def __getitem__(self, index):
+        # logger.info(f"index:{index}")
+        # logger.info(f"clean size:{self.clean_set[index].shape}")
+        # logger.info(f"noisy size:{self.noisy_set[index].shape}")
+
         return self.noisy_set[index], self.clean_set[index]
 
     def __len__(self):
