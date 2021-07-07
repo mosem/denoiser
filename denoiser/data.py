@@ -97,10 +97,6 @@ class NoisyCleanSet:
         assert len(self.clean_set) == len(self.noisy_set) # added scalar multiply for upsampling from 8k to 16k
 
     def __getitem__(self, index):
-        # logger.info(f"index:{index}")
-        # logger.info(f"clean size:{self.clean_set[index].shape}")
-        # logger.info(f"noisy size:{self.noisy_set[index].shape}")
-
         return self.noisy_set[index], self.clean_set[index]
 
     def __len__(self):
