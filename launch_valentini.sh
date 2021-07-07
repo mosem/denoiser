@@ -19,5 +19,7 @@ python train.py \
   segment=4.5 \
   stride=0.5 \
   ddp=0 \
-  batch_size=32
+  batch_size=32 \
+  restart=True \
+  dummy='silico-experiment' \
 

@@ -187,7 +187,7 @@ class Shift(nn.Module):
         n_sources, batch, channels, length = sources.shape
         _ , _, targets_length = targets.shape
         length = length - self.shift
-        targets_length = targets_length - self.shift
+        targets_length = targets_length - self.shift*2
         if self.shift > 0:
             if not self.training:
                 sources = sources[..., :length]

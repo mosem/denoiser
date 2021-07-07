@@ -90,10 +90,6 @@ class NoisyCleanSet:
         self.clean_set = Audioset(clean, sample_rate=sample_rate*2, upsampled=True, **kw)
         self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw)
 
-        logger.info(f"args:{kw}")
-        logger.info(f"clean set size:{len(self.clean_set)}")
-        logger.info(f"noisy set size:{len(self.noisy_set)}")
-
         assert len(self.clean_set) == len(self.noisy_set) # added scalar multiply for upsampling from 8k to 16k
 
     def __getitem__(self, index):
