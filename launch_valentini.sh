@@ -20,6 +20,6 @@ python train.py \
   stride=0.5 \
   ddp=0 \
   batch_size=32 \
-  restart=True \
+  restart=False \
   dummy='silico-experiment' \
 
