@@ -88,10 +88,10 @@ def _run_metrics(clean, estimate, args):
     estimate = estimate.numpy()[:, 0]
     clean = clean.numpy()[:, 0]
     if args.pesq:
-        pesq_i = get_pesq(clean, estimate, sr=args.sample_rate)
+        pesq_i = get_pesq(clean, estimate, sr=args.sample_rate*2)
     else:
         pesq_i = 0
-    stoi_i = get_stoi(clean, estimate, sr=args.sample_rate)
+    stoi_i = get_stoi(clean, estimate, sr=args.sample_rate*2)
     return pesq_i, stoi_i
 
 
