@@ -66,7 +66,7 @@ def get_estimate(model, noisy, args):
     else:
         with torch.no_grad():
             estimate = model(noisy)
-            estimate = (1 - args.dry) * estimate + args.dry * noisy
+            # estimate = (1 - args.dry) * estimate + args.dry * noisy
     return estimate
 
 
