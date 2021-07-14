@@ -9,7 +9,7 @@
 python train.py \
   dset=valentini \
   demucs.causal=1 \
-  demucs.hidden=24 \
+  demucs.hidden=48 \
   bandmask=0.2 \
   demucs.resample=4 \
   remix=1 \
@@ -21,5 +21,5 @@ python train.py \
   ddp=0 \
   batch_size=32 \
   restart=False \
-  dummy='silico-experiment' \
+  dummy='upsampling-only-2' \
 

@@ -88,10 +88,10 @@ def _run_metrics(clean, estimate, args):
     estimate = estimate.numpy()[:, 0]
     clean = clean.numpy()[:, 0]
     if clean.shape != estimate.shape:
-        logger.info(f"_run_metrics: non-equal sizes. estimate: {estimate.shape}, clean: {clean.shape}")
-        min_len = min(estimate.shape[0], clean.shape[0])
-        estimate = estimate[:min_len]
-        clean = clean[:min_len]
+        # logger.info(f"_run_metrics: non-equal sizes. estimate: {estimate.shape}, clean: {clean.shape}")
+        min_len = min(estimate.shape[1], clean.shape[1])
+        estimate = estimate[:,:min_len]
+        clean = clean[:,:min_len]
     if args.pesq:
         pesq_i = get_pesq(clean, estimate, sr=args.sample_rate*2)
     else:

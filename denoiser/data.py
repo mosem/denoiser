@@ -10,6 +10,9 @@ import logging
 import os
 import re
 
+from os import path
+import torchaudio
+
 from .audio import Audioset
 
 logger = logging.getLogger(__name__)
@@ -96,8 +99,18 @@ class NoisyCleanSet:
         # logger.info(f"index:{index}")
         # logger.info(f"clean size:{self.clean_set[index].shape}")
         # logger.info(f"noisy size:{self.noisy_set[index].shape}")
+        noisy, clean = self.noisy_set[index], self.clean_set[index]
 
-        return self.noisy_set[index], self.clean_set[index]
+        output_dir = '/vol/ep/mm/speech_enhancement/denoiser/test_data'
+        noisy_filename = output_dir + '/' + str(index) + '_noisy.wav'
+        clean_filename = output_dir + '/' + str(index) + '_clean.wav'
+
+        if index == 2 and not path.isfile(noisy_filename):
+            torchaudio.save(noisy_filename,  noisy.cpu(), 8000)
+            torchaudio.save(clean_filename,  noisy.cpu(), 16000)
+            logger.info(f"index:{index}. Saving noisy and clean audio files.")
+
+        return noisy, clean
 
     def __len__(self):
         return len(self.noisy_set)
