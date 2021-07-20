@@ -167,8 +167,8 @@ class BandMask(nn.Module):
         sources_out = sources - sources_midlow + sources_low
 
         target_mels = dsp.mel_frequencies(bands, 40, self.sample_rate) / self.sample_rate * 2
-        target_filters = dsp.LowPassFilters(target_mels[low], target_mels[high]).to(sources.device)
-        targets_low, targets_midlow = filters(target_filters)
+        target_filters = dsp.LowPassFilters([target_mels[low], target_mels[high]]).to(sources.device)
+        targets_low, targets_midlow = target_filters(targets)
         targets_out = targets - targets_midlow + targets_low
         return sources_out, targets_out
 
