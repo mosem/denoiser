@@ -214,11 +214,10 @@ class Solver(object):
                 # logger.info(f"noisy shape:{noisy.shape}")
                 # logger.info(f"clean shape:{clean.shape}")
                 # logger.info(f"clean downsampled shape:{clean_downsampled.shape}")
-                # sources = torch.stack([noisy - clean_downsampled, clean_downsampled])
-                # sources, clean = self.augment(sources, clean)
-                # noise, clean_downsampled = sources
-                # noisy = noise + clean_downsampled
-                pass
+                sources = torch.stack([noisy - clean_downsampled, clean_downsampled])
+                sources, clean = self.augment(sources, clean)
+                noise, clean_downsampled = sources
+                noisy = noise + clean_downsampled
             estimate = self.dmodel(noisy)
             # logger.info(f"estimate shape:{estimate.shape}")
             # logger.info(f"noisy shape:{noisy.shape}")

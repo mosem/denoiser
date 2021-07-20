@@ -21,5 +21,5 @@ python train.py \
   ddp=0 \
   batch_size=32 \
   restart=False \
-  dummy='upsampling-only-2' \
+  dummy='upsampling-and-denoising-with-augmentations-fixed-bandmask' \
 
