@@ -5,13 +5,14 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # authors: adiyoss and adefossez
-
+import json
 import logging
 import os
 
 import hydra
 
 from denoiser.executor import start_ddp_workers
+from env import AttrDict, build_env
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,33 @@ def run(args):
     from denoiser.data import NoisyCleanSet
     from denoiser.demucs import Demucs
     from denoiser.solver import Solver
+    from train_gan import train
+    import torch.multiprocessing as mp
+
     distrib.init(args)
+
+    if args.train_gan_alone:
+
+        with open(args.gan_config) as f:
+            data = f.read()
+
+        json_config = json.loads(data)
+        h = AttrDict(json_config)
+        build_env(args.config, 'gan_config.json', args.checkpoint_path)
+
+        torch.manual_seed(h.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(h.seed)
+            h.num_gpus = torch.cuda.device_count()
+            h.batch_size = int(h.batch_size / h.num_gpus)
+            print('Batch size per GPU :', h.batch_size)
+        else:
+            pass
+
+        if h.num_gpus > 1:
+            return mp.spawn(train, nprocs=h.num_gpus, args=(a, h,))
+        else:
+            return train(0, args, h)
 
     model = Demucs(**args.demucs)
 
@@ -110,4 +137,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    from train_gan import train_gan
+    train_gan()
