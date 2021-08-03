@@ -10,11 +10,14 @@ import time
 
 import torch as th
 from torch import nn
+from torch.nn import ConstantPad1d
 from torch.nn import functional as F
 
 from .resample import downsample2, upsample2
 from .utils import capture_init
 
+import logging
+logger = logging.getLogger(__name__)
 
 class BLSTM(nn.Module):
     def __init__(self, dim, layers=2, bi=True):
@@ -131,6 +134,11 @@ class Demucs(nn.Module):
         if rescale:
             rescale_module(self, reference=rescale)
 
+        # self.upsample = nn.Sequential([nn.Conv1d(1, self.scale_factor**2, kernel_size, stride),
+        #                                nn.PixelShuffle(self.scale_factor), nn.ReLU()]) # this uses subpixel layer
+        self.upsample = nn.Sequential(nn.ConvTranspose1d(1, 1, 2, 2), nn.ReLU())
+        self.downsample = nn.Sequential(nn.Conv1d(1,1,3,2), nn.ReLU())
+
     def valid_length(self, length):
         """
         Return the nearest valid length to use with the model so that
@@ -186,12 +194,23 @@ class Demucs(nn.Module):
             # x = downsample2(x) # when upsampling from 8k to 16k, this is commented out
             pass
         elif self.resample == 4:
-            x = downsample2(x)
+            # x = downsample2(x) # TODO: change this to learnable module
+            # logger.info(f"size before downsampling: {x.size()}")
+            x = self.downsample(x)
+            # logger.info(f"size after downsampling: {x.size()}")
             # x = downsample2(x) # when upsampling from 8k to 16k, this is commented out
         else:
-            x = upsample2(x)  # when upsampling from 8k to 16k, added this
-
-        x = x[..., :length*2]  # when upsampling from 8k to 16k, added this
+            x = upsample2(x)  # TODO: change this to learnable module
+                              # when upsampling from 8k to 16k, added this
+        # logger.info(f"length*2: {length*2}")
+        if x.size(-1) < length*2:
+            # logger.info(f"padding with {length * 2 - x.size(-1)} zeros")
+            pad = ConstantPad1d((0,length*2-x.size(-1)),0)
+            x = pad(x)
+        else:
+            # logger.info(f"trimming to {length*2}")
+            x = x[..., :length*2]  # when upsampling from 8k to 16k, added this
+        # logger.info(f"final size: {x.size()}")
         return std * x
 
 

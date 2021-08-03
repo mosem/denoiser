@@ -9,11 +9,11 @@
 python train.py \
   dset=valentini \
   demucs.causal=1 \
-  demucs.hidden=48 \
-  bandmask=0.2 \
+  demucs.hidden=24 \
+  bandmask=0 \
   demucs.resample=4 \
   remix=1 \
-  shift=8000 \
+  shift=0 \
   shift_same=True \
   stft_loss=True \
   segment=4.5 \
@@ -21,5 +21,5 @@ python train.py \
   ddp=0 \
   batch_size=32 \
   restart=False \
-  dummy='upsampling-and-denoising-with-augmentations-fixed-bandmask' \
+  dummy='upsampling_convolution' \
 

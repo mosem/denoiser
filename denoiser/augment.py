@@ -25,7 +25,9 @@ class Remix(nn.Module):
         bs, *other = noise.shape
         device = noise.device
         perm = th.argsort(th.rand(bs, device=device), dim=0)
-        return th.stack([noise[perm], clean_downsampled]), clean
+        out = th.stack([noise[perm], clean_downsampled]), clean
+        logger.info(f"Remix: output size: {out[0].size()}, {out[1].size()}")
+        return out
 
 
 class RevEcho(nn.Module):
@@ -132,7 +134,9 @@ class RevEcho(nn.Module):
         clean_downsampled += self.keep_clean * reverb_clean_downsampled
         noise += (1 - self.keep_clean) * reverb_clean_downsampled
 
-        return th.stack([noise, clean_downsampled]), clean
+        out = th.stack([noise, clean_downsampled]), clean
+        logger.info(f"Reverb: output size: {out[0].size()}, {out[1].size()}")
+        return out
 
 
 class BandMask(nn.Module):
@@ -160,17 +164,17 @@ class BandMask(nn.Module):
         mels = dsp.mel_frequencies(bands, 40, self.sample_rate/2) / self.sample_rate
         low = random.randrange(bands)
         high = random.randrange(low, min(bands, low + bandwidth))
-
         filters = dsp.LowPassFilters([mels[low], mels[high]]).to(sources.device)
         sources_low, sources_midlow = filters(sources)
         # band pass filtering
         sources_out = sources - sources_midlow + sources_low
 
-        target_mels = dsp.mel_frequencies(bands, 40, self.sample_rate) / self.sample_rate * 2
-        target_filters = dsp.LowPassFilters([target_mels[low], target_mels[high]]).to(sources.device)
-        targets_low, targets_midlow = target_filters(targets)
+        targets_low, targets_midlow = filters(targets)
         targets_out = targets - targets_midlow + targets_low
-        return sources_out, targets_out
+        out = sources_out, targets_out
+
+        logger.info(f"Bandmask: output size: {out[0].size()}, {out[1].size()}")
+        return out
 
 
 class Shift(nn.Module):
@@ -207,5 +211,6 @@ class Shift(nn.Module):
                 targets_offsets = targets_offsets.expand(-1,channels, -1)
                 targets_indexes = th.arange(targets_length, device=targets.device)
                 targets = targets.gather(2, targets_indexes + targets_offsets)
-
-        return sources, targets
+        out = sources, targets
+        logger.info(f"Shift: output size: {out[0].size()}, {out[1].size()}")
+        return out
