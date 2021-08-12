@@ -35,6 +35,62 @@ class BLSTM(nn.Module):
         return x, hidden
 
 
+import torch
+
+
+# "long" and "short" denote longer and shorter samples
+
+class PixelShuffle1D(torch.nn.Module):
+    """
+    1D pixel shuffler. https://arxiv.org/pdf/1609.05158.pdf
+    Upscales sample length, downscales channel length
+    "short" is input, "long" is output
+    """
+
+    def __init__(self, upscale_factor):
+        super(PixelShuffle1D, self).__init__()
+        self.upscale_factor = upscale_factor
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        short_channel_len = x.shape[1]
+        short_width = x.shape[2]
+
+        long_channel_len = short_channel_len // self.upscale_factor
+        long_width = self.upscale_factor * short_width
+
+        x = x.contiguous().view([batch_size, self.upscale_factor, long_channel_len, short_width])
+        x = x.permute(0, 2, 3, 1).contiguous()
+        x = x.view(batch_size, long_channel_len, long_width)
+
+        return x
+
+
+class PixelUnshuffle1D(torch.nn.Module):
+    """
+    Inverse of 1D pixel shuffler
+    Upscales channel length, downscales sample length
+    "long" is input, "short" is output
+    """
+
+    def __init__(self, downscale_factor):
+        super(PixelUnshuffle1D, self).__init__()
+        self.downscale_factor = downscale_factor
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        long_channel_len = x.shape[1]
+        long_width = x.shape[2]
+
+        short_channel_len = long_channel_len * self.downscale_factor
+        short_width = long_width // self.downscale_factor
+
+        x = x.contiguous().view([batch_size, long_channel_len, short_width, self.downscale_factor])
+        x = x.permute(0, 3, 1, 2).contiguous()
+        x = x.view([batch_size, short_channel_len, short_width])
+        return x
+
+
 def rescale_conv(conv, reference):
     std = conv.weight.std().detach()
     scale = (std / reference)**0.5
@@ -87,7 +143,8 @@ class Demucs(nn.Module):
                  normalize=True,
                  glu=True,
                  rescale=0.1,
-                 floor=1e-3):
+                 floor=1e-3,
+                 scale_factor=2):
 
         super().__init__()
         if resample not in [1, 2, 4]:
@@ -103,6 +160,7 @@ class Demucs(nn.Module):
         self.floor = floor
         self.resample = resample
         self.normalize = normalize
+        self.scale_factor = scale_factor
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -134,9 +192,9 @@ class Demucs(nn.Module):
         if rescale:
             rescale_module(self, reference=rescale)
 
-        # self.upsample = nn.Sequential([nn.Conv1d(1, self.scale_factor**2, kernel_size, stride),
-        #                                nn.PixelShuffle(self.scale_factor), nn.ReLU()]) # this uses subpixel layer
-        self.upsample = nn.Sequential(nn.ConvTranspose1d(1, 1, 2, 2), nn.ReLU())
+        self.upsample = nn.Sequential(nn.Conv1d(1, self.scale_factor, 3, 1),
+                                       PixelShuffle1D(self.scale_factor), nn.ReLU()) # subpixel layer
+        # self.upsample = nn.Sequential(nn.ConvTranspose1d(1, 1, 3, 2), nn.ReLU())
         self.downsample = nn.Sequential(nn.Conv1d(1,1,3,2), nn.ReLU())
 
     def valid_length(self, length):
@@ -200,15 +258,18 @@ class Demucs(nn.Module):
             # logger.info(f"size after downsampling: {x.size()}")
             # x = downsample2(x) # when upsampling from 8k to 16k, this is commented out
         else:
-            x = upsample2(x)  # TODO: change this to learnable module
+            # logger.info(f"size before upsampling: {x.size()}")
+            # x = upsample2(x)  # TODO: change this to learnable module
                               # when upsampling from 8k to 16k, added this
+            x = self.upsample(x)
+            # logger.info(f"size after upsampling: {x.size()}")
         # logger.info(f"length*2: {length*2}")
         if x.size(-1) < length*2:
             # logger.info(f"padding with {length * 2 - x.size(-1)} zeros")
             pad = ConstantPad1d((0,length*2-x.size(-1)),0)
             x = pad(x)
-        else:
-            # logger.info(f"trimming to {length*2}")
+        elif x.size(-1) > length*2:
+            # logger.info(f"end size: {x.size()},trimming to {length*2}")
             x = x[..., :length*2]  # when upsampling from 8k to 16k, added this
         # logger.info(f"final size: {x.size()}")
         return std * x

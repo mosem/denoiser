@@ -22,10 +22,12 @@ def run(args):
     from denoiser import distrib
     from denoiser.data import NoisyCleanSet
     from denoiser.demucs import Demucs
+    from denoiser.seanet import Seanet
     from denoiser.solver import Solver
     distrib.init(args)
 
-    model = Demucs(**args.demucs)
+    # model = Demucs(**args.demucs)
+    model = Seanet(**args.seanet)
 
     if args.show:
         logger.info(model)

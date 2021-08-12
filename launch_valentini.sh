@@ -9,9 +9,9 @@
 python train.py \
   dset=valentini \
   demucs.causal=1 \
-  demucs.hidden=24 \
+  demucs.hidden=48 \
   bandmask=0 \
-  demucs.resample=4 \
+  demucs.resample=2 \
   remix=1 \
   shift=0 \
   shift_same=True \
@@ -21,5 +21,5 @@ python train.py \
   ddp=0 \
   batch_size=32 \
   restart=False \
-  dummy='upsampling_convolution' \
+  dummy='convolution-sampling_resample_once' \
 

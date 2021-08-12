@@ -13,6 +13,8 @@ from .resample import downsample2
 
 from . import dsp
 
+import logging
+logger = logging.getLogger(__name__)
 
 class Remix(nn.Module):
     """Remix.
@@ -26,7 +28,7 @@ class Remix(nn.Module):
         device = noise.device
         perm = th.argsort(th.rand(bs, device=device), dim=0)
         out = th.stack([noise[perm], clean_downsampled]), clean
-        logger.info(f"Remix: output size: {out[0].size()}, {out[1].size()}")
+        # logger.info(f"Remix: output size: {out[0].size()}, {out[1].size()}")
         return out
 
 
