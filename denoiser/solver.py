@@ -196,9 +196,11 @@ class Solver(object):
                 if self.checkpoint:
                     self._serialize()
                     logger.debug("Checkpoint saved to %s", self.checkpoint_file.resolve())
-                    if not os.path.exists("./state_dicts"):
-                        os.mkdir("./state_dicts")
-                    torch.save(self.best_state, f"./state_dicts/{epoch}.pt")
+                    if not os.path.exists("./results"):
+                        os.mkdir("./results")
+                    if not os.path.exists("./results/state_dicts"):
+                        os.mkdir("./results/state_dicts")
+                    torch.save(self.best_state, f"./results/state_dicts/{epoch}.pt")
 
     def _run_one_epoch(self, epoch, cross_valid=False):
         total_loss = 0
