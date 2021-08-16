@@ -34,13 +34,18 @@ class MultipleInputsSequential(torch.nn.Sequential):
         return inputs
 
 class Solver(object):
-    def __init__(self, data, model, optimizer, args):
+    def __init__(self, data, model, optimizer, args, disc=None, disc_opt=None):
         self.tr_loader = data['tr_loader']
         self.cv_loader = data['cv_loader']
         self.tt_loader = data['tt_loader']
         self.model = model
         self.dmodel = distrib.wrap(model)
         self.optimizer = optimizer
+
+        if disc is not None:
+            self.disc = disc
+            self.dDisc = distrib.wrap(disc)
+            self.disc_opt = disc_opt
 
         # data augment
         augments = []
@@ -66,10 +71,12 @@ class Solver(object):
         if self.checkpoint:
             self.checkpoint_file = Path(args.checkpoint_file)
             self.best_file = Path(args.best_file)
+            self.best_disc_file = Path('discriminator_' + args.best_file)
             logger.debug("Checkpoint will be saved to %s", self.checkpoint_file.resolve())
         self.history_file = args.history_file
 
         self.best_state = None
+        self.best_state_discriminator = None
         self.restart = args.restart
         self.history = []  # Keep track of loss
         self.samples_dir = args.samples_dir  # Where to save samples
@@ -82,9 +89,13 @@ class Solver(object):
     def _serialize(self):
         package = {}
         package['model'] = serialize_model(self.model)
+        if self.disc:
+            package['disc'] = serialize_model(self.disc)
+            package['disc_opt'] = self.disc_opt.state_dict()
         package['optimizer'] = self.optimizer.state_dict()
         package['history'] = self.history
         package['best_state'] = self.best_state
+        package['best_state_discriminator'] = self.best_state_discriminator
         package['args'] = self.args
         tmp_path = str(self.checkpoint_file) + ".tmp"
         torch.save(package, tmp_path)
@@ -98,6 +109,12 @@ class Solver(object):
         tmp_path = str(self.best_file) + ".tmp"
         torch.save(model, tmp_path)
         os.rename(tmp_path, self.best_file)
+
+        disc = package['disc']
+        disc['state'] = self.best_state_discriminator
+        tmp_disc_path = str(self.best_disc_file) + '.tmp'
+        torch.save(disc,tmp_disc_path)
+        os.rename(tmp_disc_path, self.best_disc_file)
 
     def _reset(self):
         """_reset."""
@@ -117,13 +134,18 @@ class Solver(object):
             package = torch.load(load_from, 'cpu')
             if load_best:
                 self.model.load_state_dict(package['best_state'])
+                self.disc.load_state_dict(package['best_state_discriminator'])
             else:
                 self.model.load_state_dict(package['model']['state'])
+                self.disc.load_state_dict(package['disc']['state'])
             if 'optimizer' in package and not load_best:
                 self.optimizer.load_state_dict(package['optimizer'])
+            if 'dics_opt' in package and not load_best:
+                self.disc_opt.load_state_dict(package['dict_opt'])
             if keep_history:
                 self.history = package['history']
             self.best_state = package['best_state']
+            self.best_state_discriminator = package['best_state_discriminator']
         continue_pretrained = self.args.continue_pretrained
         if continue_pretrained:
             logger.info("Fine tuning from pre-trained model %s", continue_pretrained)
@@ -144,30 +166,47 @@ class Solver(object):
             start = time.time()
             logger.info('-' * 70)
             logger.info("Training...")
-            train_loss = self._run_one_epoch(epoch)
-            logger.info(
-                bold(f'Train Summary | End of Epoch {epoch + 1} | '
-                     f'Time {time.time() - start:.2f}s | Train Loss {train_loss:.5f}'))
+            if self.args.adversarial_mode:
+                train_loss, discriminator_loss = self._run_one_epoch(epoch)
+                logger.info(
+                    bold(f'Train Summary | End of Epoch {epoch + 1} | '
+                         f'Time {time.time() - start:.2f}s | Train Loss {train_loss:.5f} | Discrim. Loss {discriminator_loss:.5f}'))
+            else:
+                train_loss, _ = self._run_one_epoch(epoch)
+                logger.info(
+                    bold(f'Train Summary | End of Epoch {epoch + 1} | '
+                         f'Time {time.time() - start:.2f}s | Train Loss {train_loss:.5f}'))
 
             if self.cv_loader:
                 # Cross validation
                 logger.info('-' * 70)
                 logger.info('Cross validation...')
                 self.model.eval()
-                with torch.no_grad():
-                    valid_loss = self._run_one_epoch(epoch, cross_valid=True)
-                logger.info(
-                    bold(f'Valid Summary | End of Epoch {epoch + 1} | '
-                         f'Time {time.time() - start:.2f}s | Valid Loss {valid_loss:.5f}'))
+                if self.args.adversarial_mode:
+                    with torch.no_grad():
+                        valid_loss, discriminator_loss = self._run_one_epoch(epoch, cross_valid=True)
+                    logger.info(
+                        bold(f'Valid Summary | End of Epoch {epoch + 1} | '
+                             f'Time {time.time() - start:.2f}s | Valid Loss {valid_loss:.5f} | Discrim. Loss {discriminator_loss:.5f}'))
+                else:
+                    with torch.no_grad():
+                        valid_loss, _ = self._run_one_epoch(epoch, cross_valid=True)
+                    logger.info(
+                        bold(f'Valid Summary | End of Epoch {epoch + 1} | '
+                             f'Time {time.time() - start:.2f}s | Valid Loss {valid_loss:.5f}'))
             else:
                 valid_loss = 0
 
             best_loss = min(pull_metric(self.history, 'valid') + [valid_loss])
-            metrics = {'train': train_loss, 'valid': valid_loss, 'best': best_loss}
+            if self.args.adversarial_mode:
+                metrics = {'train': train_loss, 'discriminator': discriminator_loss, 'valid': valid_loss, 'best': best_loss}
+            else:
+                metrics = {'train': train_loss, 'valid': valid_loss, 'best': best_loss}
             # Save the best model
             if valid_loss == best_loss:
                 logger.info(bold('New best valid loss %.4f'), valid_loss)
                 self.best_state = copy_state(self.model.state_dict())
+                self.best_state_discriminator = copy_state(self.disc.state_dict())
 
             # evaluate and enhance samples every 'eval_every' argument number of epochs
             # also evaluate on last epoch
@@ -178,6 +217,7 @@ class Solver(object):
                 # We switch to the best known model for testing
                 with swap_state(self.model, self.best_state):
                     pesq, stoi = evaluate(self.args, self.model, self.tt_loader)
+
 
                 metrics.update({'pesq': pesq, 'stoi': stoi})
 
@@ -209,7 +249,7 @@ class Solver(object):
         logprog = LogProgress(logger, data_loader, updates=self.num_prints, name=name)
         for i, data in enumerate(logprog):
             noisy, clean = [x.to(self.device) for x in data]
-            clean_downsampled = downsample2(clean)
+            clean_downsampled = downsample2(clean) if self.args.upsampled else clean
             if not cross_valid:
                 # logger.info(f"noisy shape:{noisy.shape}")
                 # logger.info(f"clean shape:{clean.shape}")
@@ -224,28 +264,92 @@ class Solver(object):
             # logger.info(f"clean shape:{clean.shape}")
             # logger.info(f"clean_downsampled shape:{clean_downsampled.shape}")
             # apply a loss function after each layer
-            with torch.autograd.set_detect_anomaly(True):
-                if self.args.loss == 'l1':
-                    loss = F.l1_loss(clean, estimate)
-                elif self.args.loss == 'l2':
-                    loss = F.mse_loss(clean, estimate)
-                elif self.args.loss == 'huber':
-                    loss = F.smooth_l1_loss(clean, estimate)
-                else:
-                    raise ValueError(f"Invalid loss {self.args.loss}")
-                # MultiResolution STFT loss
-                if self.args.stft_loss:
-                    sc_loss, mag_loss = self.mrstftloss(estimate.squeeze(1), clean.squeeze(1))
-                    loss += sc_loss + mag_loss
+            if self.args.adversarial_mode:
+                loss_G, loss_D = self.get_adversarial_losses(clean, estimate, cross_valid)
+                total_G_loss += loss_G.item()
+                total_D_loss += loss_D.item()
+                logprog.update(loss_G=format(total_G_loss / (i + 1), ".5f"))
+                logprog.update(loss_D=format(total_D_loss / (i + 1), ".5f"))
+                # Just in case, clear some memory
+                del loss_G, loss_D, estimate
+            else:
+                loss = self.get_loss(clean, estimate, cross_valid)
 
-                # optimize model in training mode
-                if not cross_valid:
-                    self.optimizer.zero_grad()
-                    loss.backward()
-                    self.optimizer.step()
+                total_loss += loss.item()
+                logprog.update(loss=format(total_loss / (i + 1), ".5f"))
+                # Just in case, clear some memory
+                del loss, estimate
+        if self.args.adversarial_mode:
+            return distrib.average([total_G_loss / (i + 1)], i + 1)[0], distrib.average([total_D_loss / (i + 1)], i + 1)[0]
+        else:
+            return distrib.average([total_loss / (i + 1)], i + 1)[0], None
 
-            total_loss += loss.item()
-            logprog.update(loss=format(total_loss / (i + 1), ".5f"))
-            # Just in case, clear some memory
-            del loss, estimate
-        return distrib.average([total_loss / (i + 1)], i + 1)[0]
+
+    def get_loss(self, clean, estimate, cross_valid):
+        with torch.autograd.set_detect_anomaly(True):
+            if self.args.loss == 'l1':
+                loss = F.l1_loss(clean, estimate)
+            elif self.args.loss == 'l2':
+                loss = F.mse_loss(clean, estimate)
+            elif self.args.loss == 'huber':
+                loss = F.smooth_l1_loss(clean, estimate)
+            else:
+                raise ValueError(f"Invalid loss {self.args.loss}")
+            # MultiResolution STFT loss
+            if self.args.stft_loss:
+                sc_loss, mag_loss = self.mrstftloss(estimate.squeeze(1), clean.squeeze(1))
+                loss += sc_loss + mag_loss
+
+            # optimize model in training mode
+            if not cross_valid:
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+            return loss
+
+        def get_adversarial_losses(self, clean, estimate, cross_valid):
+            disc_fake_detached = self.dDisc(estimate.detach())
+            disc_real = self.dDisc(clean)
+
+            loss_D = 0
+            for scale in disc_fake_detached:
+                loss_D += F.relu(1+ scale[-1]).mean() # TODO: check is this is a mean over time domain or batch domain
+
+            for scale in disc_real:
+                loss_D += F.relu(1-scale[-1]).mean()  # TODO: check is this is a mean over time domain or batch domain
+
+
+            if not cross_valid:
+                # self.dDisc.zero_grad() # should I do this?
+                self.disc_opt.zero_grad()
+                loss_D.backward()
+                self.disc_opt.step()
+
+
+            disc_fake = self.dDisc(estimate)
+
+            loss_G = 0
+            for scale in disc_fake:
+                loss_G += F.relu(1-scale[-1]).mean()  # TODO: check is this is a mean over time domain or batch domain
+
+            loss_feat = 0
+            feat_weights = 4.0 / (self.args.n_layers_D + 1)
+            D_weights = 1.0 / self.args.num_D
+            wt = D_weights * feat_weights
+
+            for i in range(self.args.num_D):
+                for j in range(len(disc_fake[i]) -1):
+                    loss_feat += wt * F.l1_loss(disc_fake[i][j], disc_real[i][j].detach())
+
+            total_loss_G = (loss_G + self.args.lambda_feat * loss_feat)
+            if not cross_valid:
+                # self.dModel.zero_grad() # should I do this?
+                self.optimizer.zero_grad()
+                total_loss_G.backward()
+                self.optimizer.step()
+
+            return total_loss_G, loss_D
+
+
+

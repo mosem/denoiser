@@ -22,12 +22,13 @@ def run(args):
     from denoiser import distrib
     from denoiser.data import NoisyCleanSet
     from denoiser.demucs import Demucs
-    from denoiser.seanet import Seanet
+    from denoiser.seanet import Seanet, Discriminator
     from denoiser.solver import Solver
     distrib.init(args)
 
     # model = Demucs(**args.demucs)
     model = Seanet(**args.seanet)
+    discriminator = Discriminator(args.num_D, args.ndf, args.n_layers_D, args.downsamp_factor) if args.adversarial_mode else None
 
     if args.show:
         logger.info(model)
@@ -49,16 +50,16 @@ def run(args):
     kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(
-        args.dset.train, length=length, stride=stride, pad=args.pad, **kwargs)
+        args.dset.train, length=length, stride=stride, pad=args.pad, upsampled=args.upsampled, **kwargs)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
-        cv_dataset = NoisyCleanSet(args.dset.valid, **kwargs)
+        cv_dataset = NoisyCleanSet(args.dset.valid, upsampled=args.upsampled, **kwargs)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         cv_loader = None
     if args.dset.test:
-        tt_dataset = NoisyCleanSet(args.dset.test, **kwargs)
+        tt_dataset = NoisyCleanSet(args.dset.test, upsampled=args.upsampled, **kwargs)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         tt_loader = None
@@ -68,16 +69,19 @@ def run(args):
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
         model.cuda()
+        if args.adversarial_mode:
+            discriminator.cuda()
 
     # optimizer
     if args.optim == "adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, args.beta2))
+        disc_opt = torch.optim.Adam(discriminator.parameters(), lr=args.lr, betas=(0.9, args.beta2)) if args.adversarial_mode else None
     else:
         logger.fatal('Invalid optimizer %s', args.optim)
         os._exit(1)
 
     # Construct Solver
-    solver = Solver(data, model, optimizer, args)
+    solver = Solver(data, model, optimizer, args, disc=discriminator, disc_opt=disc_opt)
     solver.train()
 
 

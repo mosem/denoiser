@@ -9,6 +9,16 @@ segment: 4
 stride: 1    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
 
+upsampled: false # if upsampling from input dataset to target dataset
+
+# Discriminator related
+adversarial_mode: False
+n_layers_D: 4
+num_D: 3
+discriminator_downsampling_rate: 4
+ndf: 16
+lambda_feat: 100
+
 # Dataset Augmentation
 remix: false   # remix noise and clean
 bandmask: 0.   # drop at most this fraction of freqs in mel scale
@@ -79,6 +89,8 @@ seanet:
   latent_space_size: 128
   ngf: 32
   n_residual_layers: 3
+  resample: 1
+
 
 # Experiment launching, distributed
 ddp: false
