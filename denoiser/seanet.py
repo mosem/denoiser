@@ -249,6 +249,7 @@ class NLayerDiscriminator(nn.Module):
 
 
 class Discriminator(nn.Module):
+    @capture_init
     def __init__(self, num_D, ndf, n_layers, downsampling_factor):
         super().__init__()
         self.model = nn.ModuleDict()

@@ -239,6 +239,8 @@ class Solver(object):
 
     def _run_one_epoch(self, epoch, cross_valid=False):
         total_loss = 0
+        total_G_loss = 0
+        total_D_loss = 0
         data_loader = self.tr_loader if not cross_valid else self.cv_loader
 
         # get a different order for distributed training, otherwise this will get ignored
@@ -268,8 +270,7 @@ class Solver(object):
                 loss_G, loss_D = self.get_adversarial_losses(clean, estimate, cross_valid)
                 total_G_loss += loss_G.item()
                 total_D_loss += loss_D.item()
-                logprog.update(loss_G=format(total_G_loss / (i + 1), ".5f"))
-                logprog.update(loss_D=format(total_D_loss / (i + 1), ".5f"))
+                logprog.update(loss_G=format(total_G_loss / (i + 1), ".5f"), loss_D=format(total_D_loss / (i + 1), ".5f"))
                 # Just in case, clear some memory
                 del loss_G, loss_D, estimate
             else:
@@ -308,48 +309,48 @@ class Solver(object):
 
             return loss
 
-        def get_adversarial_losses(self, clean, estimate, cross_valid):
-            disc_fake_detached = self.dDisc(estimate.detach())
-            disc_real = self.dDisc(clean)
+    def get_adversarial_losses(self, clean, estimate, cross_valid):
+        disc_fake_detached = self.dDisc(estimate.detach())
+        disc_real = self.dDisc(clean)
 
-            loss_D = 0
-            for scale in disc_fake_detached:
-                loss_D += F.relu(1+ scale[-1]).mean() # TODO: check is this is a mean over time domain or batch domain
+        loss_D = 0
+        for scale in disc_fake_detached:
+            loss_D += F.relu(1+ scale[-1]).mean() # TODO: check is this is a mean over time domain or batch domain
 
-            for scale in disc_real:
-                loss_D += F.relu(1-scale[-1]).mean()  # TODO: check is this is a mean over time domain or batch domain
-
-
-            if not cross_valid:
-                # self.dDisc.zero_grad() # should I do this?
-                self.disc_opt.zero_grad()
-                loss_D.backward()
-                self.disc_opt.step()
+        for scale in disc_real:
+            loss_D += F.relu(1-scale[-1]).mean()  # TODO: check is this is a mean over time domain or batch domain
 
 
-            disc_fake = self.dDisc(estimate)
+        if not cross_valid:
+            # self.dDisc.zero_grad() # should I do this?
+            self.disc_opt.zero_grad()
+            loss_D.backward()
+            self.disc_opt.step()
 
-            loss_G = 0
-            for scale in disc_fake:
-                loss_G += F.relu(1-scale[-1]).mean()  # TODO: check is this is a mean over time domain or batch domain
 
-            loss_feat = 0
-            feat_weights = 4.0 / (self.args.n_layers_D + 1)
-            D_weights = 1.0 / self.args.num_D
-            wt = D_weights * feat_weights
+        disc_fake = self.dDisc(estimate)
 
-            for i in range(self.args.num_D):
-                for j in range(len(disc_fake[i]) -1):
-                    loss_feat += wt * F.l1_loss(disc_fake[i][j], disc_real[i][j].detach())
+        loss_G = 0
+        for scale in disc_fake:
+            loss_G += F.relu(1-scale[-1]).mean()  # TODO: check is this is a mean over time domain or batch domain
 
-            total_loss_G = (loss_G + self.args.lambda_feat * loss_feat)
-            if not cross_valid:
-                # self.dModel.zero_grad() # should I do this?
-                self.optimizer.zero_grad()
-                total_loss_G.backward()
-                self.optimizer.step()
+        loss_feat = 0
+        feat_weights = 4.0 / (self.args.n_layers_D + 1)
+        D_weights = 1.0 / self.args.num_D
+        wt = D_weights * feat_weights
 
-            return total_loss_G, loss_D
+        for i in range(self.args.num_D):
+            for j in range(len(disc_fake[i]) -1):
+                loss_feat += wt * F.l1_loss(disc_fake[i][j], disc_real[i][j].detach())
+
+        total_loss_G = (loss_G + self.args.lambda_feat * loss_feat)
+        if not cross_valid:
+            # self.dModel.zero_grad() # should I do this?
+            self.optimizer.zero_grad()
+            total_loss_G.backward()
+            self.optimizer.step()
+
+        return total_loss_G, loss_D
 
 
 

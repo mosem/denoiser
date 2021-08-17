@@ -8,21 +8,19 @@
 
 python train.py \
   dset=valentini \
-  demucs.causal=1 \
-  demucs.hidden=48 \
   seanet.ngf=32 \
   bandmask=0 \
-  demucs.resample=2 \
   remix=1 \
   shift=0 \
   shift_same=True \
   stft_loss=True \
-  segment=4 \
+  segment=2 \
   stride=2 \
   ddp=0 \
   batch_size=16 \
   restart=False \
   epochs=100 \
   sample_rate=16000 \
-  dummy='seanet-debugging' \
+  adversarial_mode=True \
+  dummy='seanet-denoising-only-16k-discriminators' \
 

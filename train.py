@@ -28,7 +28,7 @@ def run(args):
 
     # model = Demucs(**args.demucs)
     model = Seanet(**args.seanet)
-    discriminator = Discriminator(args.num_D, args.ndf, args.n_layers_D, args.downsamp_factor) if args.adversarial_mode else None
+    discriminator = Discriminator(args.num_D, args.ndf, args.n_layers_D, args.discriminator_downsampling_rate) if args.adversarial_mode else None
 
     if args.show:
         logger.info(model)
