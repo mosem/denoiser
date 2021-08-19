@@ -23,11 +23,16 @@ def run(args):
     from denoiser.data import NoisyCleanSet
     from denoiser.demucs import Demucs
     from denoiser.seanet import Seanet, Discriminator
+    from denoiser.caunet import Caunet
     from denoiser.solver import Solver
     distrib.init(args)
 
-    # model = Demucs(**args.demucs)
-    model = Seanet(**args.seanet)
+    if args.model == "demucs":
+        model = Demucs(**args.demucs)
+    elif args.model == "seanet":
+        model = Seanet(**args.seanet)
+    elif args.model == "caunet":
+        model = Caunet(**args.caunet)
     discriminator = Discriminator(args.num_D, args.ndf, args.n_layers_D, args.discriminator_downsampling_rate) if args.adversarial_mode else None
 
     if args.show:

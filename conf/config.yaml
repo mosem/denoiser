@@ -68,7 +68,7 @@ epochs: 400
 batch_size: 64
 
 # Models
-model: demucs # either demucs or dwave
+model: demucs # demucs/seanet/caunet
 demucs:
   chin: 1
   chout: 1
@@ -90,6 +90,12 @@ seanet:
   ngf: 32
   n_residual_layers: 3
   resample: 1
+
+caunet:
+  L: 512
+  width: 64
+frame_size: 512
+frame_shift: 256
 
 
 # Experiment launching, distributed

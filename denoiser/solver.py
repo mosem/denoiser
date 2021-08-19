@@ -20,6 +20,7 @@ from .evaluate import evaluate
 from .stft_loss import MultiResolutionSTFTLoss
 from .utils import bold, copy_state, pull_metric, serialize_model, swap_state, LogProgress
 from .resample import downsample2
+from .preprocess import  TorchSignalToFrames
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +43,14 @@ class Solver(object):
         self.dmodel = distrib.wrap(model)
         self.optimizer = optimizer
 
-        if disc is not None:
-            self.disc = disc
+        self.disc = disc
+        self.disc_opt = disc_opt
+        if self.disc is not None:
             self.dDisc = distrib.wrap(disc)
-            self.disc_opt = disc_opt
+
+        if args.model == "caunet":
+            self.signalPreProcessor = TorchSignalToFrames(frame_size=args.frame_size,
+                                                          frame_shift=args.frame_shift)
 
         # data augment
         augments = []
@@ -89,7 +94,7 @@ class Solver(object):
     def _serialize(self):
         package = {}
         package['model'] = serialize_model(self.model)
-        if self.disc:
+        if self.args.adversarial_mode:
             package['disc'] = serialize_model(self.disc)
             package['disc_opt'] = self.disc_opt.state_dict()
         package['optimizer'] = self.optimizer.state_dict()
@@ -110,11 +115,12 @@ class Solver(object):
         torch.save(model, tmp_path)
         os.rename(tmp_path, self.best_file)
 
-        disc = package['disc']
-        disc['state'] = self.best_state_discriminator
-        tmp_disc_path = str(self.best_disc_file) + '.tmp'
-        torch.save(disc,tmp_disc_path)
-        os.rename(tmp_disc_path, self.best_disc_file)
+        if self.args.adversarial_mode:
+            disc = package['disc']
+            disc['state'] = self.best_state_discriminator
+            tmp_disc_path = str(self.best_disc_file) + '.tmp'
+            torch.save(disc,tmp_disc_path)
+            os.rename(tmp_disc_path, self.best_disc_file)
 
     def _reset(self):
         """_reset."""
@@ -137,7 +143,8 @@ class Solver(object):
                 self.disc.load_state_dict(package['best_state_discriminator'])
             else:
                 self.model.load_state_dict(package['model']['state'])
-                self.disc.load_state_dict(package['disc']['state'])
+                if self.disc:
+                    self.disc.load_state_dict(package['disc']['state'])
             if 'optimizer' in package and not load_best:
                 self.optimizer.load_state_dict(package['optimizer'])
             if 'dics_opt' in package and not load_best:
@@ -206,7 +213,8 @@ class Solver(object):
             if valid_loss == best_loss:
                 logger.info(bold('New best valid loss %.4f'), valid_loss)
                 self.best_state = copy_state(self.model.state_dict())
-                self.best_state_discriminator = copy_state(self.disc.state_dict())
+                if self.args.adversarial_mode:
+                    self.best_state_discriminator = copy_state(self.disc.state_dict())
 
             # evaluate and enhance samples every 'eval_every' argument number of epochs
             # also evaluate on last epoch
@@ -260,7 +268,15 @@ class Solver(object):
                 sources, clean = self.augment(sources, clean)
                 noise, clean_downsampled = sources
                 noisy = noise + clean_downsampled
-            estimate = self.dmodel(noisy)
+            if self.args.model == "caunet":
+                estimate = self.signalPreProcessor(noisy)
+                clean = self.signalPreProcessor(clean)
+                logger.info(f"estimate shape:{estimate.shape}, clean shape: {clean.shape}")
+                estimate = estimate.contiguous().view(estimate.size(0), estimate.size(1), -1)
+                clean = clean.contiguous().view(clean.size(0), clean.size(1), -1)
+                logger.info(f"estimate shape:{estimate.shape}, clean shape: {clean.shape}")
+            else:
+                estimate = self.dmodel(noisy)
             # logger.info(f"estimate shape:{estimate.shape}")
             # logger.info(f"noisy shape:{noisy.shape}")
             # logger.info(f"clean shape:{clean.shape}")

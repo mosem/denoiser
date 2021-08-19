@@ -8,7 +8,7 @@
 
 python train.py \
   dset=valentini \
-  seanet.ngf=32 \
+  model=caunet \
   bandmask=0 \
   remix=1 \
   shift=0 \
@@ -18,9 +18,8 @@ python train.py \
   stride=2 \
   ddp=0 \
   batch_size=16 \
-  restart=False \
   epochs=100 \
   sample_rate=16000 \
-  adversarial_mode=True \
-  dummy='seanet-denoising-only-16k-discriminators' \
+  adversarial_mode=False \
+  dummy='caunet-debug' \
 
