@@ -17,7 +17,7 @@ python train.py \
   segment=2 \
   stride=2 \
   ddp=0 \
-  batch_size=16 \
+  batch_size=6 \
   epochs=100 \
   sample_rate=16000 \
   adversarial_mode=False \

@@ -1,15 +1,13 @@
-import math
 import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
-from torch.nn.utils.rnn import pad_packed_sequence
 import torch.nn.functional as F
-from torch.autograd import Variable
 import numpy as np
-import timeit
-import sys
 from .preprocess import TorchOLA
 from .Dual_Transformer import Dual_Transformer
+
+
+from .utils import capture_init
 
 
 class Dsconv2d(nn.Module):
@@ -87,6 +85,8 @@ class DenseBlock(nn.Module):
 
 
 class Caunet(nn.Module):
+
+    @capture_init
     def __init__(self, L=512, width=64):
         super(Caunet, self).__init__()
         self.L = L

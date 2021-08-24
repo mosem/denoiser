@@ -13,6 +13,7 @@ import time
 
 import torch
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 from . import augment, distrib, pretrained
 from .enhance import enhance
@@ -20,7 +21,7 @@ from .evaluate import evaluate
 from .stft_loss import MultiResolutionSTFTLoss
 from .utils import bold, copy_state, pull_metric, serialize_model, swap_state, LogProgress
 from .resample import downsample2
-from .preprocess import  TorchSignalToFrames
+from .preprocess import  TorchSignalToFrames, TorchOLA
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,10 @@ class Solver(object):
         if args.model == "caunet":
             self.signalPreProcessor = TorchSignalToFrames(frame_size=args.frame_size,
                                                           frame_shift=args.frame_shift)
+        if args.model == "seanet":
+            self.signalPreProcessor = TorchSignalToFrames(frame_size=args.frame_size,
+                                                          frame_shift=args.frame_shift)
+            self.framesToSignal = TorchOLA()
 
         # data augment
         augments = []
@@ -257,26 +262,32 @@ class Solver(object):
         label = ["Train", "Valid"][cross_valid]
         name = label + f" | Epoch {epoch + 1}"
         logprog = LogProgress(logger, data_loader, updates=self.num_prints, name=name)
-        for i, data in enumerate(logprog):
-            noisy, clean = [x.to(self.device) for x in data]
-            clean_downsampled = downsample2(clean) if self.args.upsampled else clean
-            if not cross_valid:
-                # logger.info(f"noisy shape:{noisy.shape}")
-                # logger.info(f"clean shape:{clean.shape}")
-                # logger.info(f"clean downsampled shape:{clean_downsampled.shape}")
-                sources = torch.stack([noisy - clean_downsampled, clean_downsampled])
-                sources, clean = self.augment(sources, clean)
-                noise, clean_downsampled = sources
-                noisy = noise + clean_downsampled
+        for i, (noisy, clean) in enumerate(logprog):
             if self.args.model == "caunet":
-                estimate = self.signalPreProcessor(noisy)
-                clean = self.signalPreProcessor(clean)
-                logger.info(f"estimate shape:{estimate.shape}, clean shape: {clean.shape}")
-                estimate = estimate.contiguous().view(estimate.size(0), estimate.size(1), -1)
-                clean = clean.contiguous().view(clean.size(0), clean.size(1), -1)
-                logger.info(f"estimate shape:{estimate.shape}, clean shape: {clean.shape}")
-            else:
-                estimate = self.dmodel(noisy)
+                noisy = self.signalPreProcessor(noisy)
+            # if self.args.model == 'seanet':
+            #     tmp = self.signalPreProcessor(noisy)
+            #     noisy = self.framesToSignal(tmp)
+            noisy = noisy.to(self.device)
+            clean = clean.to(self.device)
+
+            # logger.info(f"tmp shape:{tmp.shape}")
+            # logger.info(f"noisy shape:{noisy.shape}")
+            # logger.info(f"clean shape:{clean.shape}")
+            # clean_downsampled = downsample2(clean) if self.args.upsampled else clean
+            # if not cross_valid:
+            #     # logger.info(f"noisy shape:{noisy.shape}")
+            #     # logger.info(f"clean shape:{clean.shape}")
+            #     # logger.info(f"clean downsampled shape:{clean_downsampled.shape}")
+            #     sources = torch.stack([noisy - clean_downsampled, clean_downsampled])
+            #     sources, clean = self.augment(sources, clean)
+            #     noise, clean_downsampled = sources
+            #     noisy = noise + clean_downsampled
+
+            # with torch.autograd.profiler.profile(use_cuda=True, profile_memory=True) as prof:
+            estimate = self.dmodel(noisy)
+            # logger.info(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=10))
+
             # logger.info(f"estimate shape:{estimate.shape}")
             # logger.info(f"noisy shape:{noisy.shape}")
             # logger.info(f"clean shape:{clean.shape}")
