@@ -8,87 +8,17 @@
 import math
 import time
 
-import torch as th
+import torch
 from torch import nn
 from torch.nn import ConstantPad1d
 from torch.nn import functional as F
 
+from .modules import BLSTM
 from .resample import downsample2, upsample2
 from .utils import capture_init
 
 import logging
 logger = logging.getLogger(__name__)
-
-class BLSTM(nn.Module):
-    def __init__(self, dim, layers=2, bi=True):
-        super().__init__()
-        klass = nn.LSTM
-        self.lstm = klass(bidirectional=bi, num_layers=layers, hidden_size=dim, input_size=dim)
-        self.linear = None
-        if bi:
-            self.linear = nn.Linear(2 * dim, dim)
-
-    def forward(self, x, hidden=None):
-        x, hidden = self.lstm(x, hidden)
-        if self.linear:
-            x = self.linear(x)
-        return x, hidden
-
-
-import torch
-
-
-# "long" and "short" denote longer and shorter samples
-
-class PixelShuffle1D(torch.nn.Module):
-    """
-    1D pixel shuffler. https://arxiv.org/pdf/1609.05158.pdf
-    Upscales sample length, downscales channel length
-    "short" is input, "long" is output
-    """
-
-    def __init__(self, upscale_factor):
-        super(PixelShuffle1D, self).__init__()
-        self.upscale_factor = upscale_factor
-
-    def forward(self, x):
-        batch_size = x.shape[0]
-        short_channel_len = x.shape[1]
-        short_width = x.shape[2]
-
-        long_channel_len = short_channel_len // self.upscale_factor
-        long_width = self.upscale_factor * short_width
-
-        x = x.contiguous().view([batch_size, self.upscale_factor, long_channel_len, short_width])
-        x = x.permute(0, 2, 3, 1).contiguous()
-        x = x.view(batch_size, long_channel_len, long_width)
-
-        return x
-
-
-class PixelUnshuffle1D(torch.nn.Module):
-    """
-    Inverse of 1D pixel shuffler
-    Upscales channel length, downscales sample length
-    "long" is input, "short" is output
-    """
-
-    def __init__(self, downscale_factor):
-        super(PixelUnshuffle1D, self).__init__()
-        self.downscale_factor = downscale_factor
-
-    def forward(self, x):
-        batch_size = x.shape[0]
-        long_channel_len = x.shape[1]
-        long_width = x.shape[2]
-
-        short_channel_len = long_channel_len * self.downscale_factor
-        short_width = long_width // self.downscale_factor
-
-        x = x.contiguous().view([batch_size, long_channel_len, short_width, self.downscale_factor])
-        x = x.permute(0, 3, 1, 2).contiguous()
-        x = x.view([batch_size, short_channel_len, short_width])
-        return x
 
 
 def rescale_conv(conv, reference):
@@ -144,7 +74,7 @@ class Demucs(nn.Module):
                  glu=True,
                  rescale=0.1,
                  floor=1e-3,
-                 scale_factor=2):
+                 scale_factor=1):
 
         super().__init__()
         if resample not in [1, 2, 4]:
@@ -192,11 +122,6 @@ class Demucs(nn.Module):
         if rescale:
             rescale_module(self, reference=rescale)
 
-        self.upsample = nn.Sequential(nn.Conv1d(1, self.scale_factor, 3, 1),
-                                       PixelShuffle1D(self.scale_factor), nn.ReLU()) # subpixel layer
-        # self.upsample = nn.Sequential(nn.ConvTranspose1d(1, 1, 3, 2), nn.ReLU())
-        self.downsample = nn.Sequential(nn.Conv1d(1,1,3,2), nn.ReLU())
-
     def valid_length(self, length):
         """
         Return the nearest valid length to use with the model so that
@@ -206,13 +131,13 @@ class Demucs(nn.Module):
         If the mixture has a valid length, the estimated sources
         will have exactly the same length.
         """
-        length = math.ceil(length * self.resample)
+        length = math.ceil(length / self.scale_factor * self.resample)
         for idx in range(self.depth):
             length = math.ceil((length - self.kernel_size) / self.stride) + 1
             length = max(length, 1)
         for idx in range(self.depth):
             length = (length - 1) * self.stride + self.kernel_size
-        length = int(math.ceil(length / self.resample))
+        length = int(math.ceil(length / self.resample * self.scale_factor))
         return int(length)
 
     @property
@@ -248,30 +173,33 @@ class Demucs(nn.Module):
             skip = skips.pop(-1)
             x = x + skip[..., :x.shape[-1]]
             x = decode(x)
-        if self.resample == 2:
-            # x = downsample2(x) # when upsampling from 8k to 16k, this is commented out
-            pass
-        elif self.resample == 4:
-            # x = downsample2(x) # TODO: change this to learnable module
-            # logger.info(f"size before downsampling: {x.size()}")
-            x = self.downsample(x)
-            # logger.info(f"size after downsampling: {x.size()}")
-            # x = downsample2(x) # when upsampling from 8k to 16k, this is commented out
-        else:
-            # logger.info(f"size before upsampling: {x.size()}")
-            # x = upsample2(x)  # TODO: change this to learnable module
-                              # when upsampling from 8k to 16k, added this
-            x = self.upsample(x)
-            # logger.info(f"size after upsampling: {x.size()}")
-        # logger.info(f"length*2: {length*2}")
-        if x.size(-1) < length*2:
-            # logger.info(f"padding with {length * 2 - x.size(-1)} zeros")
-            pad = ConstantPad1d((0,length*2-x.size(-1)),0)
+        if self.scale_factor == 1:
+            if self.resample == 2:
+                x = downsample2(x)
+            elif self.resample == 4:
+                x = downsample2(x)
+                x = downsample2(x)
+            else:
+                pass
+        elif self.scale_factor == 2:
+            if self.resample == 4:
+                x = downsample2(x)
+            else:
+                pass
+        elif self.scale_factor == 4:
+            if self.resample == 1:
+                x = upsample2(x)
+                x = upsample2(x)
+            elif self.resample == 2:
+                x = upsample2(x)
+            else:
+                pass
+        trim_length = length*self.scale_factor
+        if x.size(-1) < trim_length:
+            pad = ConstantPad1d((0, trim_length-x.size(-1)), 0)
             x = pad(x)
-        elif x.size(-1) > length*2:
-            # logger.info(f"end size: {x.size()},trimming to {length*2}")
-            x = x[..., :length*2]  # when upsampling from 8k to 16k, added this
-        # logger.info(f"final size: {x.size()}")
+        elif x.size(-1) > trim_length:
+            x = x[..., :trim_length]
         return std * x
 
 
@@ -285,11 +213,11 @@ def fast_conv(conv, x):
     assert batch == 1
     if kernel == 1:
         x = x.view(chin, length)
-        out = th.addmm(conv.bias.view(-1, 1),
+        out = torch.addmm(conv.bias.view(-1, 1),
                        conv.weight.view(chout, chin), x)
     elif length == kernel:
         x = x.view(chin * kernel, 1)
-        out = th.addmm(conv.bias.view(-1, 1),
+        out = torch.addmm(conv.bias.view(-1, 1),
                        conv.weight.view(chout, chin * kernel), x)
     else:
         out = conv(x)
@@ -329,13 +257,13 @@ class DemucsStreamer:
         self.frame_length = demucs.valid_length(1) + demucs.total_stride * (num_frames - 1)
         self.total_length = self.frame_length + self.resample_lookahead
         self.stride = demucs.total_stride * num_frames
-        self.resample_in = th.zeros(demucs.chin, resample_buffer, device=device)
-        self.resample_out = th.zeros(demucs.chin, resample_buffer, device=device)
+        self.resample_in = torch.zeros(demucs.chin, resample_buffer, device=device)
+        self.resample_out = torch.zeros(demucs.chin, resample_buffer, device=device)
 
         self.frames = 0
         self.total_time = 0
         self.variance = 0
-        self.pending = th.zeros(demucs.chin, 0, device=device)
+        self.pending = torch.zeros(demucs.chin, 0, device=device)
 
         bias = demucs.decoder[0][2].bias
         weight = demucs.decoder[0][2].weight
@@ -357,7 +285,7 @@ class DemucsStreamer:
         when you have no more input and want to get back the last chunk of audio.
         """
         pending_length = self.pending.shape[1]
-        padding = th.zeros(self.demucs.chin, self.total_length, device=self.pending.device)
+        padding = torch.zeros(self.demucs.chin, self.total_length, device=self.pending.device)
         out = self.feed(padding)
         return out[:, :pending_length]
 
@@ -378,7 +306,7 @@ class DemucsStreamer:
         if chin != demucs.chin:
             raise ValueError(f"Expected {demucs.chin} channels, got {chin}")
 
-        self.pending = th.cat([self.pending, wav], dim=1)
+        self.pending = torch.cat([self.pending, wav], dim=1)
         outs = []
         while self.pending.shape[1] >= self.total_length:
             self.frames += 1
@@ -389,7 +317,7 @@ class DemucsStreamer:
                 variance = (mono**2).mean()
                 self.variance = variance / self.frames + (1 - 1 / self.frames) * self.variance
                 frame = frame / (demucs.floor + math.sqrt(self.variance))
-            padded_frame = th.cat([self.resample_in, frame], dim=-1)
+            padded_frame = torch.cat([self.resample_in, frame], dim=-1)
             self.resample_in[:] = frame[:, stride - resample_buffer:stride]
             frame = padded_frame
 
@@ -401,7 +329,7 @@ class DemucsStreamer:
             frame = frame[:, :resample * self.frame_length]  # remove extra samples after window
 
             out, extra = self._separate_frame(frame)
-            padded_out = th.cat([self.resample_out, out, extra], 1)
+            padded_out = torch.cat([self.resample_out, out, extra], 1)
             self.resample_out[:] = out[:, -resample_buffer:]
             if resample == 4:
                 # out = downsample2(downsample2(padded_out)) # when upsampling from 8k to 16k, commented out
@@ -424,9 +352,9 @@ class DemucsStreamer:
 
         self.total_time += time.time() - begin
         if outs:
-            out = th.cat(outs, 1)
+            out = torch.cat(outs, 1)
         else:
-            out = th.zeros(chin, 0, device=wav.device)
+            out = torch.zeros(chin, 0, device=wav.device)
         return out
 
     def _separate_frame(self, frame):
@@ -457,7 +385,7 @@ class DemucsStreamer:
                 x = fast_conv(encode[2], x)
                 x = encode[3](x)
                 if not first:
-                    x = th.cat([prev, x], -1)
+                    x = torch.cat([prev, x], -1)
                 next_state.append(x)
             skips.append(x)
 
@@ -512,27 +440,27 @@ def test():
     parser.add_argument("-f", "--num_frames", type=int, default=1)
     args = parser.parse_args()
     if args.num_threads:
-        th.set_num_threads(args.num_threads)
+        torch.set_num_threads(args.num_threads)
     sr = args.sample_rate
     sr_ms = sr / 1000
     demucs = Demucs(depth=args.depth, hidden=args.hidden, resample=args.resample).to(args.device)
-    x = th.randn(1, int(sr * 4)).to(args.device)
+    x = torch.randn(1, int(sr * 4)).to(args.device)
     out = demucs(x[None])[0]
     streamer = DemucsStreamer(demucs, num_frames=args.num_frames)
     out_rt = []
     frame_size = streamer.total_length
-    with th.no_grad():
+    with torch.no_grad():
         while x.shape[1] > 0:
             out_rt.append(streamer.feed(x[:, :frame_size]))
             x = x[:, frame_size:]
             frame_size = streamer.demucs.total_stride
     out_rt.append(streamer.flush())
-    out_rt = th.cat(out_rt, 1)
+    out_rt = torch.cat(out_rt, 1)
     model_size = sum(p.numel() for p in demucs.parameters()) * 4 / 2**20
     initial_lag = streamer.total_length / sr_ms
     tpf = 1000 * streamer.time_per_frame
     print(f"model size: {model_size:.1f}MB, ", end='')
-    print(f"delta batch/streaming: {th.norm(out - out_rt) / th.norm(out):.2%}")
+    print(f"delta batch/streaming: {torch.norm(out - out_rt) / torch.norm(out):.2%}")
     print(f"initial lag: {initial_lag:.1f}ms, ", end='')
     print(f"stride: {streamer.stride * args.num_frames / sr_ms:.1f}ms")
     print(f"time per frame: {tpf:.1f}ms, ", end='')

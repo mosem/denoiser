@@ -8,18 +8,20 @@
 
 python train.py \
   dset=valentini \
-  model=caunet \
+  model=demucs \
   bandmask=0 \
-  remix=1 \
+  remix=0 \
   shift=0 \
   shift_same=True \
   stft_loss=True \
   segment=2 \
   stride=2 \
   ddp=0 \
-  batch_size=6 \
-  epochs=100 \
+  batch_size=16 \
+  epochs=1 \
   sample_rate=16000 \
+  scale_factor=2 \
   adversarial_mode=False \
-  dummy='caunet-debug' \
+  eval_every=1 \
+  dummy='refactoring-debug' \
 

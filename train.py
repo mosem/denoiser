@@ -55,16 +55,16 @@ def run(args):
     kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(
-        args.dset.train, length=length, stride=stride, pad=args.pad, upsampled=args.upsampled, **kwargs)
+        args.dset.train, length=length, stride=stride, pad=args.pad, scale_factor=args.scale_factor, **kwargs)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
-        cv_dataset = NoisyCleanSet(args.dset.valid, upsampled=args.upsampled, **kwargs)
+        cv_dataset = NoisyCleanSet(args.dset.valid, scale_factor=args.scale_factor, **kwargs)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         cv_loader = None
     if args.dset.test:
-        tt_dataset = NoisyCleanSet(args.dset.test, upsampled=args.upsampled, **kwargs)
+        tt_dataset = NoisyCleanSet(args.dset.test, scale_factor=args.scale_factor, **kwargs)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         tt_loader = None

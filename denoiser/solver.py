@@ -7,6 +7,7 @@
 
 import json
 import logging
+import math
 from pathlib import Path
 import os
 import time
@@ -59,15 +60,17 @@ class Solver(object):
 
         # data augment
         augments = []
+        sources_sample_rate = math.ceil(args.sample_rate / args.scale_factor)
         if args.remix:
             augments.append(augment.Remix())
         if args.bandmask:
-            augments.append(augment.BandMask(args.bandmask, sample_rate=args.sample_rate))
+            augments.append(augment.BandMask(args.bandmask, source_sample_rate=sources_sample_rate,
+                                             target_sample_rate=args.sample_rate))
         if args.shift:
-            augments.append(augment.Shift(args.shift, args.shift_same))
+            augments.append(augment.Shift(args.shift, args.shift_same, args.scale_factor))
         if args.revecho:
             augments.append(
-                augment.RevEcho(args.revecho))
+                augment.RevEcho(args.revecho, target_sample_rate=args.sample_rate, scale_factor=args.scale_factor))
         self.augment = MultipleInputsSequential(*augments)
 
         # Training config
@@ -250,6 +253,27 @@ class Solver(object):
                     self._serialize()
                     logger.debug("Checkpoint saved to %s", self.checkpoint_file.resolve())
 
+
+    def augment_data(self, noisy, clean):
+        if self.args.scale_factor == 1:
+            sources = torch.stack([noisy - clean, clean])
+        elif self.args.scale_factor == 2:
+            noisy_downsampled = downsample2(noisy)
+            clean_downsampled=  downsample2(clean)
+            noise = noisy_downsampled - clean_downsampled
+            sources = torch.stack([noise, clean_downsampled])
+        elif self.args.scale_factor == 4:
+            noisy_downsampled = downsample2(noisy)
+            noisy_downsampled = downsample2(noisy_downsampled)
+            clean_downsampled = downsample2(clean)
+            clean_downsampled = downsample2(clean_downsampled)
+            noise = noisy_downsampled - clean_downsampled
+            sources = torch.stack([noise, clean_downsampled])
+        sources, target = self.augment(sources, clean)
+        source_noise, source_clean = sources
+        source_noisy = source_noise + source_clean
+        return source_noisy, target
+
     def _run_one_epoch(self, epoch, cross_valid=False):
         total_loss = 0
         total_G_loss = 0
@@ -265,24 +289,14 @@ class Solver(object):
         for i, (noisy, clean) in enumerate(logprog):
             if self.args.model == "caunet":
                 noisy = self.signalPreProcessor(noisy)
-            # if self.args.model == 'seanet':
-            #     tmp = self.signalPreProcessor(noisy)
-            #     noisy = self.framesToSignal(tmp)
             noisy = noisy.to(self.device)
             clean = clean.to(self.device)
 
-            # logger.info(f"tmp shape:{tmp.shape}")
-            # logger.info(f"noisy shape:{noisy.shape}")
-            # logger.info(f"clean shape:{clean.shape}")
-            # clean_downsampled = downsample2(clean) if self.args.upsampled else clean
-            # if not cross_valid:
-            #     # logger.info(f"noisy shape:{noisy.shape}")
-            #     # logger.info(f"clean shape:{clean.shape}")
-            #     # logger.info(f"clean downsampled shape:{clean_downsampled.shape}")
-            #     sources = torch.stack([noisy - clean_downsampled, clean_downsampled])
-            #     sources, clean = self.augment(sources, clean)
-            #     noise, clean_downsampled = sources
-            #     noisy = noise + clean_downsampled
+            if not cross_valid:
+                # logger.info(f"noisy shape:{noisy.shape}")
+                # logger.info(f"clean shape:{clean.shape}")
+                # logger.info(f"clean downsampled shape:{clean_downsampled.shape}")
+                noisy, clean = self.augment_data(noisy, clean)
 
             # with torch.autograd.profiler.profile(use_cuda=True, profile_memory=True) as prof:
             estimate = self.dmodel(noisy)

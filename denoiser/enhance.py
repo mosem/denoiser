@@ -6,6 +6,7 @@
 # author: adiyoss
 
 import argparse
+import math
 from concurrent.futures import ProcessPoolExecutor
 import json
 import logging
@@ -108,8 +109,8 @@ def get_dataset(args):
 
 def _estimate_and_save(model, noisy_signals, filenames, out_dir, args):
     estimate = get_estimate(model, noisy_signals, args)
-    enhanced_sr = args.sample_rate * 2 if args.upsampled else args.sample_rate
-    save_wavs(estimate, noisy_signals, filenames, out_dir, noisy_sr=args.sample_rate, enhanced_sr=enhanced_sr)
+    noisy_sr = math.ceil(args.sample_rate / args.scale_factor)
+    save_wavs(estimate, noisy_signals, filenames, out_dir, noisy_sr=noisy_sr, enhanced_sr=args.sample_rate)
 
 
 def enhance(args, model=None, local_out_dir=None):
@@ -145,8 +146,8 @@ def enhance(args, model=None, local_out_dir=None):
             else:
                 # Forward
                 estimate = get_estimate(model, noisy_signals, args)
-                enhanced_sr = args.sample_rate * 2 if args.upsampled else args.sample_rate
-                save_wavs(estimate, noisy_signals, filenames, out_dir, noisy_sr=args.sample_rate, enhanced_sr=enhanced_sr)
+                noisy_sr = math.ceil(args.sample_rate / args.scale_factor)
+                save_wavs(estimate, noisy_signals, filenames, out_dir, noisy_sr=noisy_sr, enhanced_sr=args.sample_rate)
 
         if pendings:
             print('Waiting for pending jobs...')

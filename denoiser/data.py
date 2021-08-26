@@ -14,6 +14,7 @@ from os import path
 import torchaudio
 
 from .audio import Audioset
+from .resample import  downsample2
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ def match_files(noisy, clean, matching="sort"):
 
 class NoisyCleanSet:
     def __init__(self, json_dir, matching="sort", length=None, stride=None,
-                 pad=True, sample_rate=None, upsampled=False):
+                 pad=True, sample_rate=None, scale_factor=1):
         """__init__.
 
         :param json_dir: directory containing both clean.json and noisy.json
@@ -81,6 +82,7 @@ class NoisyCleanSet:
         :param pad: pad the end of the sequence with zeros
         :param sample_rate: the signals sampling rate
         """
+        self.scale_factor = scale_factor
         noisy_json = os.path.join(json_dir, 'noisy.json')
         clean_json = os.path.join(json_dir, 'clean.json')
         with open(noisy_json, 'r') as f:
@@ -90,28 +92,20 @@ class NoisyCleanSet:
 
         match_files(noisy, clean, matching)
         kw = {'length': length, 'stride': stride, 'pad': pad}
-        clean_set_sample_rate = sample_rate*2 if upsampled else sample_rate
-        self.clean_set = Audioset(clean, sample_rate=clean_set_sample_rate, upsampled=upsampled, **kw)
+        self.clean_set = Audioset(clean, sample_rate=sample_rate, **kw)
         self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw)
 
-        # logger.info(f"clean set size: {len(self.clean_set)}. noisy set size: {len(self.noisy_set)}. upsampled? {upsampled}. clean_set_sample_rate: {clean_set_sample_rate}, sample rate: {sample_rate} ")
-
-        assert len(self.clean_set) == len(self.noisy_set) # added scalar multiply for upsampling from 8k to 16k
+        assert len(self.clean_set) == len(self.noisy_set)
 
     def __getitem__(self, index):
-        # logger.info(f"index:{index}")
-        # logger.info(f"clean size:{self.clean_set[index].shape}")
-        # logger.info(f"noisy size:{self.noisy_set[index].shape}")
         noisy, clean = self.noisy_set[index], self.clean_set[index]
-
-        # output_dir = '/vol/ep/mm/speech_enhancement/denoiser/test_data'
-        # noisy_filename = output_dir + '/' + str(index) + '_noisy.wav'
-        # clean_filename = output_dir + '/' + str(index) + '_clean.wav'
-        #
-        # if index == 2 and not path.isfile(noisy_filename):
-        #     torchaudio.save(noisy_filename,  noisy.cpu(), 8000)
-        #     torchaudio.save(clean_filename,  clean.cpu(), 16000)
-        #     logger.info(f"index:{index}. Saving noisy and clean audio files.")
+        if self.scale_factor == 2:
+            noisy = downsample2(noisy)
+        elif self.scale_factor == 4:
+            noisy = downsample2(noisy)
+            noisy = downsample2(noisy)
+        elif self.scale_factor != 1:
+            raise RuntimeError(f"Scale factor should be 1, 2, or 4")
 
         return noisy, clean
 
