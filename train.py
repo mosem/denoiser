@@ -28,9 +28,9 @@ def run(args):
     distrib.init(args)
 
     if args.model == "demucs":
-        model = Demucs(**args.demucs)
+        model = Demucs(**args.demucs, scale_factor=args.scale_factor)
     elif args.model == "seanet":
-        model = Seanet(**args.seanet)
+        model = Seanet(**args.seanet, scale_factor=args.scale_factor)
     elif args.model == "caunet":
         model = Caunet(**args.caunet)
     discriminator = Discriminator(args.num_D, args.ndf, args.n_layers_D, args.discriminator_downsampling_rate) if args.adversarial_mode else None
@@ -51,7 +51,7 @@ def run(args):
     stride = int(args.stride * args.sample_rate)
     # Demucs requires a specific number of samples to avoid 0 padding during training
     if hasattr(model, 'valid_length'):
-        length = model.valid_length(length)
+        length = model.valid_length(int(length/args.scale_factor))
     kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(

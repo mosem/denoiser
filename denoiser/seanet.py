@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import torch
 # from librosa.filters import mel as librosa_mel_fn
 from torch.nn.utils import weight_norm
+from torch.nn import ConstantPad1d
 import numpy as np
 import math
 
@@ -52,17 +53,19 @@ class Seanet(nn.Module):
 
     @capture_init
     def __init__(self,
-                 latent_space_size,
-                 ngf, n_residual_layers,
+                 latent_space_size=128,
+                 ngf=32, n_residual_layers=3,
                  resample=1,
                  normalize=True,
                  floor=1e-3,
-                 ratios =[8, 8, 2, 2]):
+                 ratios =[8, 8, 2, 2],
+                 scale_factor=1):
         super().__init__()
 
         self.resample = resample
         self.normalize = normalize
         self.floor = floor
+        self.scale_factor = scale_factor
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -148,6 +151,7 @@ class Seanet(nn.Module):
         If the mixture has a valid length, the estimated sources
         will have exactly the same length.
         """
+        length = math.ceil(length * self.scale_factor)
         length = math.ceil(length * self.resample)
         depth = len(self.ratios)
         for idx in range(depth - 1, -1, -1):
@@ -181,6 +185,12 @@ class Seanet(nn.Module):
         # logger.info(f"valid length: {self.valid_length(length)}, original length: {length}")
         # logger.info(f"original signal length is {length}, padded to {x.shape[-1]}")
 
+        if self.scale_factor == 2:
+            x = upsample2(x)
+        elif self.scale_factor == 4:
+            x = upsample2(x)
+            x = upsample2(x)
+
         if self.resample == 2:
             x = upsample2(x)
         skips = []
@@ -194,8 +204,14 @@ class Seanet(nn.Module):
             skip = skips.pop(-1)[..., :x.shape[-1]]
             # logger.info(f"extracted signal {j} with length {skip.size()}. decoder output size: {x.size()}")
             x = x + skip
-        trim_length = length*self.resample
-        x = x[..., :trim_length]
+        if self.resample == 2:
+            x = downsample2(x)
+        trim_length = length * self.scale_factor
+        if x.size(-1) < trim_length:
+            pad = ConstantPad1d((0, trim_length - x.size(-1)), 0)
+            x = pad(x)
+        elif x.size(-1) > trim_length:
+            x = x[..., :trim_length]
         return std * x
 
 

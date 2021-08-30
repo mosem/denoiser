@@ -131,13 +131,14 @@ class Demucs(nn.Module):
         If the mixture has a valid length, the estimated sources
         will have exactly the same length.
         """
-        length = math.ceil(length / self.scale_factor * self.resample)
+        length = math.ceil(length * self.scale_factor)
+        length = math.ceil(length * self.resample)
         for idx in range(self.depth):
             length = math.ceil((length - self.kernel_size) / self.stride) + 1
             length = max(length, 1)
         for idx in range(self.depth):
             length = (length - 1) * self.stride + self.kernel_size
-        length = int(math.ceil(length / self.resample * self.scale_factor))
+        length = int(math.ceil(length / self.resample))
         return int(length)
 
     @property
@@ -157,6 +158,13 @@ class Demucs(nn.Module):
         length = mix.shape[-1]
         x = mix
         x = F.pad(x, (0, self.valid_length(length) - length))
+
+        if self.scale_factor == 2:
+            x = upsample2(x)
+        elif self.scale_factor == 4:
+            x = upsample2(x)
+            x = upsample2(x)
+
         if self.resample == 2:
             x = upsample2(x)
         elif self.resample == 4:
@@ -173,27 +181,13 @@ class Demucs(nn.Module):
             skip = skips.pop(-1)
             x = x + skip[..., :x.shape[-1]]
             x = decode(x)
-        if self.scale_factor == 1:
-            if self.resample == 2:
-                x = downsample2(x)
-            elif self.resample == 4:
-                x = downsample2(x)
-                x = downsample2(x)
-            else:
-                pass
-        elif self.scale_factor == 2:
-            if self.resample == 4:
-                x = downsample2(x)
-            else:
-                pass
-        elif self.scale_factor == 4:
-            if self.resample == 1:
-                x = upsample2(x)
-                x = upsample2(x)
-            elif self.resample == 2:
-                x = upsample2(x)
-            else:
-                pass
+        if self.resample == 2:
+            x = downsample2(x)
+        elif self.resample == 4:
+            x = downsample2(x)
+            x = downsample2(x)
+        else:
+            pass
         trim_length = length*self.scale_factor
         if x.size(-1) < trim_length:
             pad = ConstantPad1d((0, trim_length-x.size(-1)), 0)

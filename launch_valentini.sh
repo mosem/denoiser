@@ -8,7 +8,7 @@
 
 python train.py \
   dset=valentini \
-  model=demucs \
+  model=seanet \
   bandmask=0 \
   remix=0 \
   shift=0 \
@@ -17,10 +17,12 @@ python train.py \
   segment=2 \
   stride=2 \
   ddp=0 \
-  batch_size=16 \
+  batch_size=8 \
   epochs=1 \
   sample_rate=16000 \
   scale_factor=2 \
+  seanet.resample=1 \
+  restart=True \
   adversarial_mode=False \
   eval_every=1 \
   dummy='refactoring-debug' \

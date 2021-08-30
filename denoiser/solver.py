@@ -53,10 +53,6 @@ class Solver(object):
         if args.model == "caunet":
             self.signalPreProcessor = TorchSignalToFrames(frame_size=args.frame_size,
                                                           frame_shift=args.frame_shift)
-        if args.model == "seanet":
-            self.signalPreProcessor = TorchSignalToFrames(frame_size=args.frame_size,
-                                                          frame_shift=args.frame_shift)
-            self.framesToSignal = TorchOLA()
 
         # data augment
         augments = []
@@ -181,42 +177,39 @@ class Solver(object):
             start = time.time()
             logger.info('-' * 70)
             logger.info("Training...")
+            losses = self._run_one_epoch(epoch)
             if self.args.adversarial_mode:
-                train_loss, discriminator_loss = self._run_one_epoch(epoch)
                 logger.info(
                     bold(f'Train Summary | End of Epoch {epoch + 1} | '
-                         f'Time {time.time() - start:.2f}s | Train Loss {train_loss:.5f} | Discrim. Loss {discriminator_loss:.5f}'))
+                         f'Time {time.time() - start:.2f}s | Train Loss {losses["model"]:.5f} | Discrim. Loss {losses["discriminator"]:.5f}'))
             else:
-                train_loss, _ = self._run_one_epoch(epoch)
                 logger.info(
                     bold(f'Train Summary | End of Epoch {epoch + 1} | '
-                         f'Time {time.time() - start:.2f}s | Train Loss {train_loss:.5f}'))
+                         f'Time {time.time() - start:.2f}s | Train Loss {losses["model"]:.5f}'))
 
             if self.cv_loader:
                 # Cross validation
                 logger.info('-' * 70)
                 logger.info('Cross validation...')
                 self.model.eval()
+                with torch.no_grad():
+                    losses = self._run_one_epoch(epoch, cross_valid=True)
                 if self.args.adversarial_mode:
-                    with torch.no_grad():
-                        valid_loss, discriminator_loss = self._run_one_epoch(epoch, cross_valid=True)
                     logger.info(
                         bold(f'Valid Summary | End of Epoch {epoch + 1} | '
-                             f'Time {time.time() - start:.2f}s | Valid Loss {valid_loss:.5f} | Discrim. Loss {discriminator_loss:.5f}'))
+                             f'Time {time.time() - start:.2f}s | Valid Loss {losses["model"]:.5f} | Discrim. Loss {losses["discriminator"]:.5f}'))
                 else:
-                    with torch.no_grad():
-                        valid_loss, _ = self._run_one_epoch(epoch, cross_valid=True)
                     logger.info(
                         bold(f'Valid Summary | End of Epoch {epoch + 1} | '
-                             f'Time {time.time() - start:.2f}s | Valid Loss {valid_loss:.5f}'))
+                             f'Time {time.time() - start:.2f}s | Valid Loss {losses["model"]:.5f}'))
             else:
                 valid_loss = 0
 
             best_loss = min(pull_metric(self.history, 'valid') + [valid_loss])
             if self.args.adversarial_mode:
-                metrics = {'train': train_loss, 'discriminator': discriminator_loss, 'valid': valid_loss, 'best': best_loss}
+                metrics = {'train': losses["model"], 'discriminator': losses["discriminator"], 'valid': valid_loss, 'best': best_loss}
             else:
-                metrics = {'train': train_loss, 'valid': valid_loss, 'best': best_loss}
+                metrics = {'train': losses["model"], 'valid': valid_loss, 'best': best_loss}
             # Save the best model
             if valid_loss == best_loss:
                 logger.info(bold('New best valid loss %.4f'), valid_loss)
@@ -256,19 +249,14 @@ class Solver(object):
 
     def augment_data(self, noisy, clean):
         if self.args.scale_factor == 1:
-            sources = torch.stack([noisy - clean, clean])
+            clean_downsampled = clean
         elif self.args.scale_factor == 2:
-            noisy_downsampled = downsample2(noisy)
             clean_downsampled=  downsample2(clean)
-            noise = noisy_downsampled - clean_downsampled
-            sources = torch.stack([noise, clean_downsampled])
         elif self.args.scale_factor == 4:
-            noisy_downsampled = downsample2(noisy)
-            noisy_downsampled = downsample2(noisy_downsampled)
             clean_downsampled = downsample2(clean)
             clean_downsampled = downsample2(clean_downsampled)
-            noise = noisy_downsampled - clean_downsampled
-            sources = torch.stack([noise, clean_downsampled])
+        noise = noisy - clean_downsampled
+        sources = torch.stack([noise, clean_downsampled])
         sources, target = self.augment(sources, clean)
         source_noise, source_clean = sources
         source_noisy = source_noise + source_clean
@@ -276,7 +264,6 @@ class Solver(object):
 
     def _run_one_epoch(self, epoch, cross_valid=False):
         total_loss = 0
-        total_G_loss = 0
         total_D_loss = 0
         data_loader = self.tr_loader if not cross_valid else self.cv_loader
 
@@ -291,7 +278,6 @@ class Solver(object):
                 noisy = self.signalPreProcessor(noisy)
             noisy = noisy.to(self.device)
             clean = clean.to(self.device)
-
             if not cross_valid:
                 # logger.info(f"noisy shape:{noisy.shape}")
                 # logger.info(f"clean shape:{clean.shape}")
@@ -308,23 +294,22 @@ class Solver(object):
             # logger.info(f"clean_downsampled shape:{clean_downsampled.shape}")
             # apply a loss function after each layer
             if self.args.adversarial_mode:
-                loss_G, loss_D = self.get_adversarial_losses(clean, estimate, cross_valid)
-                total_G_loss += loss_G.item()
-                total_D_loss += loss_D.item()
-                logprog.update(loss_G=format(total_G_loss / (i + 1), ".5f"), loss_D=format(total_D_loss / (i + 1), ".5f"))
+                generator_loss, discriminator_loss = self.get_adversarial_losses(clean, estimate, cross_valid)
+                total_loss += generator_loss.item()
+                total_D_loss += discriminator_loss.item()
+                logprog.update(loss=format(total_loss / (i + 1), ".5f"), discriminator_loss=format(total_D_loss / (i + 1), ".5f"))
                 # Just in case, clear some memory
-                del loss_G, loss_D, estimate
+                del generator_loss, discriminator_loss, estimate
             else:
                 loss = self.get_loss(clean, estimate, cross_valid)
-
                 total_loss += loss.item()
                 logprog.update(loss=format(total_loss / (i + 1), ".5f"))
                 # Just in case, clear some memory
                 del loss, estimate
+        losses = {'model': distrib.average([total_loss / (i + 1)], i + 1)[0]}
         if self.args.adversarial_mode:
-            return distrib.average([total_G_loss / (i + 1)], i + 1)[0], distrib.average([total_D_loss / (i + 1)], i + 1)[0]
-        else:
-            return distrib.average([total_loss / (i + 1)], i + 1)[0], None
+            losses['discriminator'] = distrib.average([total_D_loss / (i + 1)], i + 1)[0]
+        return losses
 
 
     def get_loss(self, clean, estimate, cross_valid):
@@ -356,10 +341,10 @@ class Solver(object):
 
         loss_D = 0
         for scale in disc_fake_detached:
-            loss_D += F.relu(1+ scale[-1]).mean() # TODO: check is this is a mean over time domain or batch domain
+            loss_D += F.relu(1+ scale[-1]).mean() # TODO: check if this is a mean over time domain or batch domain
 
         for scale in disc_real:
-            loss_D += F.relu(1-scale[-1]).mean()  # TODO: check is this is a mean over time domain or batch domain
+            loss_D += F.relu(1-scale[-1]).mean()  # TODO: check if this is a mean over time domain or batch domain
 
 
         if not cross_valid:
@@ -373,7 +358,7 @@ class Solver(object):
 
         loss_G = 0
         for scale in disc_fake:
-            loss_G += F.relu(1-scale[-1]).mean()  # TODO: check is this is a mean over time domain or batch domain
+            loss_G += F.relu(1-scale[-1]).mean()  # TODO: check if this is a mean over time domain or batch domain
 
         loss_feat = 0
         feat_weights = 4.0 / (self.args.n_layers_D + 1)
