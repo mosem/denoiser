@@ -153,7 +153,7 @@ class BandMask(nn.Module):
     (https://arxiv.org/pdf/1904.08779.pdf) but over the waveform.
     """
 
-    def __init__(self, maxwidth=0.2, bands=120, source_sample_rate=16_000, target_sample_rate=16_000):
+    def __init__(self, maxwidth=0.2, bands=120, scale_factor=1, target_sample_rate=16_000):
         """__init__.
 
         :param maxwidth: the maximum width to remove
@@ -163,7 +163,7 @@ class BandMask(nn.Module):
         super().__init__()
         self.maxwidth = maxwidth
         self.bands = bands
-        self.source_sample_rate = source_sample_rate
+        self.source_sample_rate = math.ceil(target_sample_rate / scale_factor)
         self.target_sample_rate = target_sample_rate
 
     def forward(self, sources, target):
@@ -177,8 +177,9 @@ class BandMask(nn.Module):
         # band pass filtering
         sources_out = sources - sources_midlow + sources_low
 
-        targets_mels = dsp.mel_frequencies(bands, 40, self.target_sample_rate / 2) / self.target_sample_rate
-        targets_low, targets_midlow = filters(targets_mels)
+        target_mels = dsp.mel_frequencies(bands, 40, self.target_sample_rate / 2) / self.target_sample_rate
+        target_filters = dsp.LowPassFilters([target_mels[low], target_mels[high]]).to(sources.device)
+        targets_low, targets_midlow = target_filters(target)
         target_out = target - targets_midlow + targets_low
         out = sources_out, target_out
 

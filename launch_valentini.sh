@@ -8,11 +8,7 @@
 
 python train.py \
   dset=valentini \
-  model=seanet \
-  bandmask=0 \
-  remix=0 \
-  shift=0 \
-  shift_same=True \
+  model=caunet \
   stft_loss=True \
   segment=2 \
   stride=2 \
@@ -21,9 +17,7 @@ python train.py \
   epochs=1 \
   sample_rate=16000 \
   scale_factor=2 \
-  seanet.resample=1 \
   restart=True \
-  adversarial_mode=False \
   eval_every=1 \
   dummy='refactoring-debug' \
 

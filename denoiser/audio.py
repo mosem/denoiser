@@ -23,7 +23,7 @@ def get_info(path):
     info = torchaudio.info(path)
     if hasattr(info, 'num_frames'):
         # new version of torchaudio
-        return Info(info.num_frames, info.source_sample_rate, info.num_channels)
+        return Info(info.num_frames, info.sample_rate, info.num_channels)
     else:
         siginfo = info[0]
         return Info(siginfo.length // siginfo.channels, siginfo.rate, siginfo.channels)

@@ -58,9 +58,6 @@ group.add_argument("--noisy_json", type=str, default=None,
 
 
 def get_estimate(model, noisy, args):
-    if args.model == "caunet":
-        signalConverter = TorchSignalToFrames(args.frame_size, args.frame_shift)
-        noisy = signalConverter(noisy)
     torch.set_num_threads(1)
     if args.streaming:
         streamer = DemucsStreamer(model, dry=args.dry)

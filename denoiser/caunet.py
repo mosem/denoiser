@@ -3,8 +3,10 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 import numpy as np
-from .preprocess import TorchOLA
+from .preprocess import TorchSignalToFrames, TorchOLA
 from .Dual_Transformer import Dual_Transformer
+
+from .resample import downsample2, upsample2
 
 
 from .utils import capture_init
@@ -87,7 +89,7 @@ class DenseBlock(nn.Module):
 class Caunet(nn.Module):
 
     @capture_init
-    def __init__(self, L=512, width=64):
+    def __init__(self, L=512, width=64, frame_size=512, frame_shift=256, scale_factor=1):
         super(Caunet, self).__init__()
         self.L = L
         self.frame_shift = self.L // 2
@@ -103,6 +105,10 @@ class Caunet(nn.Module):
         self.pad = nn.ConstantPad2d((1, 1, 1, 0), value=0.)
         self.pad1 = nn.ConstantPad2d((1, 1, 0, 0), value=0.)
         self.width = width
+        self.scale_factor = scale_factor
+
+        self.signalPreProcessor = TorchSignalToFrames(frame_size=frame_size,
+                                                      frame_shift=frame_shift)
 
         self.inp_conv = nn.Conv2d(in_channels=self.in_channels, out_channels=self.width, kernel_size=(1, 1))  # [b, 64, nframes, 512]
         self.inp_norm = nn.LayerNorm(512)
@@ -155,8 +161,16 @@ class Caunet(nn.Module):
         self.ola = TorchOLA(self.frame_shift)
 
     def forward(self, x):
+        if self.scale_factor == 2:
+            x = upsample2(x)
+        elif self.scale_factor == 4:
+            x = upsample2(x)
+            x = upsample2(x)
+
         enc_list = []
-        out = self.inp_prelu(self.inp_norm(self.inp_conv(x)))
+        out = self.signalPreProcessor(x)
+
+        out = self.inp_prelu(self.inp_norm(self.inp_conv(out)))
 
         out = self.enc_dense1(out)
         out = self.enc_prelu1(self.enc_norm1(self.enc_conv1(self.pad1(out))))

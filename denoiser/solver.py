@@ -21,7 +21,7 @@ from .enhance import enhance
 from .evaluate import evaluate
 from .stft_loss import MultiResolutionSTFTLoss
 from .utils import bold, copy_state, pull_metric, serialize_model, swap_state, LogProgress
-from .resample import downsample2
+from .resample import downsample2, upsample2
 from .preprocess import  TorchSignalToFrames, TorchOLA
 
 logger = logging.getLogger(__name__)
@@ -51,23 +51,22 @@ class Solver(object):
             self.dDisc = distrib.wrap(disc)
 
         if args.model == "caunet":
-            self.signalPreProcessor = TorchSignalToFrames(frame_size=args.frame_size,
-                                                          frame_shift=args.frame_shift)
+            self.signalPreProcessor = TorchSignalToFrames(frame_size=args.caunet.frame_size,
+                                                          frame_shift=args.caunet.frame_shift)
 
         # data augment
         augments = []
-        sources_sample_rate = math.ceil(args.sample_rate / args.scale_factor)
         if args.remix:
             augments.append(augment.Remix())
         if args.bandmask:
-            augments.append(augment.BandMask(args.bandmask, source_sample_rate=sources_sample_rate,
+            augments.append(augment.BandMask(args.bandmask, scale_factor=args.scale_factor,
                                              target_sample_rate=args.sample_rate))
         if args.shift:
             augments.append(augment.Shift(args.shift, args.shift_same, args.scale_factor))
         if args.revecho:
             augments.append(
                 augment.RevEcho(args.revecho, target_sample_rate=args.sample_rate, scale_factor=args.scale_factor))
-        self.augment = MultipleInputsSequential(*augments)
+        self.augment = MultipleInputsSequential(*augments) if augments else None
 
         # Training config
         self.device = args.device
@@ -274,11 +273,9 @@ class Solver(object):
         name = label + f" | Epoch {epoch + 1}"
         logprog = LogProgress(logger, data_loader, updates=self.num_prints, name=name)
         for i, (noisy, clean) in enumerate(logprog):
-            if self.args.model == "caunet":
-                noisy = self.signalPreProcessor(noisy)
             noisy = noisy.to(self.device)
             clean = clean.to(self.device)
-            if not cross_valid:
+            if not cross_valid and self.augment:
                 # logger.info(f"noisy shape:{noisy.shape}")
                 # logger.info(f"clean shape:{clean.shape}")
                 # logger.info(f"clean downsampled shape:{clean_downsampled.shape}")

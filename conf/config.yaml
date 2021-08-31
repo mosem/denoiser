@@ -94,8 +94,8 @@ seanet:
 caunet:
   L: 512
   width: 64
-frame_size: 512
-frame_shift: 256
+  frame_size: 512
+  frame_shift: 256
 
 
 # Experiment launching, distributed
