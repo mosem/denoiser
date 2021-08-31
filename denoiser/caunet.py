@@ -110,32 +110,32 @@ class Caunet(nn.Module):
         self.signalPreProcessor = TorchSignalToFrames(frame_size=frame_size,
                                                       frame_shift=frame_shift)
 
-        self.inp_conv = nn.Conv2d(in_channels=self.in_channels, out_channels=self.width, kernel_size=(1, 1))  # [b, 64, nframes, 512]
+        self.inp_conv = nn.Conv2d(in_channels=self.in_channels, out_channels=self.width, kernel_size=(1, 1))  # [b, width, nframes, 512]
         self.inp_norm = nn.LayerNorm(512)
         self.inp_prelu = nn.PReLU(self.width)
 
         self.enc_dense1 = DenseBlock(512, 3, self.width)
-        self.enc_conv1 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=(1, 3), stride=(1, 2))  # [b, 64, nframes, 256]
+        self.enc_conv1 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=(1, 3), stride=(1, 2))  # [b, width, nframes, 256]
         self.enc_norm1 = nn.LayerNorm(256)
         self.enc_prelu1 = nn.PReLU(self.width)
 
         self.enc_dense2 = DenseBlock(256, 3, self.width)
-        self.enc_conv2 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=(1, 3), stride=(1, 2))  # [b, 64, nframes, 128]
+        self.enc_conv2 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=(1, 3), stride=(1, 2))  # [b, width, nframes, 128]
         self.enc_norm2 = nn.LayerNorm(128)
         self.enc_prelu2 = nn.PReLU(self.width)
 
         self.enc_dense3 = DenseBlock(128, 3, self.width)
-        self.enc_conv3 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=(1, 3), stride=(1, 2))  # [b, 64, nframes, 64]
+        self.enc_conv3 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=(1, 3), stride=(1, 2))  # [b, width, nframes, 64]
         self.enc_norm3 = nn.LayerNorm(64)
         self.enc_prelu3 = nn.PReLU(self.width)
 
 
         self.enc_dense4 = DenseBlock(64, 3, self.width)
-        self.enc_conv4 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=(1, 3), stride=(1, 2))  # [b, 64, nframes, 32]
+        self.enc_conv4 = nn.Conv2d(in_channels=self.width, out_channels=self.width, kernel_size=(1, 3), stride=(1, 2))  # [b, width, nframes, 32]
         self.enc_norm4 = nn.LayerNorm(32)
         self.enc_prelu4 = nn.PReLU(self.width)
 
-        self.dual_transformer = Dual_Transformer(64, 64, nhead=4, num_layers=6)   # [b, 64, nframes, 8]
+        self.dual_transformer = Dual_Transformer(self.width, self.width, nhead=4, num_layers=6)   # [b, width, nframes, 8]
 
         self.dec_dense4 = DenseBlock(32, 3, self.width)
         self.dec_conv4 = SPConvTranspose2d(in_channels=self.width * 2, out_channels=self.width, kernel_size=(1, 3), r=2)

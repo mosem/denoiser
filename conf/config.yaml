@@ -12,14 +12,6 @@ pad: true   # if training sample is too short, pad it
 scale_factor: 1
 upsampled: false # if upsampling from input dataset to target dataset
 
-# Discriminator related
-adversarial_mode: False
-n_layers_D: 4
-num_D: 3
-discriminator_downsampling_rate: 4
-ndf: 16
-lambda_feat: 100
-
 # Dataset Augmentation
 remix: false   # remix noise and clean
 bandmask: 0.   # drop at most this fraction of freqs in mel scale
@@ -96,6 +88,15 @@ caunet:
   width: 64
   frame_size: 512
   frame_shift: 256
+
+
+# Discriminator related
+adversarial_mode: False
+n_layers_D: 4
+num_D: 3
+discriminator_downsampling_rate: 4
+ndf: 16
+lambda_feat: 100
 
 
 # Experiment launching, distributed

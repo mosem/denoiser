@@ -8,12 +8,14 @@
 
 python train.py \
   dset=valentini \
-  model=caunet \
+  model=seanet \
+  seanet.ngf=16 \
+  adversarial_mode=True \
   stft_loss=True \
   segment=2 \
   stride=2 \
   ddp=0 \
-  batch_size=8 \
+  batch_size=16 \
   epochs=1 \
   sample_rate=16000 \
   scale_factor=2 \
