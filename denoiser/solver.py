@@ -50,10 +50,6 @@ class Solver(object):
         if self.disc is not None:
             self.dDisc = distrib.wrap(disc)
 
-        if args.model == "caunet":
-            self.signalPreProcessor = TorchSignalToFrames(frame_size=args.caunet.frame_size,
-                                                          frame_shift=args.caunet.frame_shift)
-
         # data augment
         augments = []
         if args.remix:
@@ -276,19 +272,10 @@ class Solver(object):
             noisy = noisy.to(self.device)
             clean = clean.to(self.device)
             if not cross_valid and self.augment:
-                # logger.info(f"noisy shape:{noisy.shape}")
-                # logger.info(f"clean shape:{clean.shape}")
-                # logger.info(f"clean downsampled shape:{clean_downsampled.shape}")
                 noisy, clean = self.augment_data(noisy, clean)
 
-            # with torch.autograd.profiler.profile(use_cuda=True, profile_memory=True) as prof:
             estimate = self.dmodel(noisy)
-            # logger.info(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=10))
 
-            # logger.info(f"estimate shape:{estimate.shape}")
-            # logger.info(f"noisy shape:{noisy.shape}")
-            # logger.info(f"clean shape:{clean.shape}")
-            # logger.info(f"clean_downsampled shape:{clean_downsampled.shape}")
             # apply a loss function after each layer
             if self.args.adversarial_mode:
                 generator_loss, discriminator_loss = self.get_adversarial_losses(clean, estimate, cross_valid)
