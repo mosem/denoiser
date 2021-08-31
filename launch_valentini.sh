@@ -8,16 +8,16 @@
 
 python train.py \
   dset=valentini \
-  model=demucs \
+  model=seanet \
+  seanet.ngf=16 \
+  adversarial_mode=True \
   stft_loss=True \
   segment=2 \
   stride=2 \
   ddp=0 \
   batch_size=16 \
-  epochs=1 \
+  epochs=100 \
   sample_rate=16000 \
-  scale_factor=4 \
-  restart=True \
-  eval_every=1 \
-  dummy='refactoring-debug' \
+  scale_factor=2 \
+  dummy='seanet-laplacian-discriminators' \
 

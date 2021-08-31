@@ -274,8 +274,11 @@ class Discriminator(nn.Module):
     def forward(self, x):
         results = []
         for key, disc in self.model.items():
-            results.append(disc(x))
-            x = self.downsample(x)
+            downsampled_x = downsample2(x)
+            tmp = x - upsample2(downsampled_x)
+            results.append(disc(tmp))
+            x = downsampled_x
+            # x = self.downsample(x)
         return results
 
 
