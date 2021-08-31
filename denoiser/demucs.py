@@ -17,9 +17,6 @@ from .modules import BLSTM
 from .resample import downsample2, upsample2
 from .utils import capture_init
 
-import logging
-logger = logging.getLogger(__name__)
-
 
 def rescale_conv(conv, reference):
     std = conv.weight.std().detach()

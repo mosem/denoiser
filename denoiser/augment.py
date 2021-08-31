@@ -13,9 +13,6 @@ from .resample import downsample2
 
 from . import dsp
 
-import logging
-logger = logging.getLogger(__name__)
-
 class Remix(nn.Module):
     """Remix.
     Mixes different noises with clean speech within a given batch
@@ -27,7 +24,6 @@ class Remix(nn.Module):
         device = noise.device
         perm = th.argsort(th.rand(bs, device=device), dim=0)
         out = th.stack([noise[perm], clean_source]), target
-        # logger.info(f"Remix: output size: {out[0].size()}, {out[1].size()}")
         return out
 
 
@@ -142,7 +138,6 @@ class RevEcho(nn.Module):
         noise += (1 - self.keep_clean) * reverb_clean_downsampled
 
         out = th.stack([noise, clean_source]), clean
-        # logger.info(f"Reverb: output size: {out[0].size()}, {out[1].size()}")
         return out
 
 
@@ -182,8 +177,6 @@ class BandMask(nn.Module):
         targets_low, targets_midlow = target_filters(target)
         target_out = target - targets_midlow + targets_low
         out = sources_out, target_out
-
-        # logger.info(f"Bandmask: output size: {out[0].size()}, {out[1].size()}")
         return out
 
 
@@ -223,5 +216,4 @@ class Shift(nn.Module):
                 target_indexes = th.arange(target_length, device=target.device)
                 target = target.gather(2, target_indexes + target_offsets)
         out = sources, target
-        # logger.info(f"Shift: output size: {out[0].size()}, {out[1].size()}")
         return out

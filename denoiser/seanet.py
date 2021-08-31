@@ -11,10 +11,6 @@ from .resample import downsample2, upsample2
 
 from .utils import capture_init
 
-import logging
-
-logger = logging.getLogger(__name__)
-
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -182,9 +178,6 @@ class Seanet(nn.Module):
         x = mix
         x = F.pad(x, (0, self.valid_length(length) - length))
 
-        # logger.info(f"valid length: {self.valid_length(length)}, original length: {length}")
-        # logger.info(f"original signal length is {length}, padded to {x.shape[-1]}")
-
         if self.scale_factor == 2:
             x = upsample2(x)
         elif self.scale_factor == 4:
@@ -195,14 +188,11 @@ class Seanet(nn.Module):
             x = upsample2(x)
         skips = []
         for i,encode in enumerate(self.encoder):
-            # logger.info(f"inserting signal {i} with length {x.size()}")
             skips.append(x)
             x = encode(x)
-            # logger.info(f"encoder output size: {x.size()}")
         for j,decode in enumerate(self.decoder):
             x = decode(x)
             skip = skips.pop(-1)[..., :x.shape[-1]]
-            # logger.info(f"extracted signal {j} with length {skip.size()}. decoder output size: {x.size()}")
             x = x + skip
         if self.resample == 2:
             x = downsample2(x)
