@@ -263,6 +263,7 @@ class Discriminator(nn.Module):
     def __init__(self, num_D, ndf, n_layers, downsampling_factor):
         super().__init__()
         self.model = nn.ModuleDict()
+        self.num_D = num_D
         for i in range(num_D):
             self.model[f"disc_{i}"] = NLayerDiscriminator(
                 ndf, n_layers, downsampling_factor
@@ -273,12 +274,17 @@ class Discriminator(nn.Module):
 
     def forward(self, x):
         results = []
-        for key, disc in self.model.items():
-            downsampled_x = downsample2(x)
-            tmp = x - upsample2(downsampled_x)
-            results.append(disc(tmp))
-            x = downsampled_x
-            # x = self.downsample(x)
+        for i ,(key, disc) in enumerate(self.model.items()):
+            if i == 0: # insert total frequency range
+                results.append(disc(x))
+            elif i == self.num_D-1: # insert 0 - total frequency range / 2^num_D
+                downsampled_x = downsample2(x)
+                results.append(disc(downsampled_x))
+            else: # insert total frequency range / 2^i - total_freqency_range/2^i-1
+                downsampled_x = downsample2(x)
+                laplacian = x - upsample2(downsampled_x)
+                results.append(disc(laplacian))
+                x = downsampled_x
         return results
 
 
