@@ -280,7 +280,7 @@ class Discriminator(nn.Module):
             elif i == self.num_D-1: # insert 0 - total frequency range / 2^num_D
                 downsampled_x = downsample2(x)
                 results.append(disc(downsampled_x))
-            else: # insert total frequency range / 2^i - total_freqency_range/2^i-1
+            else: # insert total_frequency_range / 2^i - total_frequency_range/2^(i-1)
                 downsampled_x = downsample2(x)
                 laplacian = x - upsample2(downsampled_x)
                 results.append(disc(laplacian))

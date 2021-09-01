@@ -19,7 +19,7 @@ import torchaudio
 from .audio import Audioset, find_audio_files
 from . import distrib, pretrained
 from .demucs import DemucsStreamer
-from .preprocess import TorchSignalToFrames
+from .resample import downsample2, upsample2
 
 from .utils import LogProgress
 
@@ -135,6 +135,13 @@ def enhance(args, model=None, local_out_dir=None):
         for data in iterator:
             # Get batch data
             noisy_signals, filenames = data
+
+            if args.scale_factor == 2:
+                noisy_signals = downsample2(noisy_signals)
+            elif args.scale_factor == 4:
+                noisy_signals = downsample2(noisy_signals)
+                noisy_signals = downsample2(noisy_signals)
+
             noisy_signals = noisy_signals.to(args.device)
             if args.device == 'cpu' and args.num_workers > 1:
                 pendings.append(
