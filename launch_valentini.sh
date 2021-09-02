@@ -9,7 +9,7 @@
 python train.py \
   dset=valentini \
   demucs.causal=1 \
-  demucs.hidden=24 \
+  demucs.hidden=48 \
   bandmask=0.2 \
   demucs.resample=4 \
   remix=1 \
@@ -18,6 +18,5 @@ python train.py \
   stft_loss=True \
   segment=4.5 \
   stride=0.5 \
-  ddp=0 \
-  batch_size=32
+  ddp=1
 

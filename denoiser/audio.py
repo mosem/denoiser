@@ -12,6 +12,7 @@ import math
 import os
 import sys
 
+import librosa
 import torchaudio
 from torch.nn import functional as F
 
@@ -48,7 +49,7 @@ def find_audio_files(path, exts=[".wav"], progress=True):
 
 class Audioset:
     def __init__(self, files=None, length=None, stride=None,
-                 pad=True, with_path=False, sample_rate=None, upsampled = False):
+                 pad=True, with_path=False, sample_rate=None, nb_sample_rate=None):
         """
         files should be a list [(file, length)]
         """
@@ -58,10 +59,8 @@ class Audioset:
         self.stride = stride or length
         self.with_path = with_path
         self.sample_rate = sample_rate
-        self.upsampled = upsampled
+        self.nb_sample_rate = nb_sample_rate
         for file, file_length in self.files:
-            if upsampled:
-                file_length = math.ceil(file_length/2)
             if length is None:
                 examples = 1
             elif file_length < length:
@@ -85,8 +84,6 @@ class Audioset:
             if self.length is not None:
                 offset = self.stride * index
                 num_frames = self.length
-                if self.upsampled:
-                    num_frames *= 2
             if torchaudio.get_audio_backend() in ['soundfile', 'sox_io']:
                 out, sr = torchaudio.load(str(file),
                                           frame_offset=offset,
@@ -97,6 +94,11 @@ class Audioset:
                 if sr != self.sample_rate:
                     raise RuntimeError(f"Expected {file} to have sample rate of "
                                        f"{self.sample_rate}, but got {sr}")
+
+            if self.nb_sample_rate is not None and self.nb_sample_rate < self.sample_rate:
+                if num_frames:
+                    num_frames = int(num_frames * self.nb_sample_rate / self.sample_rate)
+                out = torchaudio.transforms.F.resample(out, self.sample_rate, self.nb_sample_rate)
             if num_frames:
                 out = F.pad(out, (0, num_frames - out.shape[-1]))
             if self.with_path:
@@ -106,7 +108,22 @@ class Audioset:
 
 
 if __name__ == "__main__":
-    meta = []
-    for path in sys.argv[1:]:
-        meta += find_audio_files(path)
-    json.dump(meta, sys.stdout, indent=4)
+    # meta = []
+    # for path in sys.argv[1:]:
+    #     meta += find_audio_files(path)
+    # json.dump(meta, sys.stdout, indent=4)
+
+    clean = "C:/ortal1602/demucs/dataset/debug/clean"
+    noisy = "C:/ortal1602/demucs/dataset/debug/noisy"
+
+    dirs = ["../egs/debug/tr", "../egs/debug/tt", "../egs/debug/cv"]
+    meta = find_audio_files(clean)
+    for d in dirs:
+        os.makedirs(d, exist_ok=True)
+        with open(f"{d}/clean.json", "w") as f:
+            f.write(json.dumps(meta, indent=4))
+
+    meta = find_audio_files(noisy)
+    for d in dirs:
+        with open(f"{d}/noisy.json", "w") as f:
+            f.write(json.dumps(meta, indent=4))

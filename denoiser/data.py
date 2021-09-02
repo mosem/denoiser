@@ -9,6 +9,8 @@ import json
 import logging
 import os
 import re
+import numpy as np
+import torch
 
 from .audio import Audioset
 
@@ -49,7 +51,7 @@ def match_dns(noisy, clean):
     noisy += extra_noisy
 
 
-def match_files(noisy, clean, matching="sort"):
+def match_files(fnames: dict, matching="sort"):
     """match_files.
     Sort files to match noisy and clean filenames.
     :param noisy: list of the noisy filenames
@@ -58,17 +60,18 @@ def match_files(noisy, clean, matching="sort"):
     """
     if matching == "dns":
         # dns dataset filenames don't match when sorted, we have to manually match them
+        noisy, clean = fnames[0], fnames[1]
         match_dns(noisy, clean)
     elif matching == "sort":
-        noisy.sort()
-        clean.sort()
+        for x in fnames.values():
+            x.sort()
     else:
         raise ValueError(f"Invalid value for matching {matching}")
 
 
 class NoisyCleanSet:
     def __init__(self, json_dir, matching="sort", length=None, stride=None,
-                 pad=True, sample_rate=None):
+                 pad=True, sample_rate=None, include_features=False, nb_sample_rate=None):
         """__init__.
 
         :param json_dir: directory containing both clean.json and noisy.json
@@ -80,23 +83,42 @@ class NoisyCleanSet:
         """
         noisy_json = os.path.join(json_dir, 'noisy.json')
         clean_json = os.path.join(json_dir, 'clean.json')
+
+        # add support for features
+        features_json = f"{json_dir}/features.json"
+
+        fnames = dict()
         with open(noisy_json, 'r') as f:
-            noisy = json.load(f)
+            fnames['noisy'] = json.load(f)
+            # noisy = json.load(f)
         with open(clean_json, 'r') as f:
-            clean = json.load(f)
+            fnames['clean'] = json.load(f)
+            # clean = json.load(f)
 
-        match_files(noisy, clean, matching)
-        kw = {'length': length, 'stride': stride, 'pad': pad}
-        self.clean_set = Audioset(clean, sample_rate=sample_rate*2, upsampled=True, **kw)
-        self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw)
+        # TODO add support for features and high-res clean
+        if include_features:
+            if not os.path.exists(features_json):
+                raise ValueError("missing features.json file")
+            with open(features_json, 'r') as f:
+                fnames['features'] = json.load(f)
 
-        logger.info(f"args:{kw}")
-        logger.info(f"clean set size:{len(self.clean_set)}")
-        logger.info(f"noisy set size:{len(self.noisy_set)}")
+        match_files(fnames, matching)
+        kw = {'length': length, 'stride': stride, 'pad': pad, 'sample_rate': sample_rate}
+        # self.clean_set = Audioset(clean, **kw)
+        # self.noisy_set = Audioset(noisy, **kw)
+        self.clean_set = Audioset(fnames['clean'], **kw)
+        kw = {'length': length, 'stride': stride, 'pad': pad, 'sample_rate': sample_rate, 'nb_sample_rate': nb_sample_rate}
+        self.noisy_set = Audioset(fnames['noisy'], **kw)
+        if include_features:
+            self.features = fnames['features']
+        self.include_features = include_features
 
-        assert len(self.clean_set) == len(self.noisy_set) # added scalar multiply for upsampling from 8k to 16k
+        if nb_sample_rate is None or nb_sample_rate == sample_rate:
+            assert len(self.clean_set) == len(self.noisy_set)
 
     def __getitem__(self, index):
+        if self.include_features:
+            return self.noisy_set[index], self.clean_set[index], torch.load(self.features[index])
         return self.noisy_set[index], self.clean_set[index]
 
     def __len__(self):

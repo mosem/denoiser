@@ -5,13 +5,14 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # authors: adiyoss and adefossez
-
+import itertools
 import logging
 import os
 
 import hydra
 
 from denoiser.executor import start_ddp_workers
+from gan_models import MelGenerator, HifiMultiScaleDiscriminator, HifiMultiPeriodDiscriminator
 
 logger = logging.getLogger(__name__)
 
@@ -24,17 +25,29 @@ def run(args):
     from denoiser.demucs import Demucs
     from denoiser.solver import Solver
     distrib.init(args)
+    options = {'demucs': [Demucs], 'hifi': [MelGenerator, HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator]}
+    models = list()
+    k = args.model
+    for i, cls in enumerate(options[k]):
+        if i == 0:
+            attributes = getattr(args, k)
+            if args.model == 'hifi':
+                models.append(cls(attributes))
+            else:
+                models.append(cls(**attributes))
+        else:
+            models.append(cls())
 
-    model = Demucs(**args.demucs)
 
     if args.show:
-        logger.info(model)
-        mb = sum(p.numel() for p in model.parameters()) * 4 / 2**20
-        logger.info('Size: %.1f MB', mb)
-        if hasattr(model, 'valid_length'):
-            field = model.valid_length(1)
-            logger.info('Field: %.1f ms', field / args.sample_rate * 1000)
-        return
+        for model in models:
+            logger.info(model)
+            mb = sum(p.numel() for p in model.parameters()) * 4 / 2**20
+            logger.info('Size: %.1f MB', mb)
+            if hasattr(model, 'valid_length'):
+                field = model.valid_length(1)
+                logger.info('Field: %.1f ms', field / args.sample_rate * 1000)
+            return
 
     assert args.batch_size % distrib.world_size == 0
     args.batch_size //= distrib.world_size
@@ -42,9 +55,11 @@ def run(args):
     length = int(args.segment * args.sample_rate)
     stride = int(args.stride * args.sample_rate)
     # Demucs requires a specific number of samples to avoid 0 padding during training
-    if hasattr(model, 'valid_length'):
-        length = model.valid_length(length)
-    kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
+    if hasattr(models[0], 'valid_length'):
+        length = models[0].valid_length(length)
+    # kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
+    kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate,
+              "include_features": args.include_features, "nb_sample_rate": args.nb_sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(
         args.dset.train, length=length, stride=stride, pad=args.pad, **kwargs)
@@ -65,17 +80,24 @@ def run(args):
     # torch also initialize cuda seed if available
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
-        model.cuda()
+        for model in models:
+            model.cuda()
 
     # optimizer
     if args.optim == "adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, args.beta2))
+        if args.model == 'demucs':
+            optimizers = optimizer = torch.optim.Adam(models[0].parameters(), lr=args.lr, betas=(0.9, args.beta2))
+        elif args.model == 'hifi':
+            optimizers = [torch.optim.AdamW(models[0].parameters(), lr=args.lr, betas=(args.beta1, args.beta2)),
+                          torch.optim.AdamW(models[1].parameters(),
+                          # torch.optim.AdamW(itertools.chain(models[1].parameters(), models[2].parameters()),
+                          lr=args.lr, betas=(args.beta1, args.beta2))]
     else:
         logger.fatal('Invalid optimizer %s', args.optim)
         os._exit(1)
 
     # Construct Solver
-    solver = Solver(data, model, optimizer, args)
+    solver = Solver(data, models, optimizers, args)
     solver.train()
 
 

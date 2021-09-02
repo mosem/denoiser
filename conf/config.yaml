@@ -5,9 +5,13 @@ defaults:
 
 # Dataset related
 sample_rate: 16000
-segment: 4
+#wb_sample_rate: 16000
+nb_sample_rate: 8000
+segment: 1
 stride: 1    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
+include_features: false
+include_wb_clean: false
 
 # Dataset Augmentation
 remix: false   # remix noise and clean
@@ -49,16 +53,17 @@ streaming: False  # use streaming evaluation for Demucs
 # Optimization related
 optim: adam
 lr: 3e-4
+beta1: 0.8
 beta2: 0.999
 loss: l1
 stft_loss: False
 stft_sc_factor: .5
 stft_mag_factor: .5
 epochs: 400
-batch_size: 64
+batch_size: 16
 
 # Models
-model: demucs # either demucs or dwave
+model: hifi # either demucs or dwave
 demucs:
   chin: 1
   chout: 1
@@ -73,6 +78,22 @@ demucs:
   resample: 4
   growth: 2
   rescale: 0.1
+
+# hifi gan cfgs
+hifi:
+  resblock: 1
+  upsample_rates: [8,8,2,2]
+  upsample_kernel_sizes: [16,16,4,4]
+  upsample_initial_channel: 128
+  resblock_kernel_sizes: [3,7,11]
+  resblock_dilation_sizes: [[1,3,5], [1,3,5], [1,3,5]]
+
+n_fft: 1024
+n_mels: 80
+hop_size: 256
+win_size: 1024
+with_spec: True
+
 
 # Experiment launching, distributed
 ddp: false

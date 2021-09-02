@@ -183,15 +183,12 @@ class Demucs(nn.Module):
             x = x + skip[..., :x.shape[-1]]
             x = decode(x)
         if self.resample == 2:
-            # x = downsample2(x) # when upsampling from 8k to 16k, this is commented out
-            pass
+            x = downsample2(x)
         elif self.resample == 4:
             x = downsample2(x)
-            # x = downsample2(x) # when upsampling from 8k to 16k, this is commented out
-        else:
-            x = upsample2(x)  # when upsampling from 8k to 16k, added this
+            x = downsample2(x)
 
-        x = x[..., :length*2]  # when upsampling from 8k to 16k, added this
+        x = x[..., :length]
         return std * x
 
 
@@ -324,14 +321,11 @@ class DemucsStreamer:
             padded_out = th.cat([self.resample_out, out, extra], 1)
             self.resample_out[:] = out[:, -resample_buffer:]
             if resample == 4:
-                # out = downsample2(downsample2(padded_out)) # when upsampling from 8k to 16k, commented out
-                out = downsample2(padded_out) # and added this
+                out = downsample2(downsample2(padded_out))
             elif resample == 2:
-                # out = downsample2(padded_out) # when upsampling from 8k to 16k, commented out
-                out = padded_out # and added this
+                out = downsample2(padded_out)
             else:
-                # out = padded_out # when upsampling from 8k to 16k, commented out
-                out = upsample2(padded_out) # and added this
+                out = padded_out
 
             out = out[:, resample_buffer // resample:]
             out = out[:, :stride]
