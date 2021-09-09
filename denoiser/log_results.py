@@ -2,7 +2,6 @@ import json
 import os
 import argparse
 import sys
-from decimal import *
 
 import pandas as pd
 import torchaudio
@@ -75,7 +74,6 @@ def calc_results_histogram(results_df, args):
         df = pd.read_csv(out_path)
         return df
 
-    getcontext().prec = 2
     logger.info('calculating histogram...')
     results_histogram_df = pd.DataFrame(columns=['range', 'avg pesq', 'avg stoi'])
     bin_indices, bins = pd.cut(results_df['snr'], n_bins, labels=False, retbins=True, right=False)
