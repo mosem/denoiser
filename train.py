@@ -35,7 +35,11 @@ def run(args):
         model = Seanet(**args.seanet, scale_factor=args.scale_factor)
     elif args.model == "caunet":
         model = Caunet(**args.caunet, scale_factor=args.scale_factor)
-    discriminator = Discriminator(args.num_D, args.ndf, args.n_layers_D, args.discriminator_downsampling_rate) if args.adversarial_mode else None
+    if args.adversarial_mode:
+        discriminator = LaplacianDiscriminator(**args.discriminator) if args.laplacian \
+            else Discriminator(**args.discriminator)
+    else:
+        discriminator = None
 
     if args.show:
         logger.info(model)

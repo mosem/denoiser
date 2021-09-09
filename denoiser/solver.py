@@ -345,11 +345,11 @@ class Solver(object):
             loss_G += F.relu(1-scale[-1]).mean()  # TODO: check if this is a mean over time domain or batch domain
 
         loss_feat = 0
-        feat_weights = 4.0 / (self.args.n_layers_D + 1)
-        D_weights = 1.0 / self.args.num_D
+        feat_weights = 4.0 / (self.args.discriminator.n_layers + 1)
+        D_weights = 1.0 / self.args.discriminator.num_D
         wt = D_weights * feat_weights
 
-        for i in range(self.args.num_D):
+        for i in range(self.args.discriminator.num_D):
             for j in range(len(disc_fake[i]) -1):
                 loss_feat += wt * F.l1_loss(disc_fake[i][j], disc_real[i][j].detach())
 

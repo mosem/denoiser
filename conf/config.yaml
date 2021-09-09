@@ -4,7 +4,7 @@ defaults:
   - hydra/hydra_logging: colorlog
 
 # Dataset related
-sample_rate: 8000 # target sample rate
+sample_rate: 16000 # target sample rate
 segment: 4
 stride: 1    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
@@ -57,7 +57,7 @@ loss: l1
 stft_loss: False
 stft_sc_factor: .5
 stft_mag_factor: .5
-epochs: 400
+epochs: 100
 batch_size: 64
 
 # Models
@@ -92,11 +92,14 @@ caunet:
 
 # Discriminator related
 adversarial_mode: False
-n_layers_D: 4
-num_D: 3
-discriminator_downsampling_rate: 4
-ndf: 16
+laplacian: False
 lambda_feat: 100
+discriminator:
+  n_layers: 4
+  num_D: 3
+  downsampling_factor: 4
+  ndf: 16
+
 
 
 # Experiment launching, distributed

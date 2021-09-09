@@ -8,14 +8,17 @@
 
 python train.py \
   dset=valentini \
-  model=demucs \
+  model=seanet \
+  seanet.ngf=16 \
+  adversarial_mode=True \
+  laplacian=True \
+  discriminator.num_D=4 \
+  discriminator.ndf=16 \
   stft_loss=True \
   segment=2 \
   stride=2 \
   ddp=0 \
   batch_size=16 \
-  epochs=100 \
-  sample_rate=16000 \
   scale_factor=2 \
-  dummy='caunet-2' \
+  dummy='laplacian-5' \
 
