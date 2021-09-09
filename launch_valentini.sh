@@ -20,5 +20,5 @@ python train.py \
   epochs=100 \
   sample_rate=16000 \
   scale_factor=2 \
-  dummy='seanet-laplacian-discriminators-2' \
+  dummy='seanet-laplacian-discriminators-3' \
 

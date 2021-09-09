@@ -22,9 +22,10 @@ def run(args):
     from denoiser import distrib
     from denoiser.data import NoisyCleanSet
     from denoiser.demucs import Demucs
-    from denoiser.seanet import Seanet, Discriminator
+    from denoiser.seanet import Seanet
     from denoiser.caunet import Caunet
     from denoiser.solver import Solver
+    from denoiser.modules import Discriminator, LaplacianDiscriminator
     distrib.init(args)
 
     if args.model == "demucs":
