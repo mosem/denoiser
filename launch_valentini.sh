@@ -8,10 +8,7 @@
 
 python train.py \
   dset=valentini \
-  model=seanet \
-  seanet.ngf=16 \
-  adversarial_mode=True \
-  num_D=4 \
+  model=demucs \
   stft_loss=True \
   segment=2 \
   stride=2 \
@@ -20,5 +17,5 @@ python train.py \
   epochs=100 \
   sample_rate=16000 \
   scale_factor=2 \
-  dummy='seanet-laplacian-discriminators-3' \
+  dummy='caunet-2' \
 

@@ -189,12 +189,12 @@ class Seanet(nn.Module):
             x = x + skip
         if self.resample == 2:
             x = downsample2(x)
-        trim_length = length * self.scale_factor
-        if x.size(-1) < trim_length:
-            pad = ConstantPad1d((0, trim_length - x.size(-1)), 0)
+        target_length = length * self.scale_factor if self.target_length is None else self.target_length
+        if x.size(-1) < target_length:
+            pad = ConstantPad1d((0, target_length - x.size(-1)), 0)
             x = pad(x)
-        elif x.size(-1) > trim_length:
-            x = x[..., :trim_length]
+        elif x.size(-1) > target_length:
+            x = x[..., :target_length]
         return std * x
 
 

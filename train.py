@@ -7,6 +7,7 @@
 # authors: adiyoss and adefossez
 
 import logging
+import math
 import os
 
 import hydra
@@ -52,7 +53,8 @@ def run(args):
     stride = int(args.stride * args.sample_rate)
     # Demucs requires a specific number of samples to avoid 0 padding during training
     if hasattr(model, 'valid_length'):
-        length = model.valid_length(int(length/args.scale_factor))
+        length = model.valid_length(math.ceil(length/args.scale_factor))
+    model.target_length = length
     kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(
