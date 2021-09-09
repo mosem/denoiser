@@ -72,7 +72,7 @@ def match_files(noisy, clean, matching="sort"):
 
 class NoisyCleanSet:
     def __init__(self, json_dir, matching="sort", length=None, stride=None,
-                 pad=True, sample_rate=None, scale_factor=1):
+                 pad=True, sample_rate=None, scale_factor=1, with_path=False):
         """__init__.
 
         :param json_dir: directory containing both clean.json and noisy.json
@@ -83,6 +83,7 @@ class NoisyCleanSet:
         :param sample_rate: the signals sampling rate
         """
         self.scale_factor = scale_factor
+        self.with_path = with_path
         noisy_json = os.path.join(json_dir, 'noisy.json')
         clean_json = os.path.join(json_dir, 'clean.json')
         with open(noisy_json, 'r') as f:
@@ -91,7 +92,7 @@ class NoisyCleanSet:
             clean = json.load(f)
 
         match_files(noisy, clean, matching)
-        kw = {'length': length, 'stride': stride, 'pad': pad}
+        kw = {'length': length, 'stride': stride, 'pad': pad, 'with_path': with_path}
         self.clean_set = Audioset(clean, sample_rate=sample_rate, **kw)
         self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw)
 
