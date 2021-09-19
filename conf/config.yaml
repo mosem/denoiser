@@ -6,11 +6,8 @@ defaults:
 # Dataset related
 sample_rate: 16000 # target sample rate
 segment: 4
-
 stride: 1    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
-include_features: false
-include_wb_clean: false
 
 scale_factor: 1
 upsampled: false # if upsampling from input dataset to target dataset
@@ -55,13 +52,11 @@ streaming: False  # use streaming evaluation for Demucs
 # Optimization related
 optim: adam
 lr: 3e-4
-beta1: 0.8
 beta2: 0.999
 loss: l1
 stft_loss: False
 stft_sc_factor: .5
 stft_mag_factor: .5
-
 epochs: 100
 batch_size: 64
 
@@ -109,6 +104,7 @@ hifi:
   l1_factor: 45
   gen_factor: 2
 
+
 demucs2embedded:  # used in demucs_hifi for embedded dim creation. (also with asr conditioning)
   sample_rate: 16000 # dummy - alter this in batch_solver
   slice_rate: 20e-3
@@ -125,6 +121,7 @@ discriminator:
   num_D: 3
   downsampling_factor: 4
   ndf: 16
+
 
 
 # Experiment launching, distributed
