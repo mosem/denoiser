@@ -8,15 +8,18 @@
 
 python train.py \
   dset=valentini \
-  demucs.causal=1 \
-  demucs.hidden=48 \
-  bandmask=0.2 \
-  demucs.resample=4 \
-  remix=1 \
-  shift=8000 \
-  shift_same=True \
+
+  model=seanet \
+  seanet.ngf=16 \
+  adversarial_mode=True \
+  laplacian=True \
+  discriminator.num_D=4 \
+  discriminator.ndf=16 \
   stft_loss=True \
-  segment=4.5 \
-  stride=0.5 \
-  ddp=1
+  segment=2 \
+  stride=2 \
+  ddp=0 \
+  batch_size=16 \
+  scale_factor=2 \
+  dummy='laplacian-5' \
 

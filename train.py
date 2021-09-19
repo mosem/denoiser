@@ -7,6 +7,7 @@
 # authors: adiyoss and adefossez
 import itertools
 import logging
+import math
 import os
 
 import hydra
@@ -23,7 +24,10 @@ def run(args):
     from denoiser import distrib
     from denoiser.data import NoisyCleanSet
     from denoiser.demucs import Demucs
+    from denoiser.seanet import Seanet
+    from denoiser.caunet import Caunet
     from denoiser.solver import Solver
+    from denoiser.modules import Discriminator, LaplacianDiscriminator
     distrib.init(args)
     options = {'demucs': [Demucs], 'hifi': [MelGenerator, HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator]}
     models = list()
@@ -38,6 +42,17 @@ def run(args):
         else:
             models.append(cls())
 
+    if args.model == "demucs":
+        model = Demucs(**args.demucs, scale_factor=args.scale_factor)
+    elif args.model == "seanet":
+        model = Seanet(**args.seanet, scale_factor=args.scale_factor)
+    elif args.model == "caunet":
+        model = Caunet(**args.caunet, scale_factor=args.scale_factor)
+    if args.adversarial_mode:
+        discriminator = LaplacianDiscriminator(**args.discriminator) if args.laplacian \
+            else Discriminator(**args.discriminator)
+    else:
+        discriminator = None
 
     if args.show:
         for model in models:
@@ -55,23 +70,22 @@ def run(args):
     length = int(args.segment * args.sample_rate)
     stride = int(args.stride * args.sample_rate)
     # Demucs requires a specific number of samples to avoid 0 padding during training
-    if hasattr(models[0], 'valid_length'):
-        length = models[0].valid_length(length)
-    # kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
-    kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate,
-              "include_features": args.include_features, "nb_sample_rate": args.nb_sample_rate}
+    if hasattr(model, 'valid_length'):
+        length = model.valid_length(math.ceil(length/args.scale_factor))
+    model.target_length = length
+    kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(
-        args.dset.train, length=length, stride=stride, pad=args.pad, **kwargs)
+        args.dset.train, length=length, stride=stride, pad=args.pad, scale_factor=args.scale_factor, **kwargs)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
-        cv_dataset = NoisyCleanSet(args.dset.valid, **kwargs)
+        cv_dataset = NoisyCleanSet(args.dset.valid, scale_factor=args.scale_factor, **kwargs)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         cv_loader = None
     if args.dset.test:
-        tt_dataset = NoisyCleanSet(args.dset.test, **kwargs)
+        tt_dataset = NoisyCleanSet(args.dset.test, scale_factor=args.scale_factor, **kwargs)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         tt_loader = None
@@ -80,24 +94,20 @@ def run(args):
     # torch also initialize cuda seed if available
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
-        for model in models:
-            model.cuda()
+        model.cuda()
+        if args.adversarial_mode:
+            discriminator.cuda()
 
     # optimizer
     if args.optim == "adam":
-        if args.model == 'demucs':
-            optimizers = optimizer = torch.optim.Adam(models[0].parameters(), lr=args.lr, betas=(0.9, args.beta2))
-        elif args.model == 'hifi':
-            optimizers = [torch.optim.AdamW(models[0].parameters(), lr=args.lr, betas=(args.beta1, args.beta2)),
-                          torch.optim.AdamW(models[1].parameters(),
-                          # torch.optim.AdamW(itertools.chain(models[1].parameters(), models[2].parameters()),
-                          lr=args.lr, betas=(args.beta1, args.beta2))]
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, args.beta2))
+        disc_opt = torch.optim.Adam(discriminator.parameters(), lr=args.lr, betas=(0.9, args.beta2)) if args.adversarial_mode else None
     else:
         logger.fatal('Invalid optimizer %s', args.optim)
         os._exit(1)
 
     # Construct Solver
-    solver = Solver(data, models, optimizers, args)
+    solver = Solver(data, model, optimizer, args, disc=discriminator, disc_opt=disc_opt)
     solver.train()
 
 
@@ -119,7 +129,7 @@ def _main(args):
     else:
         run(args)
 
-
+# @hydra.main(config_path="conf", config_name="config") #  for latest version of hydra=1.0
 @hydra.main(config_path="conf/config.yaml")
 def main(args):
     try:

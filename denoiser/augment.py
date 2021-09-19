@@ -4,7 +4,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # author: adefossez
-
+import math
 import random
 import torch as th
 from torch import nn
@@ -12,18 +12,19 @@ from torch.nn import functional as F
 
 from . import dsp
 
-
 class Remix(nn.Module):
     """Remix.
     Mixes different noises with clean speech within a given batch
     """
 
-    def forward(self, sources):
-        noise, clean = sources
+    def forward(self, sources, target):
+        noise, clean_source = sources
         bs, *other = noise.shape
         device = noise.device
         perm = th.argsort(th.rand(bs, device=device), dim=0)
-        return th.stack([noise[perm], clean])
+        out = th.stack([noise[perm], clean_source]), target
+        return out
+
 
 
 class RevEcho(nn.Module):
@@ -71,7 +72,7 @@ class RevEcho(nn.Module):
     """
 
     def __init__(self, proba=0.5, initial=0.3, rt60=(0.3, 1.3), first_delay=(0.01, 0.03),
-                 repeat=3, jitter=0.1, keep_clean=0.1, sample_rate=16000):
+                 repeat=3, jitter=0.1, keep_clean=0.1, target_sample_rate=16000, scale_factor=1):
         super().__init__()
         self.proba = proba
         self.initial = initial
@@ -80,9 +81,11 @@ class RevEcho(nn.Module):
         self.repeat = repeat
         self.jitter = jitter
         self.keep_clean = keep_clean
-        self.sample_rate = sample_rate
+        self.source_sample_rate = math.ceil(target_sample_rate / scale_factor)
+        self.target_sample_rate = target_sample_rate
+        self.scale_factor = scale_factor
 
-    def _reverb(self, source, initial, first_delay, rt60):
+    def _reverb(self, source, initial, first_delay, rt60, sample_rate):
         """
         Return the reverb for a single source.
         """
@@ -95,7 +98,7 @@ class RevEcho(nn.Module):
                 # First jitter noise for the delay
                 jitter = 1 + self.jitter * random.uniform(-1, 1)
                 delay = min(
-                    1 + int(jitter * first_delay * self.sample_rate),
+                    1 + int(jitter * first_delay * sample_rate),
                     length)
                 # Delay the echo in time by padding with zero on the left
                 echo = F.pad(echo[:, :, :-delay], (delay, 0))
@@ -110,24 +113,35 @@ class RevEcho(nn.Module):
                 frac *= attenuation
         return reverb
 
-    def forward(self, wav):
+
+    def forward(self, sources, target):
         if random.random() >= self.proba:
-            return wav
-        noise, clean = wav
+            return sources, target
+        noise, clean_source = sources
+        clean = target
+        
         # Sample characteristics for the reverb
         initial = random.random() * self.initial
         first_delay = random.uniform(*self.first_delay)
         rt60 = random.uniform(*self.rt60)
 
-        reverb_noise = self._reverb(noise, initial, first_delay, rt60)
+        reverb_noise = self._reverb(noise, initial, first_delay, rt60, self.source_sample_rate)
         # Reverb for the noise is always added back to the noise
         noise += reverb_noise
-        reverb_clean = self._reverb(clean, initial, first_delay, rt60)
+
+        reverb_clean = self._reverb(clean, initial, first_delay, rt60, self.target_sample_rate)
+        if self.scale_factor == 2:
+            reverb_clean_downsampled = downsample2(reverb_clean)
+        elif self.scale_factor == 4:
+            reverb_clean_downsampled = downsample2(reverb_clean)
+            reverb_clean_downsampled = downsample2(reverb_clean_downsampled)
         # Split clean reverb among the clean speech and noise
         clean += self.keep_clean * reverb_clean
-        noise += (1 - self.keep_clean) * reverb_clean
+        clean_source += self.keep_clean * reverb_clean_downsampled
+        noise += (1 - self.keep_clean) * reverb_clean_downsampled
 
-        return th.stack([noise, clean])
+        out = th.stack([noise, clean_source]), clean
+        return out
 
 
 class BandMask(nn.Module):
@@ -137,35 +151,43 @@ class BandMask(nn.Module):
     (https://arxiv.org/pdf/1904.08779.pdf) but over the waveform.
     """
 
-    def __init__(self, maxwidth=0.2, bands=120, sample_rate=16_000):
+    def __init__(self, maxwidth=0.2, bands=120, scale_factor=1, target_sample_rate=16_000):
         """__init__.
 
         :param maxwidth: the maximum width to remove
         :param bands: number of bands
-        :param sample_rate: signal sample rate
+        :param source_sample_rate: signal sample rate
         """
         super().__init__()
         self.maxwidth = maxwidth
         self.bands = bands
-        self.sample_rate = sample_rate
+        self.source_sample_rate = math.ceil(target_sample_rate / scale_factor)
+        self.target_sample_rate = target_sample_rate
 
-    def forward(self, wav):
+
+    def forward(self, sources, target):
         bands = self.bands
         bandwidth = int(abs(self.maxwidth) * bands)
-        mels = dsp.mel_frequencies(bands, 40, self.sample_rate/2) / self.sample_rate
+        mels = dsp.mel_frequencies(bands, 40, self.source_sample_rate / 2) / self.source_sample_rate
         low = random.randrange(bands)
         high = random.randrange(low, min(bands, low + bandwidth))
         filters = dsp.LowPassFilters([mels[low], mels[high]]).to(wav.device)
         low, midlow = filters(wav)
+        
         # band pass filtering
-        out = wav - midlow + low
+        sources_out = sources - sources_midlow + sources_low
+        target_mels = dsp.mel_frequencies(bands, 40, self.target_sample_rate / 2) / self.target_sample_rate
+        target_filters = dsp.LowPassFilters([target_mels[low], target_mels[high]]).to(sources.device)
+        targets_low, targets_midlow = target_filters(target)
+        target_out = target - targets_midlow + targets_low
+        out = sources_out, target_out
         return out
 
 
 class Shift(nn.Module):
     """Shift."""
 
-    def __init__(self, shift=8192, same=False):
+    def __init__(self, shift=8192, same=False, target_scale_factor=1):
         """__init__.
 
         :param shift: randomly shifts the signals up to a given factor
@@ -174,18 +196,28 @@ class Shift(nn.Module):
         super().__init__()
         self.shift = shift
         self.same = same
+        self.target_scale_factor = target_scale_factor
 
-    def forward(self, wav):
-        sources, batch, channels, length = wav.shape
+    def forward(self, sources, target):
+        n_sources, batch, channels, length = sources.shape
+        _ , _, target_length = target.shape
         length = length - self.shift
+        target_length = target_length - self.shift*self.target_scale_factor
         if self.shift > 0:
             if not self.training:
-                wav = wav[..., :length]
+                sources = sources[..., :length]
+                target = target[..., :target_length]
             else:
                 offsets = th.randint(
                     self.shift,
-                    [1 if self.same else sources, batch, 1, 1], device=wav.device)
-                offsets = offsets.expand(sources, -1, channels, -1)
-                indexes = th.arange(length, device=wav.device)
-                wav = wav.gather(3, indexes + offsets)
-        return wav
+                    [1 if self.same else n_sources, batch, 1, 1], device=sources.device)
+                sources_offsets = offsets.expand(n_sources, -1, channels, -1)
+                sources_indexes = th.arange(length, device=sources.device)
+                sources = sources.gather(3, sources_indexes + sources_offsets)
+
+                target_offsets = offsets.squeeze(dim=0) if self.same else th.randint(self.shift, [batch,1,1], device=target.device)
+                target_offsets = target_offsets.expand(-1,channels, -1)
+                target_indexes = th.arange(target_length, device=target.device)
+                target = target.gather(2, target_indexes + target_offsets)
+        out = sources, target
+        return out

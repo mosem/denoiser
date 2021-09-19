@@ -49,7 +49,7 @@ def find_audio_files(path, exts=[".wav"], progress=True):
 
 class Audioset:
     def __init__(self, files=None, length=None, stride=None,
-                 pad=True, with_path=False, sample_rate=None, nb_sample_rate=None):
+                 pad=True, with_path=False, sample_rate=None):
         """
         files should be a list [(file, length)]
         """
@@ -59,7 +59,7 @@ class Audioset:
         self.stride = stride or length
         self.with_path = with_path
         self.sample_rate = sample_rate
-        self.nb_sample_rate = nb_sample_rate
+
         for file, file_length in self.files:
             if length is None:
                 examples = 1

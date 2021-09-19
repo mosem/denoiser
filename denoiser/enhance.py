@@ -6,6 +6,7 @@
 # author: adiyoss
 
 import argparse
+import math
 from concurrent.futures import ProcessPoolExecutor
 import json
 import logging
@@ -18,6 +19,7 @@ import torchaudio
 from .audio import Audioset, find_audio_files
 from . import distrib, pretrained
 from .demucs import DemucsStreamer
+from .resample import downsample2, upsample2
 
 from .utils import LogProgress
 
@@ -66,16 +68,16 @@ def get_estimate(model, noisy, args):
     else:
         with torch.no_grad():
             estimate = model(noisy)
-            estimate = (1 - args.dry) * estimate + args.dry * noisy
+            # estimate = (1 - args.dry) * estimate + args.dry * noisy
     return estimate
 
 
-def save_wavs(estimates, noisy_sigs, filenames, out_dir, sr=16_000):
+def save_wavs(estimates, noisy_sigs, filenames, out_dir, noisy_sr=16_000, enhanced_sr=16_000):
     # Write result
     for estimate, noisy, filename in zip(estimates, noisy_sigs, filenames):
         filename = os.path.join(out_dir, os.path.basename(filename).rsplit(".", 1)[0])
-        write(noisy, filename + "_noisy.wav", sr=sr)
-        write(estimate, filename + "_enhanced.wav", sr=sr)
+        write(noisy, filename + "_noisy.wav", sr=noisy_sr)
+        write(estimate, filename + "_enhanced.wav", sr=enhanced_sr)
 
 
 def write(wav, filename, sr=16_000):
@@ -104,7 +106,8 @@ def get_dataset(args):
 
 def _estimate_and_save(model, noisy_signals, filenames, out_dir, args):
     estimate = get_estimate(model, noisy_signals, args)
-    save_wavs(estimate, noisy_signals, filenames, out_dir, sr=args.sample_rate)
+    noisy_sr = math.ceil(args.sample_rate / args.scale_factor)
+    save_wavs(estimate, noisy_signals, filenames, out_dir, noisy_sr=noisy_sr, enhanced_sr=args.sample_rate)
 
 
 def enhance(args, model=None, local_out_dir=None):
@@ -132,6 +135,13 @@ def enhance(args, model=None, local_out_dir=None):
         for data in iterator:
             # Get batch data
             noisy_signals, filenames = data
+
+            if args.scale_factor == 2:
+                noisy_signals = downsample2(noisy_signals)
+            elif args.scale_factor == 4:
+                noisy_signals = downsample2(noisy_signals)
+                noisy_signals = downsample2(noisy_signals)
+
             noisy_signals = noisy_signals.to(args.device)
             if args.device == 'cpu' and args.num_workers > 1:
                 pendings.append(
@@ -140,7 +150,8 @@ def enhance(args, model=None, local_out_dir=None):
             else:
                 # Forward
                 estimate = get_estimate(model, noisy_signals, args)
-                save_wavs(estimate, noisy_signals, filenames, out_dir, sr=args.sample_rate)
+                noisy_sr = math.ceil(args.sample_rate / args.scale_factor)
+                save_wavs(estimate, noisy_signals, filenames, out_dir, noisy_sr=noisy_sr, enhanced_sr=args.sample_rate)
 
         if pendings:
             print('Waiting for pending jobs...')
