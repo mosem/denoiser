@@ -104,13 +104,17 @@ hifi:
   l1_factor: 45
   gen_factor: 2
 
-
 demucs2embedded:  # used in demucs_hifi for embedded dim creation. (also with asr conditioning)
   sample_rate: 16000 # dummy - alter this in batch_solver
   slice_rate: 20e-3
   ch_in: 128
   len_in: 256
   emb_dim: 768
+
+features_model:
+  feature_model: 'hubert'
+  state_dict_path: 'path/to/weights/' # TODO: fill
+  features_factor: 0.01
 
 # Discriminator related
 adversarial_mode: False

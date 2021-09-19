@@ -10,6 +10,11 @@ from .modules import BLSTM
 from .resample import downsample2, upsample2
 from .utils import capture_init
 
+# asr models
+from lese.models.hubert import huBERT
+from lese.models.cpc import CPC
+from lese.models.asr import AsrFeatExtractor
+
 
 def rescale_conv(conv, reference):
     std = conv.weight.std().detach()
@@ -187,3 +192,14 @@ class DemucsHifi(nn.Module):
 
     def forward(self, x):
         return self.h(self.d2e(self.d(x)))
+
+
+def load_features_model(feature_model, state_dict_path):
+    if feature_model == 'hubert':
+        return huBERT(state_dict_path, 6)
+    elif feature_model == 'cpc':
+        return CPC()
+    elif feature_model == 'asr':
+        return AsrFeatExtractor()
+    else:
+        raise ValueError("Unknown model.")
