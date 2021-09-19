@@ -1,23 +1,20 @@
 from abc import ABC, abstractmethod
 
 class BatchSolver(ABC):
-
     @abstractmethod
     def __init__(self, args):
         pass
 
-    @property
     @abstractmethod
-    def models_dict(self):
-        pass
-
-    @property
-    @abstractmethod
-    def opt_dict(self):
+    def get_models_dict(self):
         pass
 
     @abstractmethod
-    def run(self, data):
+    def get_opt_dict(self):
+        pass
+
+    @abstractmethod
+    def run(self, data, cross_valid=False):
         pass
 
     @abstractmethod
