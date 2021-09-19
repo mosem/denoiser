@@ -323,14 +323,11 @@ class DemucsStreamer:
             padded_out = torch.cat([self.resample_out, out, extra], 1)
             self.resample_out[:] = out[:, -resample_buffer:]
             if resample == 4:
-                # out = downsample2(downsample2(padded_out)) # when upsampling from 8k to 16k, commented out
-                out = downsample2(padded_out) # and added this
+                out = downsample2(downsample2(padded_out))
             elif resample == 2:
-                # out = downsample2(padded_out) # when upsampling from 8k to 16k, commented out
-                out = padded_out # and added this
+                out = downsample2(padded_out)
             else:
-                # out = padded_out # when upsampling from 8k to 16k, commented out
-                out = upsample2(padded_out) # and added this
+                out = padded_out
 
             out = out[:, resample_buffer // resample:]
             out = out[:, :stride]

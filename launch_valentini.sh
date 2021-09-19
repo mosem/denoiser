@@ -8,6 +8,7 @@
 
 python train.py \
   dset=valentini \
+
   model=seanet \
   seanet.ngf=16 \
   adversarial_mode=True \

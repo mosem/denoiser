@@ -16,6 +16,7 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+from gan_models import generator_loss, feature_loss, discriminator_loss
 from . import augment, distrib, pretrained
 from .enhance import enhance
 from .evaluate import evaluate
@@ -27,23 +28,14 @@ from .preprocess import  TorchSignalToFrames, TorchOLA
 logger = logging.getLogger(__name__)
 
 
-class MultipleInputsSequential(torch.nn.Sequential):
-    def forward(self, *inputs):
-        for module in self._modules.values():
-            if type(inputs) == tuple:
-                inputs = module(*inputs)
-            else:
-                inputs = module(inputs)
-        return inputs
-
 class Solver(object):
     def __init__(self, data, model, optimizer, args, disc=None, disc_opt=None):
         self.tr_loader = data['tr_loader']
         self.cv_loader = data['cv_loader']
         self.tt_loader = data['tt_loader']
-        self.model = model
-        self.dmodel = distrib.wrap(model)
-        self.optimizer = optimizer
+        self.models = models
+        self.dmodel = distrib.wrap(models[0])
+        self.optimizers = optimizers
 
         self.disc = disc
         self.disc_opt = disc_opt
@@ -60,9 +52,9 @@ class Solver(object):
         if args.shift:
             augments.append(augment.Shift(args.shift, args.shift_same, args.scale_factor))
         if args.revecho:
-            augments.append(
-                augment.RevEcho(args.revecho, target_sample_rate=args.sample_rate, scale_factor=args.scale_factor))
+            augments.append(augment.RevEcho(args.revecho, target_sample_rate=args.sample_rate, scale_factor=args.scale_factor))
         self.augment = MultipleInputsSequential(*augments) if augments else None
+
 
         # Training config
         self.device = args.device
@@ -90,6 +82,26 @@ class Solver(object):
                                                   factor_mag=args.stft_mag_factor).to(self.device)
         self._reset()
 
+    # def _serialize(self):
+        # package = {}
+        # package['model'] = serialize_model(self.model)
+        # package['optimizer'] = self.optimizer.state_dict()
+        # package['history'] = self.history
+        # package['best_state'] = self.best_state
+        # package['args'] = self.args
+        # tmp_path = str(self.checkpoint_file) + ".tmp"
+        # torch.save(package, tmp_path)
+        # # renaming is sort of atomic on UNIX (not really true on NFS)
+        # # but still less chances of leaving a half written checkpoint behind.
+        # os.rename(tmp_path, self.checkpoint_file)
+        #
+        # # Saving only the latest best model.
+        # model = package['model']
+        # model['state'] = self.best_state
+        # tmp_path = str(self.best_file) + ".tmp"
+        # torch.save(model, tmp_path)
+        # os.rename(tmp_path, self.best_file)
+
     def _serialize(self):
         package = {}
         package['model'] = serialize_model(self.model)
@@ -101,6 +113,7 @@ class Solver(object):
         package['best_state'] = self.best_state
         package['best_state_discriminator'] = self.best_state_discriminator
         package['args'] = self.args
+        # tmp_path = str(self.checkpoint_file)
         tmp_path = str(self.checkpoint_file) + ".tmp"
         torch.save(package, tmp_path)
         # renaming is sort of atomic on UNIX (not really true on NFS)
@@ -108,11 +121,13 @@ class Solver(object):
         os.rename(tmp_path, self.checkpoint_file)
 
         # Saving only the latest best model.
-        model = package['model']
-        model['state'] = self.best_state
-        tmp_path = str(self.best_file) + ".tmp"
-        torch.save(model, tmp_path)
-        os.rename(tmp_path, self.best_file)
+        models = package['model']
+        for i, model in enumerate(models):
+            model['state'] = self.best_states[i]
+            # tmp_path = str(self.best_file) + f"_model_{i}"
+            tmp_path = str(self.best_file) + f"_model_{i}.tmp"
+            torch.save(model, tmp_path)
+            os.rename(tmp_path, str(self.best_file) + f"_model_{i}")
 
         if self.args.adversarial_mode:
             disc = package['disc']
@@ -122,6 +137,35 @@ class Solver(object):
             os.rename(tmp_disc_path, self.best_disc_file)
 
     def _reset(self):
+        # """_reset."""
+        # load_from = None
+        # load_best = False
+        # keep_history = True
+        # # Reset
+        # if self.checkpoint and self.checkpoint_file.exists() and not self.restart:
+        #     load_from = self.checkpoint_file
+        # elif self.continue_from:
+        #     load_from = self.continue_from
+        #     load_best = self.args.continue_best
+        #     keep_history = False
+        #
+        # if load_from:
+        #     logger.info(f'Loading checkpoint model: {load_from}')
+        #     package = torch.load(load_from, 'cpu')
+        #     if load_best:
+        #         self.model.load_state_dict(package['best_state'])
+        #     else:
+        #         self.model.load_state_dict(package['model']['state'])
+        #     if 'optimizer' in package and not load_best:
+        #         self.optimizer.load_state_dict(package['optimizer'])
+        #     if keep_history:
+        #         self.history = package['history']
+        #     self.best_state = package['best_state']
+        # continue_pretrained = self.args.continue_pretrained
+        # if continue_pretrained:
+        #     logger.info("Fine tuning from pre-trained model %s", continue_pretrained)
+        #     model = getattr(pretrained, self.args.continue_pretrained)()
+        #     self.model.load_state_dict(model.state_dict())
         """_reset."""
         load_from = None
         load_best = False
@@ -153,10 +197,10 @@ class Solver(object):
             self.best_state = package['best_state']
             self.best_state_discriminator = package['best_state_discriminator']
         continue_pretrained = self.args.continue_pretrained
-        if continue_pretrained:
+        if self.args.model == 'demucs' and continue_pretrained:
             logger.info("Fine tuning from pre-trained model %s", continue_pretrained)
-            model = getattr(pretrained, self.args.continue_pretrained)()
-            self.model.load_state_dict(model.state_dict())
+            self.models[0] = getattr(pretrained, self.args.continue_pretrained)()
+            self.models[0].load_state_dict(self.models[0].state_dict())
 
     def train(self):
         # Optimizing the model
@@ -168,7 +212,8 @@ class Solver(object):
 
         for epoch in range(len(self.history), self.epochs):
             # Train one epoch
-            self.model.train()
+            for model in self.models:
+                model.train()
             start = time.time()
             logger.info('-' * 70)
             logger.info("Training...")
@@ -186,7 +231,8 @@ class Solver(object):
                 # Cross validation
                 logger.info('-' * 70)
                 logger.info('Cross validation...')
-                self.model.eval()
+                for model in self.models:
+                    model.eval()
                 with torch.no_grad():
                     losses = self._run_one_epoch(epoch, cross_valid=True)
                 if self.args.adversarial_mode:
@@ -219,15 +265,15 @@ class Solver(object):
                 logger.info('-' * 70)
                 logger.info('Evaluating on the test set...')
                 # We switch to the best known model for testing
-                with swap_state(self.model, self.best_state):
-                    pesq, stoi = evaluate(self.args, self.model, self.tt_loader)
+                with swap_state(self.models[0], self.best_states[0]):
+                    pesq, stoi = evaluate(self.args, self.models[0], self.tt_loader)
 
 
                 metrics.update({'pesq': pesq, 'stoi': stoi})
 
                 # enhance some samples
                 logger.info('Enhance and save samples...')
-                enhance(self.args, self.model, self.samples_dir)
+                enhance(self.args, self.models[0], self.samples_dir)
 
             self.history.append(metrics)
             info = " | ".join(f"{k.capitalize()} {v:.5f}" for k, v in metrics.items())
@@ -264,10 +310,12 @@ class Solver(object):
 
         # get a different order for distributed training, otherwise this will get ignored
         data_loader.epoch = epoch
+        step_func = self.get_step_func()
 
         label = ["Train", "Valid"][cross_valid]
         name = label + f" | Epoch {epoch + 1}"
         logprog = LogProgress(logger, data_loader, updates=self.num_prints, name=name)
+
         for i, (noisy, clean) in enumerate(logprog):
             noisy = noisy.to(self.device)
             clean = clean.to(self.device)
@@ -361,6 +409,4 @@ class Solver(object):
             self.optimizer.step()
 
         return total_loss_G, loss_D
-
-
 

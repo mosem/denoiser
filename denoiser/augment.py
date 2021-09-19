@@ -9,7 +9,6 @@ import random
 import torch as th
 from torch import nn
 from torch.nn import functional as F
-from .resample import downsample2
 
 from . import dsp
 
@@ -25,6 +24,7 @@ class Remix(nn.Module):
         perm = th.argsort(th.rand(bs, device=device), dim=0)
         out = th.stack([noise[perm], clean_source]), target
         return out
+
 
 
 class RevEcho(nn.Module):
@@ -113,11 +113,13 @@ class RevEcho(nn.Module):
                 frac *= attenuation
         return reverb
 
+
     def forward(self, sources, target):
         if random.random() >= self.proba:
             return sources, target
         noise, clean_source = sources
         clean = target
+        
         # Sample characteristics for the reverb
         initial = random.random() * self.initial
         first_delay = random.uniform(*self.first_delay)
@@ -126,6 +128,7 @@ class RevEcho(nn.Module):
         reverb_noise = self._reverb(noise, initial, first_delay, rt60, self.source_sample_rate)
         # Reverb for the noise is always added back to the noise
         noise += reverb_noise
+
         reverb_clean = self._reverb(clean, initial, first_delay, rt60, self.target_sample_rate)
         if self.scale_factor == 2:
             reverb_clean_downsampled = downsample2(reverb_clean)
@@ -161,17 +164,18 @@ class BandMask(nn.Module):
         self.source_sample_rate = math.ceil(target_sample_rate / scale_factor)
         self.target_sample_rate = target_sample_rate
 
+
     def forward(self, sources, target):
         bands = self.bands
         bandwidth = int(abs(self.maxwidth) * bands)
         mels = dsp.mel_frequencies(bands, 40, self.source_sample_rate / 2) / self.source_sample_rate
         low = random.randrange(bands)
         high = random.randrange(low, min(bands, low + bandwidth))
-        filters = dsp.LowPassFilters([mels[low], mels[high]]).to(sources.device)
-        sources_low, sources_midlow = filters(sources)
+        filters = dsp.LowPassFilters([mels[low], mels[high]]).to(wav.device)
+        low, midlow = filters(wav)
+        
         # band pass filtering
         sources_out = sources - sources_midlow + sources_low
-
         target_mels = dsp.mel_frequencies(bands, 40, self.target_sample_rate / 2) / self.target_sample_rate
         target_filters = dsp.LowPassFilters([target_mels[low], target_mels[high]]).to(sources.device)
         targets_low, targets_midlow = target_filters(target)
