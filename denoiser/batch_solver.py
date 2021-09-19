@@ -1,16 +1,25 @@
 from abc import ABC, abstractmethod
 
-@abs.AbstractClass
 class BatchSolver(ABC):
 
-    def __init__(self, models_dict, opt_dict):
-        self.models_dict = models_dict
-        self.opt_dict = opt_dict
-
     @abstractmethod
-    def run(self):
+    def __init__(self, args):
+        pass
+
+    @property
+    @abstractmethod
+    def models_dict(self):
+        pass
+
+    @property
+    @abstractmethod
+    def opt_dict(self):
         pass
 
     @abstractmethod
-    def get_eval_loss(self):
+    def run(self, data):
+        pass
+
+    @abstractmethod
+    def get_eval_loss(self, losses_dict):
         pass
