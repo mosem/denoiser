@@ -10,3 +10,7 @@ class BatchSolver(ABC):
     @abstractmethod
     def run(self):
         pass
+
+    @abstractmethod
+    def get_eval_loss(self):
+        pass
