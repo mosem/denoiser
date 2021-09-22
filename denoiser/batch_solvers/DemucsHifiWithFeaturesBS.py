@@ -1,12 +1,10 @@
 import itertools
 import torch
 import torch.nn.functional as F
-from denoiser.batch_solver import BatchSolver
 from denoiser.batch_solvers.DemucsHifiBS import DemucsHifiBS
-from denoiser.demucs_hifi_gen import load_features_model, DemucsEn, DemucsToEmbeddedDim
-from denoiser.hifi_gan_models import HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator, discriminator_loss, \
+from denoiser.models.demucs_hifi_gen import load_features_model, DemucsEn, DemucsToEmbeddedDim
+from denoiser.models.hifi_gan_models import HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator, discriminator_loss, \
     feature_loss, generator_loss, HifiGenerator
-from torchaudio.transforms import MelSpectrogram
 
 
 class DemucsHifiWithFeaturesBS(DemucsHifiBS):

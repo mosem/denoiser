@@ -5,7 +5,6 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # authors: adiyoss and adefossez
-import itertools
 import logging
 import math
 import os
@@ -23,11 +22,11 @@ def run(args):
 
     from denoiser import distrib
     from denoiser.data import NoisyCleanSet
-    from denoiser.demucs import Demucs
-    from denoiser.seanet import Seanet
-    from denoiser.caunet import Caunet
+    from denoiser.models.demucs import Demucs
+    from denoiser.models.seanet import Seanet
+    from denoiser.models.caunet import Caunet
     from denoiser.solver import Solver
-    from denoiser.modules import Discriminator, LaplacianDiscriminator
+    from denoiser.models.modules import Discriminator, LaplacianDiscriminator
     distrib.init(args)
     options = {'demucs': [Demucs], 'hifi': [MelGenerator, HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator]}
     models = list()

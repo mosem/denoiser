@@ -11,6 +11,8 @@ from torch import nn
 from torch.nn import functional as F
 
 from . import dsp
+from .resample import downsample2
+
 
 class Remix(nn.Module):
     """Remix.
@@ -221,3 +223,38 @@ class Shift(nn.Module):
                 target = target.gather(2, target_indexes + target_offsets)
         out = sources, target
         return out
+
+
+class Augment(object):
+
+    def __init__(self, args):
+        augments = []
+        if args.remix:
+            augments.append(Remix())
+        if args.bandmask:
+            augments.append(BandMask(args.bandmask, scale_factor=args.scale_factor,
+                                             target_sample_rate=args.sample_rate))
+        if args.shift:
+            augments.append(Shift(args.shift, args.shift_same, args.scale_factor))
+        if args.revecho:
+            augments.append(RevEcho(args.revecho, target_sample_rate=args.sample_rate, scale_factor=args.scale_factor))
+        self.augment = th.nn.Sequential(*augments) if augments else None
+
+
+    def augment_data(self, noisy, clean):
+        if not self.augment:
+            return noisy, clean
+
+        if self.args.scale_factor == 1:
+            clean_downsampled = clean
+        elif self.args.scale_factor == 2:
+            clean_downsampled = downsample2(clean)
+        elif self.args.scale_factor == 4:
+            clean_downsampled = downsample2(clean)
+            clean_downsampled = downsample2(clean_downsampled)
+        noise = noisy - clean_downsampled
+        sources = th.stack([noise, clean_downsampled])
+        sources, target = self.augment(sources, clean)
+        source_noise, source_clean = sources
+        source_noisy = source_noise + source_clean
+        return source_noisy, target

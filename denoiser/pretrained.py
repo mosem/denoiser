@@ -9,7 +9,7 @@ import logging
 
 import torch.hub
 
-from .demucs import Demucs
+from denoiser.models.demucs import Demucs
 from .utils import deserialize_model
 
 logger = logging.getLogger(__name__)

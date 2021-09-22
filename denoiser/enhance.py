@@ -18,8 +18,8 @@ import torchaudio
 
 from .audio import Audioset, find_audio_files
 from . import distrib, pretrained
-from .demucs import DemucsStreamer
-from .resample import downsample2, upsample2
+from denoiser.models.demucs import DemucsStreamer
+from .resample import downsample2
 
 from .utils import LogProgress
 
