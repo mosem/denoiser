@@ -88,6 +88,7 @@ class Demucs(nn.Module):
         self.resample = resample
         self.normalize = normalize
         self.scale_factor = scale_factor
+        self.target_training_length = None
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -119,7 +120,7 @@ class Demucs(nn.Module):
         if rescale:
             rescale_module(self, reference=rescale)
 
-    def valid_length(self, length):
+    def calculate_valid_length(self, length):
         """
         Return the nearest valid length to use with the model so that
         there is no time steps left over in a convolutions, e.g. for all
@@ -154,7 +155,7 @@ class Demucs(nn.Module):
             std = 1
         length = mix.shape[-1]
         x = mix
-        x = F.pad(x, (0, self.valid_length(length) - length))
+        x = F.pad(x, (0, self.calculate_valid_length(length) - length))
 
         if self.scale_factor == 2:
             x = upsample2(x)
@@ -186,8 +187,8 @@ class Demucs(nn.Module):
         else:
             pass
         if target_length == None:
-            target_length = length*self.scale_factor if not self.training \
-                                                    or self.target_length is None else self.target_length
+            target_length = self.target_training_length
+
         if x.size(-1) < target_length:
             pad = ConstantPad1d((0, target_length-x.size(-1)), 0)
             x = pad(x)
@@ -247,7 +248,7 @@ class DemucsStreamer:
         self.resample_lookahead = resample_lookahead
         resample_buffer = min(demucs.total_stride, resample_buffer)
         self.resample_buffer = resample_buffer
-        self.frame_length = demucs.set_valid_length(1) + demucs.total_stride * (num_frames - 1)
+        self.frame_length = demucs.calculate_valid_length(1) + demucs.total_stride * (num_frames - 1)
         self.total_length = self.frame_length + self.resample_lookahead
         self.stride = demucs.total_stride * num_frames
         self.resample_in = torch.zeros(demucs.chin, resample_buffer, device=device)

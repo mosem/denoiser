@@ -40,7 +40,7 @@ def run(args):
             mb = sum(p.numel() for model in batch_solver.models for p in model.parameters()) * 4 / 2**20
             logger.info('Size: %.1f MB', mb)
             if hasattr(batch_solver, 'valid_length'):
-                batch_solver.set_valid_length(1)
+                batch_solver.calculate_valid_length(1)
                 field = batch_solver.get_valid_length()
                 logger.info('Field: %.1f ms', field / args.sample_rate * 1000)
             return
@@ -51,9 +51,7 @@ def run(args):
     length = int(args.segment * args.sample_rate)
     stride = int(args.stride * args.sample_rate)
     # Define a specific number of samples to avoid 0 padding during training
-    if hasattr(batch_solver, 'valid_length'):
-        batch_solver.set_valid_length(math.ceil(length / args.scale_factor))
-        length = batch_solver.get_valid_length()
+    length = batch_solver.calculate_valid_length(math.ceil(length / args.scale_factor))
     batch_solver.set_target_training_length(length)
     kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
     # Building datasets and loaders

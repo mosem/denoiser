@@ -53,15 +53,12 @@ class BatchSolver(ABC):
     def get_losses_names(self):
         return self.losses_names
 
-    def get_valid_length(self):
-        return self.valid_length
-
     @abstractmethod
-    def set_valid_length(self, length):
+    def set_target_training_length(self, target_length):
         pass
 
     @abstractmethod
-    def set_target_training_length(self, target_length):
+    def calculate_valid_length(self, length):
         pass
 
     @abstractmethod

@@ -31,11 +31,11 @@ class DemucsBS(BatchSolver):
         self.losses_names = ['generator']
 
 
-    def set_valid_length(self, length):
-        self.valid_length = self.models['generator'].valid_length(length)
+    def calculate_valid_length(self, length):
+        return self.models['generator'].calculate_valid_length(length)
 
     def set_target_training_length(self, target_length):
-        self.models['generator'].target_length = target_length
+        self.models['generator'].target_training_length = target_length
 
     def run(self, data, cross_valid=False):
         noisy, clean = data
