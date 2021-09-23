@@ -107,7 +107,7 @@ class DemucsHifiWithFeaturesBS(DemucsHifiBS):
         return {'L1': loss_audio, 'Gen_loss': loss_gen_all - loss_audio,
                 'Disc_loss': loss_disc_all, 'Embedded_L1_loss': emb_loss}
 
-    def get_eval_loss(self, losses_dict):
+    def get_evaluation_loss(self, losses_dict):
         return losses_dict['Gen_loss'] * self.args.hifi.gen_factor + losses_dict['L1'] \
                + self.args.features_model.features_factor * losses_dict['Embedded_L1_loss']
 

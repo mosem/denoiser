@@ -75,7 +75,7 @@ class Solver(object):
 
         # Saving only the latest best model.
         models = package['models']
-        for model_name, best_state in package['best_states']:
+        for model_name, best_state in package['best_states'].items():
             models[model_name]['state'] = best_state
             model_filename = model_name + '_' + self.best_file.name
             tmp_path = os.path.join(self.best_file.parent, model_filename) + ".tmp"
@@ -129,18 +129,21 @@ class Solver(object):
                 logger.info('Cross validation...')
                 self.batch_solver.eval()
                 with torch.no_grad():
-                    losses = self._run_one_epoch(epoch, cross_valid=True)
+                    valid_losses = self._run_one_epoch(epoch, cross_valid=True)
+                evaluation_loss = self.batch_solver.get_evaluation_loss(valid_losses)
                 logger_msg = f'Train Summary | End of Epoch {epoch + 1} | Time {time.time() - start:.2f}s | ' \
-                             + ' | '.join([f'{k} Loss {v:.5f}' for k, v in losses.items()])
+                             + ' | '.join([f'{k} Valid Loss {v:.5f}' for k, v in valid_losses.items()])
                 logger.info(bold(logger_msg))
+                valid_losses = {'valid_'  + k: v for k,v in valid_losses.items()}
             else:
-                valid_loss = 0
+                valid_losses = {}
+                evaluation_loss = 0
 
-            best_loss = min(pull_metric(self.history, 'valid') + [valid_loss])
-            metrics = {**losses, 'valid': valid_loss, 'best': best_loss}
+            best_loss = min(pull_metric(self.history, 'evaluation') + [evaluation_loss])
+            metrics = {**losses, **valid_losses, 'evaluation': evaluation_loss, 'best': best_loss}
             # Save the best model
-            if valid_loss == best_loss:
-                logger.info(bold('New best valid loss %.4f'), valid_loss)
+            if evaluation_loss == best_loss:
+                logger.info(bold('New best evaluation loss %.4f'), evaluation_loss)
                 self.best_states = self.batch_solver.copy_models_states()
 
             # evaluate and enhance samples every 'eval_every' argument number of epochs
@@ -149,9 +152,9 @@ class Solver(object):
                 # Evaluate on the testset
                 logger.info('-' * 70)
                 logger.info('Evaluating on the test set...')
-                generator = self.batch_solver.models['generator']
+                generator = self.batch_solver.get_generator_model()
                 # We switch to the best known model for testing
-                with swap_state(generator, self.best_states['generator']):
+                with swap_state(generator, self.batch_solver.get_generator_state(self.best_states)):
                     pesq, stoi = evaluate(self.args, generator, self.tt_loader)
 
                 metrics.update({'pesq': pesq, 'stoi': stoi})
@@ -190,11 +193,11 @@ class Solver(object):
             if not cross_valid:
                 noisy, clean = self.augment.augment_data(noisy, clean)
 
-            losses = self.batch_solver.run((noisy, clean))
+            losses = self.batch_solver.run((noisy, clean), cross_valid)
             for k in self.batch_solver.get_losses_names():
                 total_losses[k] += losses[k]
             losses_info = {k: format(v/(i+1), ".5f") for k,v in total_losses.items()}
-            logprog.update(losses_info)
+            logprog.update(**losses_info)
             del losses
 
         for k,v in total_losses.items():

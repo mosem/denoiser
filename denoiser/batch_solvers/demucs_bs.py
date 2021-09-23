@@ -7,49 +7,66 @@ import torch.nn.functional as F
 from denoiser.batch_solvers.batch_solver import BatchSolver
 from denoiser.models.demucs import Demucs
 
+from denoiser.stft_loss import MultiResolutionSTFTLoss
+
 logger = logging.getLogger(__name__)
 
 class DemucsBS(BatchSolver):
 
 
     def __init__(self, args):
-        super().__init__(args)
-        self.args = args
+        super(DemucsBS, self).__init__(args)
+        self.device = args.device
 
         generator = Demucs(**args.demucs, scale_factor=args.scale_factor)
-        if args.optim == "adam":
-            generator_optimizer = torch.optim.Adam(generator.parameters(), lr=args.lr, betas=(0.9, args.beta2))
-        else:
-            logger.fatal('Invalid optimizer %s', args.optim)
-            os._exit(1)
+        if torch.cuda.is_available():
+            generator.cuda()
+        generator_optimizer = torch.optim.Adam(generator.parameters(), lr=args.lr, betas=(0.9, args.beta2))
+
+        self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
+                                                  factor_mag=args.stft_mag_factor).to(self.device)
 
         self.models = {'generator': generator}
         self.optimizers = {'generator_optimizer': generator_optimizer}
+        self.losses_names = ['generator']
 
-    def train(self):
-        for model in self.models.values():
-            model.train()
 
-    def eval(self):
-        for model in self.models.values():
-            model.eval()
+    def set_valid_length(self, length):
+        self.valid_length = self.models['generator'].valid_length(length)
 
-    def get_losses_names(self):
-        return ['generator']
-
-    def get_models(self):
-        return self.models
-
-    def get_optimizers(self):
-        return self.optimizers
+    def set_target_training_length(self, target_length):
+        self.models['generator'].target_length = target_length
 
     def run(self, data, cross_valid=False):
         noisy, clean = data
-        estimate = self.models['generator'](noisy)
-        losses = {'generator': self._get_loss(clean, estimate, cross_valid)}
+        target_length = clean.size(-1) if cross_valid else None
+        estimate = self.models['generator'](noisy, target_length)
+        loss = self._get_loss(clean, estimate)
+        if not cross_valid:
+            self._optimize(loss)
+        losses = {self.losses_names[0]: loss.item()}
         return losses
 
-    def _get_loss(self, clean, estimate, cross_valid):
+
+    def get_evaluation_loss(self, losses_dict):
+        return losses_dict[self.losses_names[0]]
+
+
+    def get_generator_model(self):
+        return self.models['generator']
+
+
+    def get_generator_state(self, best_states):
+        return best_states['generator']
+
+
+    def _optimize(self, loss):
+        self.optimizers['generator_optimizer'].zero_grad()
+        loss.backward()
+        self.optimizers['generator_optimizer'].step()
+
+
+    def _get_loss(self, clean, estimate):
         with torch.autograd.set_detect_anomaly(True):
             if self.args.loss == 'l1':
                 loss = F.l1_loss(clean, estimate)
@@ -64,13 +81,4 @@ class DemucsBS(BatchSolver):
                 sc_loss, mag_loss = self.mrstftloss(estimate.squeeze(1), clean.squeeze(1))
                 loss += sc_loss + mag_loss
 
-            # optimize model in training mode
-            if not cross_valid:
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
-
-            return loss.item()
-
-    def get_eval_loss(self, losses_dict):
-        pass
+            return loss

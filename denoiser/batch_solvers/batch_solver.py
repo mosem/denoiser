@@ -5,9 +5,11 @@ from denoiser.utils import serialize_model, copy_state
 class BatchSolver(ABC):
     @abstractmethod
     def __init__(self, args):
+        self.args = args
         self.models = {}
-        self.optimizers_dict = {}
-        self.keys = []
+        self.optimizers = {}
+        self.losses_names = []
+        self.valid_length = 0
 
     def train(self):
         for model in self.models.values():
@@ -22,7 +24,7 @@ class BatchSolver(ABC):
         serialized_optimizers = {}
         for name, model in self.models.items():
             serialized_models[name] = serialize_model(model)
-        for name, optimizer in self.optimizers_dict.items():
+        for name, optimizer in self.optimizers.items():
             serialized_optimizers[name] = optimizer.state_dict()
         return serialized_models, serialized_optimizers
 
@@ -34,7 +36,7 @@ class BatchSolver(ABC):
             for name, model_package in package['models'].items():
                 self.models[name].load_state_dict(model_package['state'])
             for name, opt_package in package['optimizers'].items():
-                self.optimizers_dict[name].load_state_dict(opt_package)
+                self.optimizers[name].load_state_dict(opt_package)
 
     def copy_models_states(self):
         states = {}
@@ -42,17 +44,24 @@ class BatchSolver(ABC):
             states[name] = copy_state(model.state_dict())
         return states
 
-
-    @abstractmethod
-    def get_losses_names(self):
-        pass
-
-    @abstractmethod
     def get_models(self):
+        return self.models
+
+    def get_optimizers(self):
+        return self.optimizers
+
+    def get_losses_names(self):
+        return self.losses_names
+
+    def get_valid_length(self):
+        return self.valid_length
+
+    @abstractmethod
+    def set_valid_length(self, length):
         pass
 
     @abstractmethod
-    def get_optimizers(self):
+    def set_target_training_length(self, target_length):
         pass
 
     @abstractmethod
@@ -60,5 +69,13 @@ class BatchSolver(ABC):
         pass
 
     @abstractmethod
-    def get_eval_loss(self, losses_dict):
+    def get_evaluation_loss(self, losses_dict):
+        pass
+
+    @abstractmethod
+    def get_generator_model(self):
+        pass
+
+    @abstractmethod
+    def get_generator_state(self, best_states):
         pass

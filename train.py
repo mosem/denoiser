@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 def run(args):
     import torch
 
+    from denoiser.batch_solvers import demucs_bs
     from denoiser import distrib
     from denoiser.data import NoisyCleanSet
     from denoiser.models.demucs import Demucs
@@ -28,24 +29,19 @@ def run(args):
     from denoiser.models.modules import Discriminator, LaplacianDiscriminator
     distrib.init(args)
 
+    # torch also initialize cuda seed if available
+    torch.manual_seed(args.seed)
+
     if args.model == "demucs":
-        model = Demucs(**args.demucs, scale_factor=args.scale_factor)
-    elif args.model == "seanet":
-        model = Seanet(**args.seanet, scale_factor=args.scale_factor)
-    elif args.model == "caunet":
-        model = Caunet(**args.caunet, scale_factor=args.scale_factor)
-    if args.adversarial_mode:
-        discriminator = LaplacianDiscriminator(**args.discriminator) if args.laplacian \
-            else Discriminator(**args.discriminator)
-    else:
-        discriminator = None
+        batch_solver = demucs_bs.DemucsBS(args)
 
     if args.show:
-            logger.info(model)
-            mb = sum(p.numel() for p in model.parameters()) * 4 / 2**20
+            logger.info(batch_solver)
+            mb = sum(p.numel() for model in batch_solver.models for p in model.parameters()) * 4 / 2**20
             logger.info('Size: %.1f MB', mb)
-            if hasattr(model, 'valid_length'):
-                field = model.valid_length(1)
+            if hasattr(batch_solver, 'valid_length'):
+                batch_solver.set_valid_length(1)
+                field = batch_solver.get_valid_length()
                 logger.info('Field: %.1f ms', field / args.sample_rate * 1000)
             return
 
@@ -54,10 +50,11 @@ def run(args):
 
     length = int(args.segment * args.sample_rate)
     stride = int(args.stride * args.sample_rate)
-    # Demucs requires a specific number of samples to avoid 0 padding during training
-    if hasattr(model, 'valid_length'):
-        length = model.valid_length(math.ceil(length/args.scale_factor))
-    model.target_length = length
+    # Define a specific number of samples to avoid 0 padding during training
+    if hasattr(batch_solver, 'valid_length'):
+        batch_solver.set_valid_length(math.ceil(length / args.scale_factor))
+        length = batch_solver.get_valid_length()
+    batch_solver.set_target_training_length(length)
     kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(
@@ -76,23 +73,8 @@ def run(args):
         tt_loader = None
     data = {"tr_loader": tr_loader, "cv_loader": cv_loader, "tt_loader": tt_loader}
 
-    # torch also initialize cuda seed if available
-    torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
-        model.cuda()
-        if args.adversarial_mode:
-            discriminator.cuda()
-
-    # optimizer
-    if args.optim == "adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, args.beta2))
-        disc_opt = torch.optim.Adam(discriminator.parameters(), lr=args.lr, betas=(0.9, args.beta2)) if args.adversarial_mode else None
-    else:
-        logger.fatal('Invalid optimizer %s', args.optim)
-        os._exit(1)
-
     # Construct Solver
-    solver = Solver(data, model, optimizer, args, disc=discriminator, disc_opt=disc_opt)
+    solver = Solver(data, batch_solver, args)
     solver.train()
 
 

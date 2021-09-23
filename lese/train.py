@@ -34,7 +34,7 @@ def run(args):
         logger.info('Size: %.1f MB', mb)
         logger.info(f'No params: {no_params}')
         if hasattr(model, 'valid_length'):
-            field = model.valid_length(1)
+            field = model.set_valid_length(1)
             logger.info('Field: %.1f ms', field / args.sample_rate * 1000)
         return
 
@@ -45,7 +45,7 @@ def run(args):
     stride = int(args.stride * args.sample_rate)
     # Demucs requires a specific number of samples to avoid 0 padding during training
     if hasattr(model, 'valid_length'):
-        length = model.valid_length(length)
+        length = model.set_valid_length(length)
     kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(

@@ -9,14 +9,12 @@ import json
 import logging
 import os
 import re
-import numpy as np
-import torch
 
 from os import path
 import torchaudio
 
 from .audio import Audioset
-from .resample import  downsample2
+from .resample import downsample2
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +22,6 @@ logger = logging.getLogger(__name__)
 def match_dns(noisy, clean):
     """match_dns.
     Match noisy and clean DNS dataset filenames.
-
     :param noisy: list of the noisy filenames
     :param clean: list of the clean filenames
     """
@@ -55,7 +52,7 @@ def match_dns(noisy, clean):
     noisy += extra_noisy
 
 
-def match_files(fnames: dict, matching="sort"):
+def match_files(noisy, clean, matching="sort"):
     """match_files.
     Sort files to match noisy and clean filenames.
     :param noisy: list of the noisy filenames
@@ -64,11 +61,10 @@ def match_files(fnames: dict, matching="sort"):
     """
     if matching == "dns":
         # dns dataset filenames don't match when sorted, we have to manually match them
-        noisy, clean = fnames[0], fnames[1]
         match_dns(noisy, clean)
     elif matching == "sort":
-        for x in fnames.values():
-            x.sort()
+        noisy.sort()
+        clean.sort()
     else:
         raise ValueError(f"Invalid value for matching {matching}")
 
@@ -77,7 +73,6 @@ class NoisyCleanSet:
     def __init__(self, json_dir, matching="sort", length=None, stride=None,
                  pad=True, sample_rate=None, scale_factor=1, with_path=False):
         """__init__.
-
         :param json_dir: directory containing both clean.json and noisy.json
         :param matching: matching function for the files
         :param length: maximum sequence length
@@ -89,7 +84,6 @@ class NoisyCleanSet:
         self.with_path = with_path
         noisy_json = os.path.join(json_dir, 'noisy.json')
         clean_json = os.path.join(json_dir, 'clean.json')
-
         with open(noisy_json, 'r') as f:
             noisy = json.load(f)
         with open(clean_json, 'r') as f:

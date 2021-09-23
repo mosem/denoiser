@@ -142,7 +142,7 @@ class Demucs(nn.Module):
     def total_stride(self):
         return self.stride ** self.depth // self.resample
 
-    def forward(self, mix):
+    def forward(self, mix, target_length=None):
         if mix.dim() == 2:
             mix = mix.unsqueeze(1)
 
@@ -185,7 +185,9 @@ class Demucs(nn.Module):
             x = downsample2(x)
         else:
             pass
-        target_length = length*self.scale_factor if self.target_length is None else self.target_length
+        if target_length == None:
+            target_length = length*self.scale_factor if not self.training \
+                                                    or self.target_length is None else self.target_length
         if x.size(-1) < target_length:
             pad = ConstantPad1d((0, target_length-x.size(-1)), 0)
             x = pad(x)
@@ -245,7 +247,7 @@ class DemucsStreamer:
         self.resample_lookahead = resample_lookahead
         resample_buffer = min(demucs.total_stride, resample_buffer)
         self.resample_buffer = resample_buffer
-        self.frame_length = demucs.valid_length(1) + demucs.total_stride * (num_frames - 1)
+        self.frame_length = demucs.set_valid_length(1) + demucs.total_stride * (num_frames - 1)
         self.total_length = self.frame_length + self.resample_lookahead
         self.stride = demucs.total_stride * num_frames
         self.resample_in = torch.zeros(demucs.chin, resample_buffer, device=device)

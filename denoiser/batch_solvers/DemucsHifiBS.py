@@ -104,6 +104,6 @@ class DemucsHifiBS(BatchSolver):
 
         return {'L1': loss_audio, 'Gen_loss': loss_gen_all - loss_audio, 'Disc_loss': loss_disc_all}
 
-    def get_eval_loss(self, losses_dict):
+    def get_evaluation_loss(self, losses_dict):
         return losses_dict['Gen_loss'] * self.args.hifi.gen_factor + losses_dict['L1']
 
