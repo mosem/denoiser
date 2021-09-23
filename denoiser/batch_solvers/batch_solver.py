@@ -44,7 +44,7 @@ class BatchSolver(ABC):
 
 
     @abstractmethod
-    def get_keys(self):
+    def get_losses_names(self):
         pass
 
     @abstractmethod

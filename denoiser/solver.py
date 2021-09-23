@@ -75,12 +75,12 @@ class Solver(object):
 
         # Saving only the latest best model.
         models = package['models']
-        for name, best_state in package['best_states']:
-            models[name]['state'] = best_state
-            model_name = name + '_' + self.best_file.name
-            tmp_path = os.path.join(self.best_file.parent, model_name) + ".tmp"
-            torch.save(models[name], tmp_path)
-            model_path = Path(self.best_file.parent / model_name)
+        for model_name, best_state in package['best_states']:
+            models[model_name]['state'] = best_state
+            model_filename = model_name + '_' + self.best_file.name
+            tmp_path = os.path.join(self.best_file.parent, model_filename) + ".tmp"
+            torch.save(models[model_name], tmp_path)
+            model_path = Path(self.best_file.parent / model_filename)
             os.rename(tmp_path, model_path)
 
     def _reset(self):
@@ -119,7 +119,8 @@ class Solver(object):
             logger.info('-' * 70)
             logger.info("Training...")
             losses = self._run_one_epoch(epoch)
-            logger_msg = f'Train Summary | End of Epoch {epoch + 1} | Time {time.time() - start:.2f}s | ' + ' | '.join([f'{k} Loss {v:.5f}' for k,v in losses.items()])
+            logger_msg = f'Train Summary | End of Epoch {epoch + 1} | Time {time.time() - start:.2f}s | ' \
+                         + ' | '.join([f'{k} Loss {v:.5f}' for k,v in losses.items()])
             logger.info(bold(logger_msg))
 
             if self.cv_loader:
@@ -173,7 +174,7 @@ class Solver(object):
 
 
     def _run_one_epoch(self, epoch, cross_valid=False):
-        total_losses = {k:0 for k in self.batch_solver.get_keys()}
+        total_losses = {k:0 for k in self.batch_solver.get_losses_names()}
         data_loader = self.tr_loader if not cross_valid else self.cv_loader
 
         # get a different order for distributed training, otherwise this will get ignored
@@ -190,7 +191,7 @@ class Solver(object):
                 noisy, clean = self.augment.augment_data(noisy, clean)
 
             losses = self.batch_solver.run((noisy, clean))
-            for k in self.batch_solver.get_keys():
+            for k in self.batch_solver.get_losses_names():
                 total_losses[k] += losses[k]
             losses_info = {k: format(v/(i+1), ".5f") for k,v in total_losses.items()}
             logprog.update(losses_info)

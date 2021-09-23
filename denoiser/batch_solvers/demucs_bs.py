@@ -34,7 +34,7 @@ class DemucsBS(BatchSolver):
         for model in self.models.values():
             model.eval()
 
-    def get_keys(self):
+    def get_losses_names(self):
         return ['generator']
 
     def get_models(self):
