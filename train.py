@@ -12,7 +12,6 @@ import os
 import hydra
 
 from denoiser.executor import start_ddp_workers
-from gan_models import MelGenerator, HifiMultiScaleDiscriminator, HifiMultiPeriodDiscriminator
 
 logger = logging.getLogger(__name__)
 
@@ -28,18 +27,6 @@ def run(args):
     from denoiser.solver import Solver
     from denoiser.models.modules import Discriminator, LaplacianDiscriminator
     distrib.init(args)
-    options = {'demucs': [Demucs], 'hifi': [MelGenerator, HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator]}
-    models = list()
-    k = args.model
-    for i, cls in enumerate(options[k]):
-        if i == 0:
-            attributes = getattr(args, k)
-            if args.model == 'hifi':
-                models.append(cls(attributes))
-            else:
-                models.append(cls(**attributes))
-        else:
-            models.append(cls())
 
     if args.model == "demucs":
         model = Demucs(**args.demucs, scale_factor=args.scale_factor)
@@ -54,7 +41,6 @@ def run(args):
         discriminator = None
 
     if args.show:
-        for model in models:
             logger.info(model)
             mb = sum(p.numel() for p in model.parameters()) * 4 / 2**20
             logger.info('Size: %.1f MB', mb)

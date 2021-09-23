@@ -16,7 +16,6 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from gan_models import generator_loss, feature_loss, discriminator_loss
 from . import augment, distrib, pretrained
 from .augment import Augment
 from .enhance import enhance
@@ -202,7 +201,6 @@ class Solver(object):
 
         return total_losses
 
-
     def get_loss(self, clean, estimate, cross_valid):
         with torch.autograd.set_detect_anomaly(True):
             if self.args.loss == 'l1':
@@ -237,13 +235,11 @@ class Solver(object):
         for scale in disc_real:
             loss_D += F.relu(1-scale[-1]).mean()  # TODO: check if this is a mean over time domain or batch domain
 
-
         if not cross_valid:
             # self.dDisc.zero_grad() # should I do this?
             self.disc_opt.zero_grad()
             loss_D.backward()
             self.disc_opt.step()
-
 
         disc_fake = self.disc(estimate)
 
