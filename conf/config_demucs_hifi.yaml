@@ -64,7 +64,7 @@ stft_loss: False
 stft_sc_factor: .5
 stft_mag_factor: .5
 epochs: 1
-batch_size: 4
+batch_size: 15
 
 # Models
 model: demucs_hifi # demucs/demucs_adversarial/demucs_hifi/demucs_hifi_features

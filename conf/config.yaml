@@ -50,7 +50,7 @@ dummy:  # use this if you want twice the same exp, with a different name
 
 # Evaluation stuff
 pesq: True # compute pesq?
-eval_every: 1  # compute test metrics every so epochs
+eval_every: 10  # compute test metrics every so epochs
 dry: 0.  # dry/wet knob value at eval
 streaming: False  # use streaming evaluation for Demucs
 
@@ -64,7 +64,7 @@ stft_loss: False
 stft_sc_factor: .5
 stft_mag_factor: .5
 epochs: 100
-batch_size: 4
+batch_size: 32
 
 # Models
 model: demucs # demucs/demucs_adversarial/demucs_hifi/demucs_hifi_features
