@@ -100,17 +100,14 @@ def _main(args):
 def main(args):
     try:
         if "hifi" in args.model:
-            for l1 in [45, 1, 2, 5, 35, 40]:
-                args.hifi.l1_factor = l1
-                for gen in [2, 1, 5, 10]:
-                    args.hifi.gen_factor = gen
-                    os.makedirs(f"../hifi_L-{l1}_G-{gen}", exist_ok=True)
-                    _main(args)
-                    now = datetime.now()
-                    try:
-                        shutil.move(".", f"../hifi_L-{l1}_G-{gen}/{now.strftime('%d-%m-%Y_%H-%M')}")
-                    except Exception:
-                        continue
+            os.makedirs(f"../hifi_L-{args.hifi.l1_factor}_G-{args.hifi.gen_factor}", exist_ok=True)
+            _main(args)
+            now = datetime.now()
+            try:
+                shutil.move(".", f"../hifi_L-{args.hifi.l1_factor}_G-{args.hifi.gen_factor}/{now.strftime('%d-%m-%Y_%H-%M')}")
+            except Exception:
+                pass
+
         else:
             _main(args)
     except Exception:
