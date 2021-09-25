@@ -116,6 +116,10 @@ class Solver(object):
             # Train one epoch
             self.batch_solver.train()
             start = time.time()
+            # added logging support for printing out model params
+            logger.info("Trainable Params:")
+            for name, model in self.batch_solver.get_models().items():
+                logger.info(f"{name}: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
             logger.info('-' * 70)
             logger.info("Training...")
             losses = self._run_one_epoch(epoch)
@@ -152,12 +156,18 @@ class Solver(object):
                 # Evaluate on the testset
                 logger.info('-' * 70)
                 logger.info('Evaluating on the test set...')
-                generator = self.batch_solver.get_generator_model()
-                # We switch to the best known model for testing
-                with swap_state(generator, self.batch_solver.get_generator_state(self.best_states)):
+
+                # generator = self.batch_solver.get_generator_model()
+                # # We switch to the best known model for testing
+                # with swap_state(generator, self.batch_solver.get_generator_state(self.best_states)):
+                #     pesq, stoi = evaluate(self.args, generator, self.tt_loader)
+
+                # (or) replaced the above block with this
+                generator = self.batch_solver.get_generator_for_evaluation(self.best_states)
+                with torch.no_grad():
                     pesq, stoi = evaluate(self.args, generator, self.tt_loader)
 
-                metrics.update({'pesq': pesq, 'stoi': stoi})
+                    metrics.update({'pesq': pesq, 'stoi': stoi})
 
                 # enhance some samples
                 logger.info('Enhance and save samples...')

@@ -47,7 +47,7 @@ def evaluate(args, model=None, data_loader=None):
 
     # Load data
     if data_loader is None:
-        dataset = NoisyCleanSet(args.data_dir, matching=args.matching, sample_rate=args.sample_rate, scale_factor=args.scale_factor)
+        dataset = NoisyCleanSet(args, args.data_dir, matching=args.matching, sample_rate=args.sample_rate, scale_factor=args.scale_factor)
         data_loader = distrib.loader(dataset, batch_size=1, num_workers=2)
     pendings = []
     with ProcessPoolExecutor(args.num_workers) as pool:

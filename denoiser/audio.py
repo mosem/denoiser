@@ -47,16 +47,30 @@ def find_audio_files(path, exts=[".wav"], progress=True):
 
 class Audioset:
     def __init__(self, files=None, length=None, stride=None,
-                 pad=True, with_path=False, sample_rate=None):
+                 pad=True, with_path=False, sample_rate=None, source_sample_rate=None):
         """
         files should be a list [(file, length)]
         """
         self.files = files
         self.num_examples = []
-        self.length = length
+        # if source_sample_rate is not None and sample_rate is not None and source_sample_rate != sample_rate:
+        #     length = int(length * source_sample_rate/sample_rate)
         self.stride = stride or length
+        # # force even sample length over target rate samples
+        # self.length = length if length is None or length % 2 == 0 or \
+        #                         (source_sample_rate is not None and source_sample_rate != sample_rate) \
+        #     else length - 1
+        self.length = length
         self.with_path = with_path
         self.sample_rate = sample_rate
+        self.ssr = source_sample_rate
+
+        # (or) added resampling support
+        if source_sample_rate is not None and source_sample_rate != sample_rate:
+            self.resample = torchaudio.transforms.Resample(sample_rate, source_sample_rate)
+        else:
+            self.resample = None
+
         for file, file_length in self.files:
             if length is None:
                 examples = 1
@@ -81,6 +95,8 @@ class Audioset:
             if self.length is not None:
                 offset = self.stride * index
                 num_frames = self.length
+                if self.resample is not None:
+                    num_frames = int(num_frames * self.ssr / self.sample_rate)
             if torchaudio.get_audio_backend() in ['soundfile', 'sox_io']:
                 out, sr = torchaudio.load(str(file),
                                           frame_offset=offset,
@@ -91,6 +107,8 @@ class Audioset:
                 if sr != self.sample_rate:
                     raise RuntimeError(f"Expected {file} to have sample rate of "
                                        f"{self.sample_rate}, but got {sr}")
+            if self.resample is not None:  # (or) added resampling support
+                out = self.resample(out)
             if num_frames:
                 out = F.pad(out, (0, num_frames - out.shape[-1]))
             if self.with_path:

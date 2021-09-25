@@ -41,7 +41,7 @@ def log_results(args):
 
     logger.info('logging results...')
     df = pd.DataFrame(columns=['filename', 'snr', 'estimated snr', 'pesq', 'stoi'])
-    dataset = NoisyCleanSet(args.json_dir, with_path=True)
+    dataset = NoisyCleanSet(args, args.json_dir, with_path=True)
     loader = distrib.loader(dataset, batch_size=1)
     iterator = LogProgress(logger, loader, name="Iterate over noisy/clean dataset")
     for i, ((noisy, noisy_path), (clean, clean_path)) in enumerate(iterator):
@@ -94,7 +94,8 @@ def add_flags(parser):
     Add the flags for the argument parser that are related to model loading and evaluation"
     """
     parser.add_argument('--device', default="cpu")
-    parser.add_argument('--sample_rate', default=16_000, type=int, help='sample rate')
+    parser.add_argument('--sample_rate', default=16_000, type=int, help='target sample rate')
+    parser.add_argument('--source_sample_rate', default=8_000, type=int, help='source sample rate')
     parser.add_argument('-v', '--verbose', action='store_const', const=logging.DEBUG,
                         default=logging.INFO, help="more loggging")
     parser.add_argument('--pesq', action='store_false')

@@ -71,55 +71,12 @@ class ResBlock2(torch.nn.Module):
 
 
 class HifiGenerator(torch.nn.Module):
-    def __init__(self,
-                 resblock_kernel_sizes,
-                 upsample_rates,
-                 upsample_initial_channel,
-                 resblock,
-                 resblock_dilation_sizes):
-        super(HifiGenerator, self).__init__()
-        self.num_kernels = len(resblock_kernel_sizes)
-        self.num_upsamples = len(upsample_rates)
-        self.conv_pre = weight_norm(Conv1d(1, upsample_initial_channel, 7, 1, padding=3))
-        # self.conv_pre = weight_norm(Conv1d(1, h.upsample_initial_channel, 7, 1, padding=3))
-        resblock = ResBlock1 if str(resblock) == '1' else ResBlock2
-
-        self.ups = nn.ModuleList()
-        # for i, (u, k) in enumerate(zip(h.upsample_rates, h.upsample_kernel_sizes)):
-        #     self.ups.append(weight_norm(
-        #         ConvTranspose1d(max(h.upsample_initial_channel//(2**i), 1),
-        #                         max(h.upsample_initial_channel//(2**(i+1)), 1),
-        #                         k, u, padding=(k-u)//2)))
-        #
-        self.ups.append(nn.ConvTranspose1d(in_channels=upsample_initial_channel,
-                                           out_channels=upsample_initial_channel,
-                                           kernel_size=12,
-                                           stride=2,
-                                           padding=5))
-        self.ups.append(weight_norm(Conv1d(upsample_initial_channel, upsample_initial_channel, 7, 1, padding=3)))
-
-        # self.ups.append(nn.ConvTranspose1d(in_channels=h.upsample_initial_channel,
-        #                                    out_channels=h.upsample_initial_channel // 2,
-        #                                    kernel_size=12,
-        #                                    stride=2,
-        #                                    padding=5))
-
-        self.resblocks = nn.ModuleList()
-        for i in range(len(self.ups)):
-            ch = upsample_initial_channel
-            # ch = max(h.upsample_initial_channel//(2**(i+1)), 1)
-            for j, (k, d) in enumerate(zip(resblock_kernel_sizes, resblock_dilation_sizes)):
-                self.resblocks.append(resblock(ch, k, d))
-
-        self.conv_post = weight_norm(Conv1d(ch, 1, 7, 1, padding=3))
-        self.ups.apply(init_weights)
-        self.conv_post.apply(init_weights)
-
     def forward(self, x):
         x = self.conv_pre(x)
         for i in range(len(self.ups)):
             x = F.leaky_relu(x, LRELU_SLOPE)
             x = self.ups[i](x)
+            x = x[:, :, :-1]  # TODO: find a cleaner way to deal with this
             xs = None
             for j in range(self.num_kernels):
                 if xs is None:
@@ -132,6 +89,68 @@ class HifiGenerator(torch.nn.Module):
         x = torch.tanh(x)
 
         return x
+
+    def __init__(self,
+                 resblock,
+                 upsample_rates,
+                 upsample_kernel_sizes,
+                 upsample_dialation_sizes,
+                 upsample_initial_channel,
+                 input_initial_channel,
+                 resblock_kernel_sizes,
+                 resblock_dilation_sizes,
+                 **kwargs):
+        super(HifiGenerator, self).__init__()
+        self.num_kernels = len(resblock_kernel_sizes)
+        self.num_upsamples = len(upsample_rates)
+        self.conv_pre = weight_norm(Conv1d(input_initial_channel, upsample_initial_channel, 7, 1, padding=3))
+        # self.conv_pre = weight_norm(Conv1d(1, h.upsample_initial_channel, 7, 1, padding=3))
+        resblock = ResBlock1 if str(resblock) == '1' else ResBlock2
+        args = {
+            "resblock": resblock,
+            "upsample_rates": upsample_rates,
+            "upsample_kernel_sizes": upsample_kernel_sizes,
+            "upsample_dialation_sizes": upsample_dialation_sizes,
+            "upsample_initial_channel": upsample_initial_channel,
+            "input_initial_channel": input_initial_channel,
+            "resblock_kernel_sizes": resblock_kernel_sizes,
+            "resblock_dilation_sizes": resblock_dilation_sizes,
+        }
+        self._init_args_kwargs = (args, None)
+
+        self.ups = nn.ModuleList()
+        for i, (u, d, k) in enumerate(zip(upsample_rates, upsample_dialation_sizes, upsample_kernel_sizes)):
+            self.ups.append(weight_norm(
+                ConvTranspose1d(in_channels=max(upsample_initial_channel//(2**i), 1),
+                                out_channels=max(upsample_initial_channel//(2**(i+1)), 1),
+                                kernel_size=k,
+                                stride=u,
+                                padding=(k-u)//2,
+                                dilation=d)))
+        #
+        # self.ups.append(nn.ConvTranspose1d(in_channels=upsample_initial_channel,
+        #                                    out_channels=upsample_initial_channel,
+        #                                    kernel_size=12,
+        #                                    stride=2,
+        #                                    padding=5))
+        # self.ups.append(weight_norm(Conv1d(upsample_initial_channel, upsample_initial_channel, 7, 1, padding=3)))
+
+        # self.ups.append(nn.ConvTranspose1d(in_channels=h.upsample_initial_channel,
+        #                                    out_channels=h.upsample_initial_channel // 2,
+        #                                    kernel_size=12,
+        #                                    stride=2,
+        #                                    padding=5))
+
+        self.resblocks = nn.ModuleList()
+        for i in range(len(self.ups)):
+            # ch = upsample_initial_channel
+            ch = max(upsample_initial_channel//(2**(i+1)), 1)
+            for j, (k, d) in enumerate(zip(resblock_kernel_sizes, resblock_dilation_sizes)):
+                self.resblocks.append(resblock(ch, k, d))
+
+        self.conv_post = weight_norm(Conv1d(ch, 1, 7, 1, padding=3))
+        self.ups.apply(init_weights)
+        self.conv_post.apply(init_weights)
 
     def remove_weight_norm(self):
         print('Removing weight norm...')
@@ -189,6 +208,7 @@ class HifiMultiPeriodDiscriminator(torch.nn.Module):
             DiscriminatorP(7),
             DiscriminatorP(11),
         ])
+        self._init_args_kwargs = (None, None)
 
     def forward(self, y, y_hat):
         y_d_rs = []
@@ -256,6 +276,7 @@ class HifiMultiScaleDiscriminator(torch.nn.Module):
             AvgPool1d(4, 2, padding=2),
             AvgPool1d(4, 2, padding=2)
         ])
+        self._init_args_kwargs = (None, None)
 
     def forward(self, y, y_hat):
         y_d_rs = []

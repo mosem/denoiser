@@ -8,42 +8,57 @@ from denoiser.models.hifi_gan_models import HifiMultiPeriodDiscriminator, HifiMu
 
 
 class DemucsHifiWithFeaturesBS(DemucsHifiBS):
+    ENC = "enc"
+    D2E = "d2e"
+    FT = "ft"
+    DEC = "dec"
 
     def __init__(self, args):
         super().__init__(args)
+        self.LOSS_NAMES = ['L1', 'Gen_loss', 'Disc_loss', 'Embedded_L1_loss']
 
     def _construct_models(self):
         sample_rate = self.args.sample_rate
         d2e_args = self.args.demucs2embedded
         d2e_args.sample_rate = sample_rate
-        encoder = DemucsEn(self.args.demucs)
-        d2e = DemucsToEmbeddedDim(d2e_args)
-        decoder = HifiGenerator(**self.args.hifi)
-        ft = load_features_model(self.args.features_model.feature_model, self.args.features_model.state_dict_path)
-        mpd = HifiMultiPeriodDiscriminator()
-        msd = HifiMultiScaleDiscriminator()
-        return {'enc': encoder, 'd2e': d2e, 'ft': ft, 'dec': decoder, 'mpd': mpd, 'msd': msd}
+        device = 'cuda' if torch.cuda.is_available() and self.args.device != 'cpu' else 'cpu'
+        encoder = DemucsEn(self.args.demucs).to(device)
+        d2e = DemucsToEmbeddedDim(d2e_args).to(device)
+        decoder = HifiGenerator(**self.args.hifi).to(device)
+        ft = load_features_model(self.args.features_model.feature_model, self.args.features_model.state_dict_path).to(device)
+        mpd = HifiMultiPeriodDiscriminator().to(device)
+        msd = HifiMultiScaleDiscriminator().to(device)
+        return {self.ENC: encoder, self.D2E: d2e, self.FT: ft, self.DEC: decoder, self.MPD: mpd, self.MSD: msd}
 
     def _construct_optimizers(self):
-        gen_opt = torch.optim.AdamW(itertools.chain(self._models_dict['enc'].parameters(),
-                                                    self._models_dict['ft'].parameters(),
-                                                    self._models_dict['dec'].parameters()),
+        gen_opt = torch.optim.AdamW(itertools.chain(self._models_dict[self.ENC].parameters(),
+                                                    self._models_dict[self.D2E].parameters(),
+                                                    self._models_dict[self.DEC].parameters()),
                                     lr=self.args.lr, betas=(self.args.beta1, self.args.beta2))
-        disc_opt = torch.optim.AdamW(itertools.chain(self._models_dict['mpd'].parameters(),
-                                                     self._models_dict['msd'].parameters()),
+        disc_opt = torch.optim.AdamW(itertools.chain(self._models_dict[self.MPD].parameters(),
+                                                     self._models_dict[self.MSD].parameters()),
                                      lr=self.args.lr, betas=(self.args.beta1, self.args.beta2))
-        return {'gen_opt': gen_opt, "disc_opt": disc_opt}
+        return {self.G_OPT: gen_opt, self.D_OPT: disc_opt}
+
+    def get_generator_for_evaluation(self, best_states):
+        encoder = self._models_dict[self.ENC]
+        d2e = self._models_dict[self.D2E]
+        decoder = self._models_dict[self.DEC]
+        encoder.load_state_dict(best_states[self.ENC])
+        d2e.load_state_dict(best_states[self.D2E])
+        decoder.load_state_dict(best_states[self.DEC])
+        return torch.nn.Sequential(encoder, d2e, decoder)
 
     def run(self, data, cross_valid=False):
         x, y = data
-        encoder = self._models_dict['enc']
-        d2e = self._models_dict['d2e']
-        decoder = self._models_dict['dec']
-        ft = self._models_dict['ft']
-        mpd = self._models_dict['mpd']
-        msd = self._models_dict['msd']
+        encoder = self._models_dict[self.ENC]
+        d2e = self._models_dict[self.D2E]
+        decoder = self._models_dict[self.DEC]
+        ft = self._models_dict[self.FT]
+        mpd = self._models_dict[self.MPD]
+        msd = self._models_dict[self.MSD]
 
-        optim_g, optim_d = self._opt_dict['gen_opt'], self._opt_dict['disc_opt']
+        optim_g, optim_d = self._opt_dict[self.G_OPT], self._opt_dict[self.D_OPT]
 
         x = d2e(encoder(x))
 
@@ -104,8 +119,8 @@ class DemucsHifiWithFeaturesBS(DemucsHifiBS):
         del y, y_ds_hat_g, y_df_hat_g, fmap_s_r, fmap_s_g, fmap_f_r, fmap_f_g, \
             y_ds_hat_r, y_ds_hat_g, y_df_hat_r, y_df_hat_g
 
-        return {'L1': loss_audio, 'Gen_loss': loss_gen_all - loss_audio,
-                'Disc_loss': loss_disc_all, 'Embedded_L1_loss': emb_loss}
+        return {self.LOSS_NAMES[0]: loss_audio, self.LOSS_NAMES[1]: loss_gen_all - loss_audio,
+                self.LOSS_NAMES[2]: loss_disc_all, self.LOSS_NAMES[3]: emb_loss}
 
     def get_evaluation_loss(self, losses_dict):
         return losses_dict['Gen_loss'] * self.args.hifi.gen_factor + losses_dict['L1'] \

@@ -36,12 +36,13 @@ class DemucsToEmbeddedDim(nn.Module):
         """
         super().__init__()
         self.l1 = nn.Linear(len_in, int(sample_rate * slice_rate)) # first match the num of expected feature vectors dim
-        self.l2 = nn.Linear(ch_in, emb_dim) # then match embedded dim, requires transpose
+        # self.l2 = nn.Linear(ch_in, emb_dim) # then match embedded dim, requires transpose
 
     def forward(self, x):
-         x = nn.SiLU()(self.l1(x))
-         x = torch.transpose(x, 1, 2)
-         return nn.SiLU()(self.l2(x))
+         x = nn.ReLU()(self.l1(x))
+         # x = torch.transpose(x, 1, 2)
+         return x
+         # return nn.ReLU()(self.l2(x))
 
 
 class DemucsEn(nn.Module):
@@ -154,9 +155,9 @@ class DemucsEn(nn.Module):
             mix = mix / (self.floor + std)
         else:
             std = 1
-        length = mix.shape[-1]
+        # length = mix.shape[-1]
         x = mix
-        x = F.pad(x, (0, self.valid_length(length) - length))
+        # x = F.pad(x, (0, self.valid_length(length) - length))
 
         if self.scale_factor == 2:
             x = upsample2(x)
@@ -187,9 +188,14 @@ class DemucsHifi(nn.Module):
         self.d = DemucsEn(**demucs_args)
         self.d2e = DemucsToEmbeddedDim(**demucs2embedded_args)
         self.h = HifiGenerator(**hifi_args)
+        kw = {"d2e": demucs2embedded_args, "hifi": hifi_args}
+        self._init_args_kwargs = (demucs_args, kw)
 
     def forward(self, x):
-        return self.h(self.d2e(self.d(x)))
+        x = self.d(x)
+        x = self.d2e(x)
+        x = self.h(x)
+        return x
 
 
 def load_features_model(feature_model, state_dict_path):

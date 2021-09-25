@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 class DemucsBS(BatchSolver):
 
-
     def __init__(self, args):
         super(DemucsBS, self).__init__(args)
         self.device = args.device
@@ -30,6 +29,10 @@ class DemucsBS(BatchSolver):
         self.optimizers = {'generator_optimizer': generator_optimizer}
         self.losses_names = ['generator']
 
+    def get_generator_for_evaluation(self, best_states):
+        generator = self.get_generator_model()
+        generator.load_state_dict(self.get_generator_state(best_states))
+        return generator
 
     def calculate_valid_length(self, length):
         return self.models['generator'].calculate_valid_length(length)
@@ -47,18 +50,23 @@ class DemucsBS(BatchSolver):
         losses = {self.losses_names[0]: loss.item()}
         return losses
 
+    def get_models(self):
+        return self.models
+
+    def get_optimizers(self):
+        return self.optimizers
 
     def get_evaluation_loss(self, losses_dict):
         return losses_dict[self.losses_names[0]]
 
-
     def get_generator_model(self):
         return self.models['generator']
-
 
     def get_generator_state(self, best_states):
         return best_states['generator']
 
+    def get_losses_names(self):
+        return self.losses_names
 
     def _optimize(self, loss):
         self.optimizers['generator_optimizer'].zero_grad()

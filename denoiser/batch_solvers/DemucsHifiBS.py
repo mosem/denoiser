@@ -9,17 +9,44 @@ from torchaudio.transforms import MelSpectrogram
 
 
 class DemucsHifiBS(BatchSolver):
+    GEN = 'gen'
+    MPD = 'mpd'
+    MSD = 'msd'
+    G_OPT = "gen_opt"
+    D_OPT = "disc_opt"
 
     def __init__(self, args):
         super().__init__(args)
         self.args = args
         self._models_dict = self._construct_models()
         self._opt_dict = self._construct_optimizers()
+        self.LOSS_NAMES = ['L1', 'Gen_loss', 'Disc_loss']
         self._mel = MelSpectrogram(sample_rate=args.sample_rate,
                                    n_fft=args.hifi.n_fft,
                                    win_length=args.hifi.win_size,
                                    hop_length=args.hifi.hop_size,
-                                   n_mels=args.hifi.n_mels)
+                                   n_mels=args.hifi.n_mels).to(args.device)
+
+    def get_generator_for_evaluation(self, best_states):
+        generator = self.get_generator_model()
+        generator.load_state_dict(self.get_generator_state(best_states))
+        return generator
+
+    def get_losses_names(self) -> list:
+        return self.LOSS_NAMES
+
+    def set_target_training_length(self, target_length):
+        return None
+
+    def calculate_valid_length(self, length):
+        return self.args.segment * self.args.sample_rate
+        # return self._models_dict[self.GEN].d.valid_length(length)
+
+    def get_generator_model(self):
+        return self._models_dict[self.GEN]
+
+    def get_generator_state(self, best_states):
+        return best_states[self.GEN]
 
     def get_models(self):
         return self._models_dict
@@ -31,25 +58,26 @@ class DemucsHifiBS(BatchSolver):
         sample_rate = self.args.sample_rate
         d2e_args = self.args.demucs2embedded
         d2e_args.sample_rate = sample_rate
-        gen = DemucsHifi(self.args.demucs, d2e_args, self.args.hifi)
-        mpd = HifiMultiPeriodDiscriminator()
-        msd = HifiMultiScaleDiscriminator()
-        return {'gen': gen, 'mpd': mpd, 'msd': msd}
+        device = 'cuda' if torch.cuda.is_available() and self.args.device != 'cpu' else 'cpu'
+        gen = DemucsHifi(self.args.demucs, d2e_args, self.args.hifi).to(device)
+        mpd = HifiMultiPeriodDiscriminator().to(device)
+        msd = HifiMultiScaleDiscriminator().to(device)
+        return {self.GEN: gen, self.MPD: mpd, self.MSD: msd}
 
     def _construct_optimizers(self):
-        gen_opt = torch.optim.AdamW(self._models_dict['gen'].parameters(), lr=self.args.lr, betas=(self.args.beta1, self.args.beta2))
-        disc_opt = torch.optim.AdamW(itertools.chain(self._models_dict['mpd'].parameters(),
-                                                     self._models_dict['msd'].parameters()),
+        gen_opt = torch.optim.AdamW(self._models_dict[self.GEN].parameters(), lr=self.args.lr, betas=(self.args.beta1, self.args.beta2))
+        disc_opt = torch.optim.AdamW(itertools.chain(self._models_dict[self.MPD].parameters(),
+                                                     self._models_dict[self.MSD].parameters()),
                                      lr=self.args.lr, betas=(self.args.beta1, self.args.beta2))
-        return {'gen_opt': gen_opt, "disc_opt": disc_opt}
+        return {self.G_OPT: gen_opt, self.D_OPT: disc_opt}
 
     def run(self, data, cross_valid=False):
         x, y = data
-        generator = self._models_dict['gen']
-        mpd = self._models_dict['mpd']
-        msd = self._models_dict['msd']
+        generator = self._models_dict[self.GEN]
+        mpd = self._models_dict[self.MPD]
+        msd = self._models_dict[self.MSD]
 
-        optim_g, optim_d = self._opt_dict['gen_opt'], self._opt_dict['disc_opt']
+        optim_g, optim_d = self._opt_dict[self.G_OPT], self._opt_dict[self.D_OPT]
 
         y_g_hat = generator(x)
 
@@ -100,10 +128,12 @@ class DemucsHifiBS(BatchSolver):
             optim_g.step()
 
         del y, y_ds_hat_g, y_df_hat_g, fmap_s_r, fmap_s_g, fmap_f_r, fmap_f_g, \
-            y_ds_hat_r, y_ds_hat_g, y_df_hat_r, y_df_hat_g
+            y_ds_hat_r, y_df_hat_r
 
-        return {'L1': loss_audio, 'Gen_loss': loss_gen_all - loss_audio, 'Disc_loss': loss_disc_all}
+        return {self.LOSS_NAMES[0]: loss_audio.item(),
+                self.LOSS_NAMES[1]: loss_gen_all.item() - loss_audio.item(),
+                self.LOSS_NAMES[2]: loss_disc_all.item()}
 
     def get_evaluation_loss(self, losses_dict):
-        return losses_dict['Gen_loss'] * self.args.hifi.gen_factor + losses_dict['L1']
+        return losses_dict[self.LOSS_NAMES[1]] * self.args.hifi.gen_factor + losses_dict[self.LOSS_NAMES[0]]
 

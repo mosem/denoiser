@@ -136,7 +136,7 @@ class LogProgress:
                 self._log()
 
     def _log(self):
-        self._speed = (1 + self._index) / (time.time() - self._begin)
+        self._speed = (1 + self._index) / (time.time() - self._begin + 1e-6)
         infos = " | ".join(f"{k.capitalize()} {v}" for k, v in self._infos.items())
         if self._speed < 1e-4:
             speed = "oo sec/it"

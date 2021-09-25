@@ -7,15 +7,40 @@
 
 import math
 import time
+import logging
 
-import torch
+import torch as th
 from torch import nn
-from torch.nn import ConstantPad1d
 from torch.nn import functional as F
 
-from denoiser.models.modules import BLSTM
-from denoiser.resample import downsample2, upsample2
-from denoiser.utils import capture_init
+from .resample import downsample2, upsample2
+from .hubert import huBERT
+from .asr import AsrFeatExtractor
+from .cpc import CPC
+from ..utils import capture_init
+import fairseq
+
+logger = logging.getLogger(__name__)
+
+PRE = 'pre'
+POST = 'post'
+SUP = 'sup'
+
+class BLSTM(nn.Module):
+    def __init__(self, in_dim, out_dim, layers=2, bi=True):
+        super().__init__()
+        klass = nn.LSTM
+        self.lstm = klass(bidirectional=bi, num_layers=layers, hidden_size=out_dim, input_size=in_dim)
+        self.linear = None
+        if bi:
+            self.linear = nn.Linear(2*out_dim, out_dim)
+
+    def forward(self, x, hidden=None):
+        x, hidden = self.lstm(x, hidden)
+        if self.linear:
+            x = self.linear(x)
+        return x, hidden
+
 
 def rescale_conv(conv, reference):
     std = conv.weight.std().detach()
@@ -70,7 +95,7 @@ class Demucs(nn.Module):
                  glu=True,
                  rescale=0.1,
                  floor=1e-3,
-                 scale_factor=1):
+                 lexical=None):
 
         super().__init__()
         if resample not in [1, 2, 4]:
@@ -86,13 +111,20 @@ class Demucs(nn.Module):
         self.floor = floor
         self.resample = resample
         self.normalize = normalize
-        self.scale_factor = scale_factor
-        self.target_training_length = None
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
         activation = nn.GLU(1) if glu else nn.ReLU()
         ch_scale = 2 if glu else 1
+        self.lexical_model = None
+
+        self.lexical_path = lexical['path']
+        self.lexical_layer = lexical['layer']
+        self.lexical_model_type = lexical['model']
+        self.lexical_position = lexical['inject']
+        self.lexical_dim = lexical['dim']
+        self.lexical_merge_method = lexical['merge']
+        self.lexical_setup()
 
         for index in range(depth):
             encode = []
@@ -115,11 +147,14 @@ class Demucs(nn.Module):
             chin = hidden
             hidden = min(int(growth * hidden), max_hidden)
 
-        self.lstm = BLSTM(chin, bi=not causal)
+        self.lstm = BLSTM(chin, chin, bi=not causal)
+        if self.lexical and self.lexical_position != SUP:
+            self.proj = nn.Linear(chin + self.lexical_dim, chin)
+
         if rescale:
             rescale_module(self, reference=rescale)
 
-    def calculate_valid_length(self, length):
+    def valid_length(self, length):
         """
         Return the nearest valid length to use with the model so that
         there is no time steps left over in a convolutions, e.g. for all
@@ -128,7 +163,6 @@ class Demucs(nn.Module):
         If the mixture has a valid length, the estimated sources
         will have exactly the same length.
         """
-        length = math.ceil(length * self.scale_factor)
         length = math.ceil(length * self.resample)
         for idx in range(self.depth):
             length = math.ceil((length - self.kernel_size) / self.stride) + 1
@@ -138,11 +172,43 @@ class Demucs(nn.Module):
         length = int(math.ceil(length / self.resample))
         return int(length)
 
+    def lexical_setup(self):
+        if self.lexical_model_type == 'hubert':
+            self.lexical_model = huBERT(self.lexical_path, self.lexical_layer)
+            self.lexical = True
+        elif self.lexical_model_type == 'cpc':
+            self.lexical_model = CPC()
+            self.lexical = True
+        elif self.lexical_model_type == 'asr':
+            self.lexical_model = AsrFeatExtractor()
+            self.lexical = True
+        elif self.lexical_model_type == "none":
+            self.lexical = False
+        else:
+            logger.error("Unknown model.")
+    
+    def _extract_feat(self, mix):
+        feats = self.lexical_model.extract_feats(mix)
+        return feats
+
+    def _merge(self, x, feats, method='inter'):
+
+        if method == 'inter':
+            x_res = F.interpolate(feats.permute(0, 2, 1), x.shape[0]).permute(2, 0, 1)
+        elif method == 'att':
+            x_res = x.permute(1, 0, 2)
+            alpha = F.softmax((feats.unsqueeze(1) * x_res.unsqueeze(2)).sum(dim=-1), dim=2)
+            x_res = th.bmm(alpha, feats).permute(1, 0 ,2)
+
+        x = th.cat([x, x_res], dim=-1)
+        x = self.proj(x)
+        return x
+
     @property
     def total_stride(self):
         return self.stride ** self.depth // self.resample
 
-    def forward(self, mix, target_length=None):
+    def forward(self, mix):
         if mix.dim() == 2:
             mix = mix.unsqueeze(1)
 
@@ -154,14 +220,7 @@ class Demucs(nn.Module):
             std = 1
         length = mix.shape[-1]
         x = mix
-        x = F.pad(x, (0, self.calculate_valid_length(length) - length))
-
-        if self.scale_factor == 2:
-            x = upsample2(x)
-        elif self.scale_factor == 4:
-            x = upsample2(x)
-            x = upsample2(x)
-
+        x = F.pad(x, (0, self.valid_length(length) - length))
         if self.resample == 2:
             x = upsample2(x)
         elif self.resample == 4:
@@ -172,7 +231,19 @@ class Demucs(nn.Module):
             x = encode(x)
             skips.append(x)
         x = x.permute(2, 0, 1)
+
+        #  add lexical features as pre sequantial model conditioning
+        if self.lexical and self.lexical_position == PRE:
+            feats = self._extract_feat(mix)
+            x = self._merge(x, feats, method=self.lexical_merge_method)
+
         x, _ = self.lstm(x)
+
+        #  add lexical features as pre sequantial model conditioning
+        if self.lexical and self.lexical_position == POST:
+            feats = self._extract_feat(mix)
+            x = self._merge(x, feats, method=self.lexical_merge_method)
+
         x = x.permute(1, 2, 0)
         for decode in self.decoder:
             skip = skips.pop(-1)
@@ -183,16 +254,8 @@ class Demucs(nn.Module):
         elif self.resample == 4:
             x = downsample2(x)
             x = downsample2(x)
-        else:
-            pass
-        if target_length == None:
-            target_length = self.target_training_length
 
-        if x.size(-1) < target_length:
-            pad = ConstantPad1d((0, target_length-x.size(-1)), 0)
-            x = pad(x)
-        elif x.size(-1) > target_length:
-            x = x[..., :target_length]
+        x = x[..., :length]
         return std * x
 
 
@@ -206,11 +269,11 @@ def fast_conv(conv, x):
     assert batch == 1
     if kernel == 1:
         x = x.view(chin, length)
-        out = torch.addmm(conv.bias.view(-1, 1),
+        out = th.addmm(conv.bias.view(-1, 1),
                        conv.weight.view(chout, chin), x)
     elif length == kernel:
         x = x.view(chin * kernel, 1)
-        out = torch.addmm(conv.bias.view(-1, 1),
+        out = th.addmm(conv.bias.view(-1, 1),
                        conv.weight.view(chout, chin * kernel), x)
     else:
         out = conv(x)
@@ -247,16 +310,16 @@ class DemucsStreamer:
         self.resample_lookahead = resample_lookahead
         resample_buffer = min(demucs.total_stride, resample_buffer)
         self.resample_buffer = resample_buffer
-        self.frame_length = demucs.calculate_valid_length(1) + demucs.total_stride * (num_frames - 1)
+        self.frame_length = demucs.valid_length(1) + demucs.total_stride * (num_frames - 1)
         self.total_length = self.frame_length + self.resample_lookahead
         self.stride = demucs.total_stride * num_frames
-        self.resample_in = torch.zeros(demucs.chin, resample_buffer, device=device)
-        self.resample_out = torch.zeros(demucs.chin, resample_buffer, device=device)
+        self.resample_in = th.zeros(demucs.chin, resample_buffer, device=device)
+        self.resample_out = th.zeros(demucs.chin, resample_buffer, device=device)
 
         self.frames = 0
         self.total_time = 0
         self.variance = 0
-        self.pending = torch.zeros(demucs.chin, 0, device=device)
+        self.pending = th.zeros(demucs.chin, 0, device=device)
 
         bias = demucs.decoder[0][2].bias
         weight = demucs.decoder[0][2].weight
@@ -278,7 +341,7 @@ class DemucsStreamer:
         when you have no more input and want to get back the last chunk of audio.
         """
         pending_length = self.pending.shape[1]
-        padding = torch.zeros(self.demucs.chin, self.total_length, device=self.pending.device)
+        padding = th.zeros(self.demucs.chin, self.total_length, device=self.pending.device)
         out = self.feed(padding)
         return out[:, :pending_length]
 
@@ -299,7 +362,7 @@ class DemucsStreamer:
         if chin != demucs.chin:
             raise ValueError(f"Expected {demucs.chin} channels, got {chin}")
 
-        self.pending = torch.cat([self.pending, wav], dim=1)
+        self.pending = th.cat([self.pending, wav], dim=1)
         outs = []
         while self.pending.shape[1] >= self.total_length:
             self.frames += 1
@@ -310,7 +373,7 @@ class DemucsStreamer:
                 variance = (mono**2).mean()
                 self.variance = variance / self.frames + (1 - 1 / self.frames) * self.variance
                 frame = frame / (demucs.floor + math.sqrt(self.variance))
-            padded_frame = torch.cat([self.resample_in, frame], dim=-1)
+            padded_frame = th.cat([self.resample_in, frame], dim=-1)
             self.resample_in[:] = frame[:, stride - resample_buffer:stride]
             frame = padded_frame
 
@@ -322,7 +385,7 @@ class DemucsStreamer:
             frame = frame[:, :resample * self.frame_length]  # remove extra samples after window
 
             out, extra = self._separate_frame(frame)
-            padded_out = torch.cat([self.resample_out, out, extra], 1)
+            padded_out = th.cat([self.resample_out, out, extra], 1)
             self.resample_out[:] = out[:, -resample_buffer:]
             if resample == 4:
                 out = downsample2(downsample2(padded_out))
@@ -342,9 +405,9 @@ class DemucsStreamer:
 
         self.total_time += time.time() - begin
         if outs:
-            out = torch.cat(outs, 1)
+            out = th.cat(outs, 1)
         else:
-            out = torch.zeros(chin, 0, device=wav.device)
+            out = th.zeros(chin, 0, device=wav.device)
         return out
 
     def _separate_frame(self, frame):
@@ -375,7 +438,7 @@ class DemucsStreamer:
                 x = fast_conv(encode[2], x)
                 x = encode[3](x)
                 if not first:
-                    x = torch.cat([prev, x], -1)
+                    x = th.cat([prev, x], -1)
                 next_state.append(x)
             skips.append(x)
 
@@ -430,27 +493,27 @@ def test():
     parser.add_argument("-f", "--num_frames", type=int, default=1)
     args = parser.parse_args()
     if args.num_threads:
-        torch.set_num_threads(args.num_threads)
+        th.set_num_threads(args.num_threads)
     sr = args.sample_rate
     sr_ms = sr / 1000
     demucs = Demucs(depth=args.depth, hidden=args.hidden, resample=args.resample).to(args.device)
-    x = torch.randn(1, int(sr * 4)).to(args.device)
+    x = th.randn(1, int(sr * 4)).to(args.device)
     out = demucs(x[None])[0]
     streamer = DemucsStreamer(demucs, num_frames=args.num_frames)
     out_rt = []
     frame_size = streamer.total_length
-    with torch.no_grad():
+    with th.no_grad():
         while x.shape[1] > 0:
             out_rt.append(streamer.feed(x[:, :frame_size]))
             x = x[:, frame_size:]
             frame_size = streamer.demucs.total_stride
     out_rt.append(streamer.flush())
-    out_rt = torch.cat(out_rt, 1)
+    out_rt = th.cat(out_rt, 1)
     model_size = sum(p.numel() for p in demucs.parameters()) * 4 / 2**20
     initial_lag = streamer.total_length / sr_ms
     tpf = 1000 * streamer.time_per_frame
     print(f"model size: {model_size:.1f}MB, ", end='')
-    print(f"delta batch/streaming: {torch.norm(out - out_rt) / torch.norm(out):.2%}")
+    print(f"delta batch/streaming: {th.norm(out - out_rt) / th.norm(out):.2%}")
     print(f"initial lag: {initial_lag:.1f}ms, ", end='')
     print(f"stride: {streamer.stride * args.num_frames / sr_ms:.1f}ms")
     print(f"time per frame: {tpf:.1f}ms, ", end='')

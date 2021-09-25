@@ -8,10 +8,12 @@
 import logging
 import math
 import os
+import shutil
 
 import hydra
 
 from denoiser.executor import start_ddp_workers
+from denoiser.batch_solvers.BatchSolverFactory import BatchSolverFactory
 
 logger = logging.getLogger(__name__)
 
@@ -22,18 +24,14 @@ def run(args):
     from denoiser.batch_solvers import demucs_bs
     from denoiser import distrib
     from denoiser.data import NoisyCleanSet
-    from denoiser.models.demucs import Demucs
-    from denoiser.models.seanet import Seanet
-    from denoiser.models.caunet import Caunet
     from denoiser.solver import Solver
-    from denoiser.models.modules import Discriminator, LaplacianDiscriminator
     distrib.init(args)
 
     # torch also initialize cuda seed if available
     torch.manual_seed(args.seed)
 
-    if args.model == "demucs":
-        batch_solver = demucs_bs.DemucsBS(args)
+    # (or) added batch solver factory
+    batch_solver = BatchSolverFactory.get_bs(args)
 
     if args.show:
             logger.info(batch_solver)
@@ -56,16 +54,18 @@ def run(args):
     kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(
-        args.dset.train, length=length, stride=stride, pad=args.pad, scale_factor=args.scale_factor, **kwargs)
+            args, args.dset.train, length=length, stride=stride, pad=args.pad, scale_factor=args.scale_factor, **kwargs)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
-        cv_dataset = NoisyCleanSet(args.dset.valid, scale_factor=args.scale_factor, **kwargs)
+        cv_dataset = NoisyCleanSet(
+            args, args.dset.valid, length=length, stride=stride, pad=args.pad, scale_factor=args.scale_factor, **kwargs)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         cv_loader = None
     if args.dset.test:
-        tt_dataset = NoisyCleanSet(args.dset.test, scale_factor=args.scale_factor, **kwargs)
+        tt_dataset = NoisyCleanSet(
+            args, args.dset.test, length=length, stride=stride, pad=args.pad, scale_factor=args.scale_factor, **kwargs)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         tt_loader = None
@@ -94,11 +94,21 @@ def _main(args):
     else:
         run(args)
 
-# @hydra.main(config_path="conf", config_name="config") #  for latest version of hydra=1.0
-@hydra.main(config_path="conf/config.yaml")
+@hydra.main(config_path="conf", config_name="config_demucs_hifi") #  for latest version of hydra=1.0
+# @hydra.main(config_path="conf", config_name="config") #  for latest version of hydra=1.0, general config | TODO change to this one for demucs
+# @hydra.main(config_path="conf/config.yaml")
 def main(args):
     try:
-        _main(args)
+        if "hifi" in args.model:
+            for l1 in args.hyperparams.l1_factors:
+                args.hifi.l1_factor = l1
+                for gen in args.hyperparams.gen_factors:
+                    args.hifi.gen_factor = gen
+                    os.makedirs(f"outputs/hifi_L-{l1}_G-{gen}", exist_ok=True)
+                    _main(args)
+                    shutil.move("outputs/exp_", f"outputs/hifi_L-{l1}_G-{gen}")
+        else:
+            _main(args)
     except Exception:
         logger.exception("Some error happened")
         # Hydra intercepts exit code, fixed in beta but I could not get the beta to work
