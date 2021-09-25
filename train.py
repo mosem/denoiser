@@ -100,9 +100,9 @@ def _main(args):
 def main(args):
     try:
         if "hifi" in args.model:
-            for l1 in args.hyperparams.l1_factors:
+            for l1 in [45, 1, 2, 5, 35, 40]:
                 args.hifi.l1_factor = l1
-                for gen in args.hyperparams.gen_factors:
+                for gen in [2, 1, 5, 10]:
                     args.hifi.gen_factor = gen
                     os.makedirs(f"../hifi_L-{l1}_G-{gen}", exist_ok=True)
                     _main(args)

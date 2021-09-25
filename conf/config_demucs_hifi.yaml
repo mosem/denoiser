@@ -3,10 +3,6 @@ defaults:
   - hydra/job_logging: colorlog
   - hydra/hydra_logging: colorlog
 
-hyperparams:
-  l1_factors: [45, 1, 2, 5, 35, 40]
-  gen_factors: [2, 1, 5, 10]
-
 # Dataset related
 sample_rate: 16000 # target sample rate
 source_sample_rate: 8000 # source sample rate, added to support BWE
