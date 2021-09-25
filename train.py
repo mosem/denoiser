@@ -9,7 +9,7 @@ import logging
 import math
 import os
 import shutil
-
+from datetime import datetime
 import hydra
 
 from denoiser.executor import start_ddp_workers
@@ -104,9 +104,13 @@ def main(args):
                 args.hifi.l1_factor = l1
                 for gen in args.hyperparams.gen_factors:
                     args.hifi.gen_factor = gen
-                    os.makedirs(f"outputs/hifi_L-{l1}_G-{gen}", exist_ok=True)
+                    os.makedirs(f"../hifi_L-{l1}_G-{gen}", exist_ok=True)
                     _main(args)
-                    shutil.move("outputs/exp_", f"outputs/hifi_L-{l1}_G-{gen}")
+                    now = datetime.now()
+                    try:
+                        shutil.move(".", f"../hifi_L-{l1}_G-{gen}/{now.strftime('%d-%m-%Y_%H-%M')}")
+                    except Exception:
+                        continue
         else:
             _main(args)
     except Exception:

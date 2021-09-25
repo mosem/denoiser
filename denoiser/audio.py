@@ -107,8 +107,10 @@ class Audioset:
                 if sr != self.sample_rate:
                     raise RuntimeError(f"Expected {file} to have sample rate of "
                                        f"{self.sample_rate}, but got {sr}")
+
             if self.resample is not None:  # (or) added resampling support
                 out = self.resample(out)
+
             if num_frames:
                 out = F.pad(out, (0, num_frames - out.shape[-1]))
             if self.with_path:
