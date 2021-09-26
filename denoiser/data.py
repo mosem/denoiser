@@ -15,6 +15,7 @@ import torchaudio
 
 from .audio import Audioset
 from .resample import downsample2
+from torch.nn import functional as F
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,8 @@ class NoisyCleanSet:
         """
         self.scale_factor = scale_factor
         self.with_path = with_path
+        self.length = length
+        self.scale_factor = scale_factor
         noisy_json = os.path.join(json_dir, 'noisy.json')
         clean_json = os.path.join(json_dir, 'clean.json')
         with open(noisy_json, 'r') as f:
@@ -92,12 +95,19 @@ class NoisyCleanSet:
         match_files(noisy, clean, matching)
         kw = {'length': length, 'stride': stride, 'pad': pad, 'with_path': with_path}
         self.clean_set = Audioset(clean, sample_rate=sample_rate, **kw)
-        self.noisy_set = Audioset(noisy, sample_rate=sample_rate, source_sample_rate=args.source_sample_rate, **kw)
+        self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw)
 
         assert len(self.clean_set) == len(self.noisy_set)
 
     def __getitem__(self, index):
         noisy, clean = self.noisy_set[index], self.clean_set[index]
+
+        if clean.shape[-1] < self.length:
+            clean = F.pad(clean, (0, 0, self.scale_factor - clean.shape[-1]))
+
+        if noisy.shape[-1] < self.length:
+            noisy = F.pad(noisy, (0, 0, self.length - noisy.shape[-1]))
+
         if self.scale_factor == 2:
             noisy = downsample2(noisy)
         elif self.scale_factor == 4:

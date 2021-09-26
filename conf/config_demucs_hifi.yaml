@@ -1,5 +1,5 @@
 defaults:
-  - dset: valentini
+  - dset: debug
   - hydra/job_logging: colorlog
   - hydra/hydra_logging: colorlog
 
@@ -10,7 +10,7 @@ segment: 2
 stride: 2    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
 
-scale_factor: 1
+scale_factor: 2
 upsampled: false # if upsampling from input dataset to target dataset
 
 # Dataset Augmentation
@@ -60,7 +60,7 @@ stft_loss: False
 stft_sc_factor: .5
 stft_mag_factor: .5
 epochs: 1
-batch_size: 15
+batch_size: 4
 
 # Models
 model: demucs_hifi # demucs/demucs_adversarial/demucs_hifi/demucs_hifi_features

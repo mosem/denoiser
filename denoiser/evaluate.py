@@ -11,7 +11,12 @@ import json
 import logging
 import sys
 
-from pesq import pesq
+from scipy.io.wavfile import write
+
+import torchaudio
+import matplotlib.pyplot as plt
+
+from pesq import pesq, PesqError
 # from pypesq import pesq
 from pystoi import stoi
 import torch
@@ -48,7 +53,9 @@ def evaluate(args, model=None, data_loader=None):
 
     # Load data
     if data_loader is None:
-        dataset = NoisyCleanSet(args, args.data_dir, matching=args.matching, sample_rate=args.sample_rate, scale_factor=args.scale_factor)
+        dataset = NoisyCleanSet(args, args.data_dir, matching=args.matching,
+                                sample_rate=args.sample_rate,
+                                scale_factor=args.scale_factor)
         data_loader = distrib.loader(dataset, batch_size=1, num_workers=2)
     pendings = []
     # with ProcessPoolExecutor(args.num_workers) as pool:
@@ -90,14 +97,13 @@ def evaluate(args, model=None, data_loader=None):
                 estimate = get_estimate(model, noisy, args)
                 estimate = estimate.cpu()
 
+                clean = clean.cpu()
+
                 # TODO: fix this
                 estimate = estimate.flatten().unsqueeze(0).unsqueeze(0)
 
-                clean = clean.cpu()
-                try:
-                    pendings.append(_run_metrics(clean, estimate, args))
-                except Exception:
-                    print("")
+
+                pendings.append(_run_metrics(clean, estimate, args))
             total_cnt += clean.shape[0]
 
     for pending in LogProgress(logger, pendings, updates, name="Eval metrics"):
@@ -119,6 +125,9 @@ def _estimate_and_run_metrics(clean, model, noisy, args):
 def _run_metrics(clean, estimate, args):
     estimate = estimate.numpy()[:, 0]
     clean = clean.numpy()[:, 0]
+    write("C:/Users/ortal/Downloads/estimate.wav", 16000, estimate.flatten())
+    write("C:/Users/ortal/Downloads/clean_est.wav", 16000, clean.flatten())
+
     if clean.shape != estimate.shape:
         # logger.info(f"_run_metrics: non-equal sizes. estimate: {estimate.shape}, clean: {clean.shape}")
         min_len = min(estimate.shape[-1], clean.shape[-1])

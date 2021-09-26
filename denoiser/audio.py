@@ -14,6 +14,7 @@ import sys
 
 import torchaudio
 from torch.nn import functional as F
+from scipy.io.wavfile import write
 
 Info = namedtuple("Info", ["length", "sample_rate", "channels"])
 
@@ -66,10 +67,10 @@ class Audioset:
         self.ssr = source_sample_rate
 
         # (or) added resampling support
-        if source_sample_rate is not None and source_sample_rate != sample_rate:
-            self.resample = torchaudio.transforms.Resample(sample_rate, source_sample_rate)
-        else:
-            self.resample = None
+        # if source_sample_rate is not None and source_sample_rate != sample_rate:
+        #     self.resample = torchaudio.transforms.Resample(sample_rate, source_sample_rate)
+        # else:
+        #     self.resample = None
 
         for file, file_length in self.files:
             if length is None:
@@ -77,9 +78,11 @@ class Audioset:
             elif file_length < length:
                 examples = 1 if pad else 0
             elif pad:
-                examples = int(math.ceil((file_length - self.length) / self.stride) + 1)
+                examples = int(math.ceil((file_length - self.length) / self.stride))
+                # examples = int(math.ceil((file_length - self.length) / self.stride) + 1)
             else:
-                examples = (file_length - self.length) // self.stride + 1
+                examples = (file_length - self.length) // self.stride
+                # examples = (file_length - self.length) // self.stride + 1
             self.num_examples.append(examples)
 
     def __len__(self):
@@ -95,8 +98,7 @@ class Audioset:
             if self.length is not None:
                 offset = self.stride * index
                 num_frames = self.length
-                if self.resample is not None:
-                    num_frames = int(num_frames * self.ssr / self.sample_rate)
+
             if torchaudio.get_audio_backend() in ['soundfile', 'sox_io']:
                 out, sr = torchaudio.load(str(file),
                                           frame_offset=offset,
@@ -108,11 +110,8 @@ class Audioset:
                     raise RuntimeError(f"Expected {file} to have sample rate of "
                                        f"{self.sample_rate}, but got {sr}")
 
-            if self.resample is not None:  # (or) added resampling support
-                out = self.resample(out)
-
-            if num_frames:
-                out = F.pad(out, (0, num_frames - out.shape[-1]))
+            if num_frames or (self.length is not None and out.shape[-1] < self.length):
+                out = F.pad(out, (0, self.length - out.shape[-1]))
             if self.with_path:
                 return out, file
             else:

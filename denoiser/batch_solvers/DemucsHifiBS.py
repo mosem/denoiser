@@ -39,7 +39,7 @@ class DemucsHifiBS(BatchSolver):
         return None
 
     def calculate_valid_length(self, length):
-        return self.args.segment * self.args.sample_rate
+        return int(self.args.segment * self.args.sample_rate)
         # return self._models_dict[self.GEN].d.valid_length(length)
 
     def get_generator_model(self):

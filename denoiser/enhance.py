@@ -80,6 +80,15 @@ def save_wavs(estimates, noisy_sigs, filenames, out_dir, noisy_sr=16_000, enhanc
         write(estimate, filename + "_enhanced.wav", sr=enhanced_sr)
 
 
+def save_wavs_new(estimates, noisy_sigs, clean_sigs, filenames, out_dir, noisy_sr=16_000):
+    # Write result
+    for estimate, noisy, clean, filename in zip(estimates, noisy_sigs, clean_sigs, filenames):
+        filename = os.path.join(out_dir, os.path.basename(filename).rsplit(".", 1)[0])
+        write(noisy, filename + "_noisy.wav", sr=noisy_sr)
+        write(estimate, filename + "_enhanced.wav", sr=args.sample_rate)
+        write(clean, filename + "_clean.wav", sr=args.sample_rate)
+
+
 def write(wav, filename, sr=16_000):
     # Normalize audio if it prevents clipping
     wav = wav / max(wav.abs().max().item(), 1)
@@ -110,7 +119,13 @@ def _estimate_and_save(model, noisy_signals, filenames, out_dir, args):
     save_wavs(estimate, noisy_signals, filenames, out_dir, noisy_sr=noisy_sr, enhanced_sr=args.sample_rate)
 
 
-def enhance(args, model=None, local_out_dir=None):
+def _estimate_and_save_new(model, noisy, clean, filename, out_dir, args):
+    estimate = model(noisy)
+    noisy_sr = args.source_sample_rate
+    save_wavs_new(estimate, noisy, clean, filename, noisy_sr)
+
+
+def enhance(args, model=None, local_out_dir=None, loader=None):
     # Load model
     if not model:
         model = pretrained.get_model(args).to(args.device)
@@ -120,11 +135,6 @@ def enhance(args, model=None, local_out_dir=None):
     else:
         out_dir = args.out_dir
 
-    dset = get_dataset(args)
-    if dset is None:
-        return
-    loader = distrib.loader(dset, batch_size=1)
-
     if distrib.rank == 0:
         os.makedirs(out_dir, exist_ok=True)
     distrib.barrier()
@@ -132,26 +142,21 @@ def enhance(args, model=None, local_out_dir=None):
     with ProcessPoolExecutor(args.num_workers) as pool:
         iterator = LogProgress(logger, loader, name="Generate enhanced files")
         pendings = []
-        for data in iterator:
+        for i, data in enumerate(iterator):
             # Get batch data
-            noisy_signals, filenames = data
-
-            if args.scale_factor == 2:
-                noisy_signals = downsample2(noisy_signals)
-            elif args.scale_factor == 4:
-                noisy_signals = downsample2(noisy_signals)
-                noisy_signals = downsample2(noisy_signals)
+            noisy_signals, clean = data
 
             noisy_signals = noisy_signals.to(args.device)
             if args.device == 'cpu' and args.num_workers > 1:
                 pendings.append(
                     pool.submit(_estimate_and_save,
-                                model, noisy_signals, filenames, out_dir, args))
+                                model, noisy_signals, [f"{i}"], out_dir, args))
             else:
+
                 # Forward
                 estimate = get_estimate(model, noisy_signals, args)
                 noisy_sr = math.ceil(args.sample_rate / args.scale_factor)
-                save_wavs(estimate, noisy_signals, filenames, out_dir, noisy_sr=noisy_sr, enhanced_sr=args.sample_rate)
+                save_wavs(estimate, noisy_signals, [f"{i}"], out_dir, noisy_sr=noisy_sr, enhanced_sr=args.sample_rate)
 
         if pendings:
             print('Waiting for pending jobs...')

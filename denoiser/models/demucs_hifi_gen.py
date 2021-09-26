@@ -1,5 +1,6 @@
 import math
 import torch
+import torchaudio
 from torch import nn
 from torch.nn import functional as F
 
@@ -188,14 +189,17 @@ class DemucsHifi(nn.Module):
         self.d = DemucsEn(**demucs_args)
         self.d2e = DemucsToEmbeddedDim(**demucs2embedded_args)
         self.h = HifiGenerator(**hifi_args)
+        self.upscale = torchaudio.transforms.Resample(orig_freq=8000, new_freq=16000)
         kw = {"d2e": demucs2embedded_args, "hifi": hifi_args}
         self._init_args_kwargs = (demucs_args, kw)
 
     def forward(self, x):
+        x_len = x.shape[-1]
+        x_upscaled = self.upscale(x)
         x = self.d(x)
         x = self.d2e(x)
         x = self.h(x)
-        return x
+        return x + x_upscaled
 
 
 def load_features_model(feature_model, state_dict_path):

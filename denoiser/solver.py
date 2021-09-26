@@ -25,6 +25,8 @@ from .utils import bold, copy_state, pull_metric, serialize_model, swap_state, L
 from .resample import downsample2, upsample2
 from .preprocess import  TorchSignalToFrames, TorchOLA
 
+from scipy.io.wavfile import write
+
 logger = logging.getLogger(__name__)
 
 
@@ -171,7 +173,7 @@ class Solver(object):
 
                 # enhance some samples
                 logger.info('Enhance and save samples...')
-                enhance(self.args, generator, self.samples_dir)
+                enhance(self.args, generator, self.samples_dir, loader=self.tt_loader)
 
             self.history.append(metrics)
             info = " | ".join(f"{k.capitalize()} {v:.5f}" for k, v in metrics.items())
@@ -200,6 +202,11 @@ class Solver(object):
         for i, (noisy, clean) in enumerate(logprog):
             noisy = noisy.to(self.device)
             clean = clean.to(self.device)
+
+            # #TODO remove after debugging
+            # write("C:/Users/ortal/Downloads/noisy.wav", 8000, noisy[0].cpu().flatten().numpy())
+            # write("C:/Users/ortal/Downloads/clean.wav", 16000, clean[0].cpu().flatten().numpy())
+
             if not cross_valid:
                 noisy, clean = self.augment.augment_data(noisy, clean)
 
