@@ -96,7 +96,6 @@ def _main(args):
 
 @hydra.main(config_path="conf", config_name="config_demucs_hifi") #  for latest version of hydra=1.0
 # @hydra.main(config_path="conf", config_name="config") #  for latest version of hydra=1.0, general config | TODO change to this one for demucs
-# @hydra.main(config_path="conf/config.yaml")
 def main(args):
     try:
         if "hifi" in args.model:

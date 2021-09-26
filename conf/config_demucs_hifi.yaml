@@ -1,5 +1,5 @@
 defaults:
-  - dset: debug
+  - dset: valentini
   - hydra/job_logging: colorlog
   - hydra/hydra_logging: colorlog
 
@@ -59,7 +59,7 @@ loss: l1
 stft_loss: False
 stft_sc_factor: .5
 stft_mag_factor: .5
-epochs: 1
+epochs: 100
 batch_size: 4
 
 # Models
