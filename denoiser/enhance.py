@@ -80,13 +80,13 @@ def save_wavs(estimates, noisy_sigs, filenames, out_dir, noisy_sr=16_000, enhanc
         write(estimate, filename + "_enhanced.wav", sr=enhanced_sr)
 
 
-def save_wavs_new(estimates, noisy_sigs, clean_sigs, filenames, out_dir, noisy_sr=16_000):
+def save_wavs_new(estimates, noisy_sigs, clean_sigs, filenames, out_dir, noisy_sr=16_000, out_sr=16_000):
     # Write result
     for estimate, noisy, clean, filename in zip(estimates, noisy_sigs, clean_sigs, filenames):
         filename = os.path.join(out_dir, os.path.basename(filename).rsplit(".", 1)[0])
         write(noisy, filename + "_noisy.wav", sr=noisy_sr)
-        write(estimate, filename + "_enhanced.wav", sr=args.sample_rate)
-        write(clean, filename + "_clean.wav", sr=args.sample_rate)
+        write(estimate, filename + "_enhanced.wav", sr=out_sr)
+        write(clean, filename + "_clean.wav", sr=out_sr)
 
 
 def write(wav, filename, sr=16_000):
@@ -122,7 +122,7 @@ def _estimate_and_save(model, noisy_signals, filenames, out_dir, args):
 def _estimate_and_save_new(model, noisy, clean, filename, out_dir, args):
     estimate = model(noisy)
     noisy_sr = args.source_sample_rate
-    save_wavs_new(estimate, noisy, clean, filename, noisy_sr)
+    save_wavs_new(estimate, noisy, clean, filename, out_dir, noisy_sr, args.sample_rate)
 
 
 def enhance(args, model=None, local_out_dir=None, loader=None):
@@ -156,7 +156,7 @@ def enhance(args, model=None, local_out_dir=None, loader=None):
                 # Forward
                 estimate = get_estimate(model, noisy_signals, args)
                 noisy_sr = math.ceil(args.sample_rate / args.scale_factor)
-                save_wavs_new(estimate, noisy_signals, [f"{i}"], out_dir, noisy_sr=noisy_sr, enhanced_sr=args.sample_rate)
+                save_wavs_new(estimate, noisy_signals, clean, [f"{i}"], out_dir, noisy_sr=noisy_sr, out_sr=args.sample_rate)
 
         if pendings:
             print('Waiting for pending jobs...')

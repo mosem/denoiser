@@ -194,12 +194,10 @@ class DemucsHifi(nn.Module):
         self._init_args_kwargs = (demucs_args, kw)
 
     def forward(self, x):
-        x_len = x.shape[-1]
-        x_upscaled = self.upscale(x)
         x = self.d(x)
         x = self.d2e(x)
         x = self.h(x)
-        return x + x_upscaled
+        return x
 
 
 def load_features_model(feature_model, state_dict_path):
