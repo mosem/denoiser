@@ -125,8 +125,6 @@ def _estimate_and_run_metrics(clean, model, noisy, args):
 def _run_metrics(clean, estimate, args):
     estimate = estimate.numpy()[:, 0]
     clean = clean.numpy()[:, 0]
-    write("C:/Users/ortal/Downloads/estimate.wav", 16000, estimate.flatten())
-    write("C:/Users/ortal/Downloads/clean_est.wav", 16000, clean.flatten())
 
     if clean.shape != estimate.shape:
         # logger.info(f"_run_metrics: non-equal sizes. estimate: {estimate.shape}, clean: {clean.shape}")
