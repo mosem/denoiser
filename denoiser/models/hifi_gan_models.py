@@ -127,19 +127,6 @@ class HifiGenerator(torch.nn.Module):
                                 stride=u,
                                 padding=(k-u)//2,
                                 dilation=d)))
-        #
-        # self.ups.append(nn.ConvTranspose1d(in_channels=upsample_initial_channel,
-        #                                    out_channels=upsample_initial_channel,
-        #                                    kernel_size=12,
-        #                                    stride=2,
-        #                                    padding=5))
-        # self.ups.append(weight_norm(Conv1d(upsample_initial_channel, upsample_initial_channel, 7, 1, padding=3)))
-
-        # self.ups.append(nn.ConvTranspose1d(in_channels=h.upsample_initial_channel,
-        #                                    out_channels=h.upsample_initial_channel // 2,
-        #                                    kernel_size=12,
-        #                                    stride=2,
-        #                                    padding=5))
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
@@ -240,16 +227,6 @@ class DiscriminatorS(torch.nn.Module):
             norm_f(Conv1d(128, 128, 5, 1, padding=2)),
         ])
         self.conv_post = norm_f(Conv1d(128, 1, 3, 1, padding=1))
-        # self.convs = nn.ModuleList([
-        #     norm_f(Conv1d(1, 32, 15, 1, padding=7)),
-        #     norm_f(Conv1d(32, 32, 41, 2, groups=4, padding=20)),
-        #     norm_f(Conv1d(32, 64, 41, 2, groups=16, padding=20)),
-        #     norm_f(Conv1d(64, 64, 41, 4, groups=16, padding=20)),
-        #     norm_f(Conv1d(64, 128, 41, 4, groups=16, padding=20)),
-        #     norm_f(Conv1d(128, 128, 41, 1, groups=16, padding=20)),
-        #     norm_f(Conv1d(128, 128, 5, 1, padding=2)),
-        # ])
-        # self.conv_post = norm_f(Conv1d(128, 1, 3, 1, padding=1))
 
     def forward(self, x):
         fmap = []

@@ -66,12 +66,6 @@ class Audioset:
         self.sample_rate = sample_rate
         self.ssr = source_sample_rate
 
-        # (or) added resampling support
-        # if source_sample_rate is not None and source_sample_rate != sample_rate:
-        #     self.resample = torchaudio.transforms.Resample(sample_rate, source_sample_rate)
-        # else:
-        #     self.resample = None
-
         for file, file_length in self.files:
             if length is None:
                 examples = 1
@@ -79,10 +73,8 @@ class Audioset:
                 examples = 1 if pad else 0
             elif pad:
                 examples = int(math.ceil((file_length - self.length) / self.stride))
-                # examples = int(math.ceil((file_length - self.length) / self.stride) + 1)
             else:
                 examples = (file_length - self.length) // self.stride
-                # examples = (file_length - self.length) // self.stride + 1
             self.num_examples.append(examples)
 
     def __len__(self):

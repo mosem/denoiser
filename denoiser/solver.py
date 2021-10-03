@@ -159,12 +159,6 @@ class Solver(object):
                 logger.info('-' * 70)
                 logger.info('Evaluating on the test set...')
 
-                # generator = self.batch_solver.get_generator_model()
-                # # We switch to the best known model for testing
-                # with swap_state(generator, self.batch_solver.get_generator_state(self.best_states)):
-                #     pesq, stoi = evaluate(self.args, generator, self.tt_loader)
-
-                # (or) replaced the above block with this
                 generator = self.batch_solver.get_generator_for_evaluation(self.best_states)
                 with torch.no_grad():
                     pesq, stoi = evaluate(self.args, generator, self.tt_loader)
@@ -202,11 +196,6 @@ class Solver(object):
         for i, (noisy, clean) in enumerate(logprog):
             noisy = noisy.to(self.device)
             clean = clean.to(self.device)
-
-            # #TODO remove after debugging
-            # write("C:/Users/ortal/Downloads/noisy.wav", 8000, noisy[0].cpu().flatten().numpy())
-            # write("C:/Users/ortal/Downloads/clean.wav", 16000, clean[0].cpu().flatten().numpy())
-
             if not cross_valid:
                 noisy, clean = self.augment.augment_data(noisy, clean)
 

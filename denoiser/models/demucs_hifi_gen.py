@@ -160,9 +160,7 @@ class DemucsEn(nn.Module):
             mix = mix / (self.floor + std)
         else:
             std = 1
-        # length = mix.shape[-1]
         x = mix
-        # x = F.pad(x, (0, self.valid_length(length) - length))
 
         if self.scale_factor == 2:
             x = upsample2(x)
@@ -351,8 +349,8 @@ class DemucsHifiNew(nn.Module):
 
         # decode to original dims
         for i, decode in enumerate(self.decoder):
-            skip = skips.pop(-1)
             if self.include_skip:
+                skip = skips.pop(-1)
                 x = x + skip[..., :x.shape[-1]]
             x = decode(x)
             xs = None

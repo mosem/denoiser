@@ -18,10 +18,6 @@ from denoiser.batch_solvers.BatchSolverFactory import BatchSolverFactory
 
 logger = logging.getLogger(__name__)
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--conf_name", required=True)
-conf_name = parser.parse_args().conf_name
-
 def run(args):
     import torch
 
@@ -98,8 +94,7 @@ def _main(args):
     else:
         run(args)
 
-@hydra.main(config_path="conf", config_name=conf_name) #  for latest version of hydra=1.0
-# @hydra.main(config_path="conf", config_name="config") #  for latest version of hydra=1.0, general config | TODO change to this one for demucs
+@hydra.main(config_path="conf", config_name="config_demucs_hifi") #  for latest version of hydra=1.0
 def main(args):
     try:
         _main(args)
