@@ -66,18 +66,20 @@ batch_size: 16
 model: demucs_hifi # demucs/demucs_adversarial/demucs_hifi/demucs_hifi_features
 demucs:
   chin: 1
-  chout: 1
+  chout: 24
   hidden: 48
   max_hidden: 10000
   causal: true
+  floor: 1e-3
   glu: true
   depth: 5
   kernel_size: 8
-  stride: 4
+  stride: 2
   normalize: true
   resample: 1
   growth: 2
   rescale: 0.1
+  scale_factor: 1
 
 seanet:
   latent_space_size: 128
@@ -92,11 +94,11 @@ caunet:
   frame_shift: 256
 
 hifi:
-  resblock: 1
+  resblock: 2
   upsample_rates: [10,5,2]
   upsample_kernel_sizes: [11,6,3]
   upsample_dialation_sizes: [1,1,1]
-  upsample_initial_channel: 128
+  upsample_initial_channel: 1536
   input_initial_channel: 768
   resblock_kernel_sizes: [3,7,11]
   resblock_dilation_sizes: [[1,3,5], [1,3,5], [1,3,5]]
