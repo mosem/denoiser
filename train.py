@@ -11,12 +11,16 @@ import os
 import shutil
 from datetime import datetime
 import hydra
+import argparse
 
 from denoiser.executor import start_ddp_workers
 from denoiser.batch_solvers.BatchSolverFactory import BatchSolverFactory
 
 logger = logging.getLogger(__name__)
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--conf_name", required=True)
+conf_name = parser.parse_args().conf_name
 
 def run(args):
     import torch
@@ -94,21 +98,11 @@ def _main(args):
     else:
         run(args)
 
-@hydra.main(config_path="conf", config_name="config_demucs_hifi") #  for latest version of hydra=1.0
+@hydra.main(config_path="conf", config_name=conf_name) #  for latest version of hydra=1.0
 # @hydra.main(config_path="conf", config_name="config") #  for latest version of hydra=1.0, general config | TODO change to this one for demucs
 def main(args):
     try:
-        if "hifi" in args.model:
-            os.makedirs(f"../hifi_L-{args.hifi.l1_factor}_G-{args.hifi.gen_factor}", exist_ok=True)
-            _main(args)
-            now = datetime.now()
-            try:
-                shutil.move(".", f"../hifi_L-{args.hifi.l1_factor}_G-{args.hifi.gen_factor}/{now.strftime('%d-%m-%Y_%H-%M')}")
-            except Exception:
-                pass
-
-        else:
-            _main(args)
+        _main(args)
     except Exception:
         logger.exception("Some error happened")
         # Hydra intercepts exit code, fixed in beta but I could not get the beta to work

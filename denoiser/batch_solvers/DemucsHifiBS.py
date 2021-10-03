@@ -2,7 +2,7 @@ import itertools
 import torch
 import torch.nn.functional as F
 from denoiser.batch_solvers.batch_solver import BatchSolver
-from denoiser.models.demucs_hifi_gen import DemucsHifi, DemucsHifiWithSkipConnections
+from denoiser.models.demucs_hifi_gen import DemucsHifi, DemucsHifiNew
 from denoiser.models.hifi_gan_models import HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator, discriminator_loss, \
     feature_loss, generator_loss
 from torchaudio.transforms import MelSpectrogram
@@ -60,8 +60,7 @@ class DemucsHifiBS(BatchSolver):
         d2e_args.sample_rate = sample_rate
         device = 'cuda' if torch.cuda.is_available() and self.args.device != 'cpu' else 'cpu'
         # gen = DemucsHifi(self.args.demucs, d2e_args, self.args.hifi).to(device)
-        gen = DemucsHifiWithSkipConnections(self.args.demucs, d2e_args, self.args.hifi,
-                                            int(self.args.sample_rate * self.args.segment)).to(device)
+        gen = DemucsHifiNew(self.args, int(self.args.sample_rate * self.args.segment)).to(device)
         mpd = HifiMultiPeriodDiscriminator().to(device)
         msd = HifiMultiScaleDiscriminator().to(device)
         return {self.GEN: gen, self.MPD: mpd, self.MSD: msd}

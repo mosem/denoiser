@@ -214,25 +214,31 @@ def load_features_model(feature_model, state_dict_path):
         raise ValueError("Unknown model.")
 
 
-class DemucsHifiWithSkipConnections(nn.Module):
-    def __init__(self, demucs_args, demucs2embedded_args, hifi_args, output_length):
+class DemucsHifiNew(nn.Module):
+    def __init__(self, args, output_length):
         super().__init__()
 
         # demucs related
+        demucs_args = args.demucs
+        demucs2embedded_args = args.demucs2embedded
+        hifi_args = args.hifi
+        demucs_hifi_args = args.demucs_hifi
         self.chin = demucs_args.chin
         self.chout = demucs_args.chout
         self.hidden = demucs_args.hidden
         self.depth = demucs_args.depth
         self.kernel_size = demucs_args.kernel_size
         self.stride = demucs_args.stride
+        self.dialation = demucs_args.dialation
         self.causal = demucs_args.causal
         self.floor = demucs_args.floor
         self.resample = demucs_args.resample
         self.normalize = demucs_args.normalize
         self.scale_factor = demucs_args.scale_factor
+        self.include_skip = demucs_hifi_args.include_skip_connections
+        self.ft_loss = demucs_hifi_args.include_hubert_features_loss
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
-
         self.target_training_length = output_length
         activation = nn.GLU(1) if demucs_args.glu else nn.ReLU()
         # ch_scale = 1
@@ -246,7 +252,8 @@ class DemucsHifiWithSkipConnections(nn.Module):
         for index in range(demucs_args.depth):
             encode = []
             encode += [
-                nn.Conv1d(self.chin, self.hidden, demucs_args.kernel_size, demucs_args.stride),
+                nn.Conv1d(self.chin, self.hidden, demucs_args.kernel_size, demucs_args.stride,
+                          padding=(demucs_args.kernel_size - demucs_args.stride)//2),
                 nn.ReLU(),
                 nn.Conv1d(self.hidden, self.hidden * ch_scale, 1), activation,
             ]
@@ -254,8 +261,8 @@ class DemucsHifiWithSkipConnections(nn.Module):
 
             decode = []
             decode += [
-                nn.Conv1d( self.hidden, ch_scale * self.hidden, 1), activation,
-                nn.ConvTranspose1d(self.hidden, self.chout, self.kernel_size, self.stride),
+                nn.Conv1d(self.hidden, ch_scale * self.hidden, 1), activation,
+                nn.ConvTranspose1d(self.hidden, self.chout, 4, 2, 1),
             ]
             if index > 0:
                 decode.append(nn.ReLU())
@@ -272,16 +279,13 @@ class DemucsHifiWithSkipConnections(nn.Module):
             rescale_module(self, reference=demucs_args.rescale)
 
         # linear embedded dim
-        # self.l1 = nn.Linear(demucs2embedded_args.len_in,
-        #                     int(demucs2embedded_args.sample_rate * demucs2embedded_args.slice_rate)) # TODO: this supports a fixed length of input, change this?
-        #
-        # self.l2 = nn.Linear(int(demucs2embedded_args.sample_rate * demucs2embedded_args.slice_rate), demucs2embedded_args.len_in)
+        if self.ft_loss:
+            self.resampler = torchaudio.transforms.Resample(output_length // (2**demucs_args.depth),
+                                                            int(args.source_sample_rate * args.segment * demucs2embedded_args.slice_rate))
 
         # hifi generator
         self.num_kernels = len(hifi_args.resblock_kernel_sizes)
         self.num_upsamples = len(hifi_args.upsample_rates)
-        # self.conv_pre = weight_norm(Conv1d(hifi_args.input_initial_channel, hifi_args.upsample_initial_channel, 7, 1, padding=3))
-        # self.conv_pre = weight_norm(Conv1d(1, h.upsample_initial_channel, 7, 1, padding=3))
         resblock = ResBlock1 if str(hifi_args.resblock) == '1' else ResBlock2
         args = {
             "resblock": resblock,
@@ -294,17 +298,6 @@ class DemucsHifiWithSkipConnections(nn.Module):
             "resblock_dilation_sizes": hifi_args.resblock_dilation_sizes,
         }
         self._init_args_kwargs = (args, None)
-
-        # self.ups = nn.ModuleList()
-        # for i, (u, d, k) in enumerate(zip(hifi_args.upsample_rates, hifi_args.upsample_dialation_sizes, hifi_args.upsample_kernel_sizes)):
-        #     self.ups.append(weight_norm(
-        #         ConvTranspose1d(in_channels=max(hifi_args.upsample_initial_channel // (2 ** i), 1),
-        #                         out_channels=max(hifi_args.upsample_initial_channel // (2 ** (i + 1)), 1),
-        #                         kernel_size=k,
-        #                         stride=u,
-        #                         padding=(k - u) // 2,
-        #                         dilation=d)))
-
         self.resblocks = nn.ModuleList()
         ch = 24
         for i in range(len(self.decoder)):
@@ -313,16 +306,6 @@ class DemucsHifiWithSkipConnections(nn.Module):
             ch = channels.pop()
             for j, (k, d) in enumerate(zip(hifi_args.resblock_kernel_sizes, hifi_args.resblock_dilation_sizes)):
                 self.resblocks.append(resblock(ch, k, d))
-
-        self.last_upscaling_conv_transpose = ConvTranspose1d(in_channels=ch,
-                                                             out_channels=ch,
-                                                             kernel_size=4,
-                                                             stride=2,
-                                                             padding=1,
-                                                             dilation=5)
-        self.last_resblocks = nn.ModuleList()
-        for (k, d) in zip(hifi_args.resblock_kernel_sizes, hifi_args.resblock_dilation_sizes):
-            self.last_resblocks.append(resblock(ch, k, d))
 
         self.conv_post = weight_norm(Conv1d(ch, 1, 7, 1, padding=3))
         # self.ups.apply(init_weights)
@@ -356,21 +339,21 @@ class DemucsHifiWithSkipConnections(nn.Module):
         skips = []
         for encode in self.encoder:
             x = encode(x)
-            skips.append(x)
+            if self.include_skip:
+                skips.append(x)
         x = x.permute(2, 0, 1)
         x, _ = self.lstm(x)
         x = x.permute(1, 2, 0)
 
         # embedded dim createion
-        # x = F.leaky_relu(self.l1(x), LRELU_SLOPE)
-        # x = F.leaky_relu(self.l2(x), LRELU_SLOPE)
+        if self.ft_loss:
+            ft = self.resampler(x)
 
         # decode to original dims
         for i, decode in enumerate(self.decoder):
             skip = skips.pop(-1)
-            x = x + skip[..., :x.shape[-1]]
-            # if i == 0:
-            #     x = F.leaky_relu(self.conv_pre(x), LRELU_SLOPE)
+            if self.include_skip:
+                x = x + skip[..., :x.shape[-1]]
             x = decode(x)
             xs = None
             for j in range(self.num_kernels):
@@ -379,16 +362,6 @@ class DemucsHifiWithSkipConnections(nn.Module):
                 else:
                     xs += self.resblocks[i * self.num_kernels + j](x)
             x = xs / self.num_kernels
-
-        # upscale to proper length
-        x = F.leaky_relu(self.last_upscaling_conv_transpose(x), LRELU_SLOPE)
-        xs = None
-        for j in range(self.num_kernels):
-            if xs is None:
-                xs = self.last_resblocks[j](x)
-            else:
-                xs += self.last_resblocks[j](x)
-        x = xs / self.num_kernels
 
         x = F.leaky_relu(x)
         x = self.conv_post(x)
@@ -401,5 +374,7 @@ class DemucsHifiWithSkipConnections(nn.Module):
             x = pad(x)
         elif x.size(-1) > target_length:
             x = x[..., :target_length]
+        if self.ft_loss:
+            return x * std, ft
         return x * std
 
