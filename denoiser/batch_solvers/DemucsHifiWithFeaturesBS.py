@@ -18,11 +18,11 @@ class DemucsHifiWithFeaturesBS(DemucsHifiBS):
         self.LOSS_NAMES = ['L1', 'Gen_loss', 'Disc_loss', 'Embedded_L1_loss']
 
     def _construct_models(self):
-        sample_rate = self.args.sample_rate
-        d2e_args = self.args.demucs2embedded
+        sample_rate = self.args.experiment.sample_rate
+        d2e_args = self.args.experiment.demucs2embedded
         d2e_args.sample_rate = sample_rate
         device = 'cuda' if torch.cuda.is_available() and self.args.device != 'cpu' else 'cpu'
-        encoder = DemucsEn(self.args.demucs).to(device)
+        encoder = DemucsEn(self.args.experiment.demucs).to(device)
         d2e = DemucsToEmbeddedDim(d2e_args).to(device)
         decoder = HifiGenerator(**self.args.hifi).to(device)
         ft = load_features_model(self.args.features_model.feature_model, self.args.features_model.state_dict_path).to(device)

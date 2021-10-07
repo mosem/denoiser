@@ -26,7 +26,7 @@ def get_clean_dataset(args):
     clean_json_path = os.path.join(paths.test, 'clean.json')
     with open(clean_json_path) as f:
         files = json.load(f)
-    return Audioset(files, with_path=True, sample_rate=args.sample_rate)
+    return Audioset(files, with_path=True, sample_rate=args.experiment.sample_rate)
 
 
 def snr(signal, noise):

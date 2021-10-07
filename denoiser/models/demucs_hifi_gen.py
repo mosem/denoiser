@@ -217,10 +217,10 @@ class DemucsHifiNew(nn.Module):
         super().__init__()
 
         # demucs related
-        demucs_args = args.demucs
-        demucs2embedded_args = args.demucs2embedded
-        hifi_args = args.hifi
-        demucs_hifi_args = args.demucs_hifi
+        demucs_args = args.experiment.demucs
+        demucs2embedded_args = args.experiment.demucs2embedded
+        hifi_args = args.experiment.hifi
+        demucs_hifi_args = args.experiment.demucs_hifi
         self.chin = demucs_args.chin
         self.chout = demucs_args.chout
         self.hidden = demucs_args.hidden

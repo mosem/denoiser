@@ -100,12 +100,12 @@ def get_dataset(args):
             "Small sample set was not provided by either noisy_dir or noisy_json. "
             "Skipping enhancement.")
         return None
-    return Audioset(files, with_path=True, sample_rate=args.sample_rate)
+    return Audioset(files, with_path=True, sample_rate=args.experiment.sample_rate)
 
 
 def _estimate_and_save(model, noisy_signals, filenames, out_dir, args):
     estimate = get_estimate(model, noisy_signals, args)
-    save_wavs(estimate, noisy_signals, filenames, out_dir, sr=args.sample_rate)
+    save_wavs(estimate, noisy_signals, filenames, out_dir, sr=args.experiment.sample_rate)
 
 
 def enhance(args, model=None, local_out_dir=None):
@@ -141,7 +141,7 @@ def enhance(args, model=None, local_out_dir=None):
             else:
                 # Forward
                 estimate = get_estimate(model, noisy_signals, args)
-                save_wavs(estimate, noisy_signals, filenames, out_dir, sr=args.sample_rate)
+                save_wavs(estimate, noisy_signals, filenames, out_dir, sr=args.experiment.sample_rate)
 
         if pendings:
             print('Waiting for pending jobs...')

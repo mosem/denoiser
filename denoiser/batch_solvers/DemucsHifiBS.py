@@ -21,7 +21,7 @@ class DemucsHifiBS(BatchSolver):
         self._models_dict = self._construct_models()
         self._opt_dict = self._construct_optimizers()
         self.LOSS_NAMES = ['L1', 'Gen_loss', 'Disc_loss']
-        self._mel = MelSpectrogram(sample_rate=args.sample_rate,
+        self._mel = MelSpectrogram(sample_rate=args.experiment.sample_rate,
                                    n_fft=args.hifi.n_fft,
                                    win_length=args.hifi.win_size,
                                    hop_length=args.hifi.hop_size,
@@ -39,7 +39,7 @@ class DemucsHifiBS(BatchSolver):
         return None
 
     def calculate_valid_length(self, length):
-        return int(self.args.segment * self.args.sample_rate)
+        return int(self.args.experiment.segment * self.args.experiment.sample_rate)
         # return self._models_dict[self.GEN].d.valid_length(length)
 
     def get_generator_model(self):
@@ -55,12 +55,12 @@ class DemucsHifiBS(BatchSolver):
         return self._opt_dict
 
     def _construct_models(self):
-        sample_rate = self.args.sample_rate
-        d2e_args = self.args.demucs2embedded
+        sample_rate = self.args.experiment.sample_rate
+        d2e_args = self.args.experiment.demucs2embedded
         d2e_args.sample_rate = sample_rate
         device = 'cuda' if torch.cuda.is_available() and self.args.device != 'cpu' else 'cpu'
-        # gen = DemucsHifi(self.args.demucs, d2e_args, self.args.hifi).to(device)
-        gen = DemucsHifiNew(self.args, int(self.args.sample_rate * self.args.segment)).to(device)
+        # gen = DemucsHifi(self.args.experiment.demucs, d2e_args, self.args.hifi).to(device)
+        gen = DemucsHifiNew(self.args, int(self.args.experiment.sample_rate * self.args.experiment.segment)).to(device)
         mpd = HifiMultiPeriodDiscriminator().to(device)
         msd = HifiMultiScaleDiscriminator().to(device)
         return {self.GEN: gen, self.MPD: mpd, self.MSD: msd}

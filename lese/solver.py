@@ -39,7 +39,7 @@ class Solver(object):
         if args.remix:
             augments.append(augment.Remix())
         if args.bandmask:
-            augments.append(augment.BandMask(args.bandmask, sample_rate=args.sample_rate))
+            augments.append(augment.BandMask(args.bandmask, sample_rate=args.experiment.sample_rate))
         if args.shift:
             augments.append(augment.Shift(args.shift, args.shift_same))
         if args.revecho:

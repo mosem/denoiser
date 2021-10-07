@@ -12,7 +12,7 @@ class BatchSolverFactory:
                     "demucs_adversarial": DemucsAdversarialBS,
                     "demucs_hifi": DemucsHifiBS,
                     "demucs_hifi_features": DemucsHifiWithFeaturesBS}
-        if args.model not in bsolvers.keys():
+        if args.experiment.model not in bsolvers.keys():
             raise ValueError("Given model name is not supported")
 
-        return bsolvers[args.model](args)
+        return bsolvers[args.experiment.model](args)

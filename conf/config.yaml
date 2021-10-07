@@ -1,17 +1,8 @@
 defaults:
+  - experiment: example_file
   - dset: valentini
   - hydra/job_logging: colorlog
   - hydra/hydra_logging: colorlog
-
-# Dataset related
-sample_rate: 16000 # target sample rate
-source_sample_rate: 16000 # source sample rate, added to support BWE
-segment: 2
-stride: 2    # in seconds, how much to stride between training examples
-pad: true   # if training sample is too short, pad it
-
-scale_factor: 1
-upsampled: false # if upsampling from input dataset to target dataset
 
 # Dataset Augmentation
 remix: false   # remix noise and clean
@@ -31,7 +22,7 @@ show: 0   # just show the model and its size and exit
 checkpoint: true
 continue_from: '' # Path the a checkpoint.th file to start from.
                   # this is not used in the name of the experiment!
-                  # so use a dummy=something not to mixup experiments.
+                  # so use a dummy=something not to mixup experiment.
 continue_best: false  # continue from best, not last state if continue_from is set.
 continue_pretrained:   # use either dns48, dns64 or master64 to fine tune from pretrained-model
 restart: false # Ignore existing checkpoints
@@ -62,76 +53,6 @@ stft_mag_factor: .5
 epochs: 100
 batch_size: 32
 
-# Models
-model: demucs # demucs/demucs_adversarial/demucs_hifi/demucs_hifi_features
-demucs:
-  chin: 1
-  chout: 1
-  hidden: 48
-  max_hidden: 10000
-  causal: true
-  floor: 1e-3
-  glu: true
-  depth: 5
-  kernel_size: 8
-  stride: 4
-  normalize: true
-  resample: 4
-  growth: 2
-  rescale: 0.1
-  scale_factor: 1
-
-seanet:
-  latent_space_size: 128
-  ngf: 32
-  n_residual_layers: 3
-  resample: 1
-
-caunet:
-  L: 512
-  width: 64
-  frame_size: 512
-  frame_shift: 256
-
-hifi:
-  resblock: 1
-  upsample_rates: [8,8,2,2]
-  upsample_kernel_sizes: [16,16,4,4]
-  upsample_initial_channel: 128
-  input_initial_channel: 1
-  resblock_kernel_sizes: [3,7,11]
-  resblock_dilation_sizes: [[1,3,5], [1,3,5], [1,3,5]]
-  n_fft: 1024
-  hop_size: 256
-  win_size: 1024
-  n_mels: 80
-  with_spec: True
-  l1_factor: 45
-  gen_factor: 2
-
-
-demucs2embedded:  # used in demucs_hifi for embedded dim creation. (also with asr conditioning)
-  sample_rate: 16000 # dummy - alter this in batch_solver
-  slice_rate: 20e-3
-  ch_in: 128
-  len_in: 256
-  emb_dim: 768
-
-features_model:
-  feature_model: 'hubert'
-  state_dict_path: 'path/to/weights/' # TODO: fill
-  features_factor: 0.01
-
-# Discriminator related
-adversarial_mode: False
-laplacian: False
-lambda_feat: 100
-discriminator:
-  n_layers: 4
-  num_D: 3
-  downsampling_factor: 4
-  ndf: 16
-
 # Experiment launching, distributed
 ddp: false
 ddp_backend: nccl
@@ -144,7 +65,7 @@ world_size:
 # Hydra config
 hydra:
   run:
-    dir: ./outputs/exp_${hydra.job.override_dirname}
+    dir: ./outputs/${experiment.experiment_name}_${hydra.job.override_dirname}
   job:
     config:
       # configuration for the ${hydra.job.override_dirname} runtime variable

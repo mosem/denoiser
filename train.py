@@ -40,32 +40,32 @@ def run(args):
             if hasattr(batch_solver, 'valid_length'):
                 batch_solver.calculate_valid_length(1)
                 field = batch_solver.get_valid_length()
-                logger.info('Field: %.1f ms', field / args.sample_rate * 1000)
+                logger.info('Field: %.1f ms', field / args.experiment.sample_rate * 1000)
             return
 
     assert args.batch_size % distrib.world_size == 0
     args.batch_size //= distrib.world_size
 
-    length = int(args.segment * args.sample_rate)
-    stride = int(args.stride * args.sample_rate)
+    length = int(args.experiment.segment * args.experiment.sample_rate)
+    stride = int(args.experiment.stride * args.experiment.sample_rate)
     # Define a specific number of samples to avoid 0 padding during training
-    length = batch_solver.calculate_valid_length(math.ceil(length / args.scale_factor))
+    length = batch_solver.calculate_valid_length(math.ceil(length / args.experiment.scale_factor))
     batch_solver.set_target_training_length(length)
-    kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
+    kwargs = {"matching": args.dset.matching, "sample_rate": args.experiment.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(
-            args, args.dset.train, length=length, stride=stride, pad=args.pad, scale_factor=args.scale_factor, **kwargs)
+            args, args.dset.train, length=length, stride=stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, **kwargs)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
         cv_dataset = NoisyCleanSet(
-            args, args.dset.valid, length=length, stride=stride, pad=args.pad, scale_factor=args.scale_factor, **kwargs)
+            args, args.dset.valid, length=length, stride=stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, **kwargs)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         cv_loader = None
     if args.dset.test:
         tt_dataset = NoisyCleanSet(
-            args, args.dset.test, length=length, stride=stride, pad=args.pad, scale_factor=args.scale_factor, **kwargs)
+            args, args.dset.test, length=length, stride=stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, **kwargs)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         tt_loader = None
@@ -94,7 +94,8 @@ def _main(args):
     else:
         run(args)
 
-@hydra.main(config_path="conf", config_name="config_demucs_hifi") #  for latest version of hydra=1.0
+# @hydra.main(config_path="conf", config_name="config_demucs_hifi_with_skips") #  for latest version of hydra=1.0
+@hydra.main(config_path="conf", config_name="config") #  for latest version of hydra=1.0
 def main(args):
     try:
         _main(args)

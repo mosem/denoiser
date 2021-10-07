@@ -232,12 +232,12 @@ class Augment(object):
         if args.remix:
             augments.append(Remix())
         if args.bandmask:
-            augments.append(BandMask(args.bandmask, scale_factor=args.scale_factor,
-                                             target_sample_rate=args.sample_rate))
+            augments.append(BandMask(args.bandmask, scale_factor=args.experiment.scale_factor,
+                                             target_sample_rate=args.experiment.sample_rate))
         if args.shift:
-            augments.append(Shift(args.shift, args.shift_same, args.scale_factor))
+            augments.append(Shift(args.shift, args.shift_same, args.experiment.scale_factor))
         if args.revecho:
-            augments.append(RevEcho(args.revecho, target_sample_rate=args.sample_rate, scale_factor=args.scale_factor))
+            augments.append(RevEcho(args.revecho, target_sample_rate=args.experiment.sample_rate, scale_factor=args.experiment.scale_factor))
         self.augment = th.nn.Sequential(*augments) if augments else None
 
 
@@ -245,11 +245,11 @@ class Augment(object):
         if not self.augment:
             return noisy, clean
 
-        if self.args.scale_factor == 1:
+        if self.args.experiment.scale_factor == 1:
             clean_downsampled = clean
-        elif self.args.scale_factor == 2:
+        elif self.args.experiment.scale_factor == 2:
             clean_downsampled = downsample2(clean)
-        elif self.args.scale_factor == 4:
+        elif self.args.experiment.scale_factor == 4:
             clean_downsampled = downsample2(clean)
             clean_downsampled = downsample2(clean_downsampled)
         noise = noisy - clean_downsampled

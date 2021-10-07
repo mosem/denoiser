@@ -494,7 +494,7 @@ def test():
     args = parser.parse_args()
     if args.num_threads:
         th.set_num_threads(args.num_threads)
-    sr = args.sample_rate
+    sr = args.experiment.sample_rate
     sr_ms = sr / 1000
     demucs = Demucs(depth=args.depth, hidden=args.hidden, resample=args.resample).to(args.device)
     x = th.randn(1, int(sr * 4)).to(args.device)

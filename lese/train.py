@@ -25,7 +25,7 @@ def run(args):
     from .solver import Solver
     distrib.init()
 
-    model = Demucs(**args.demucs)
+    model = Demucs(**args.experiment.demucs)
 
     if args.show:
         logger.info(model)
@@ -35,21 +35,21 @@ def run(args):
         logger.info(f'No params: {no_params}')
         if hasattr(model, 'valid_length'):
             field = model.calculate_valid_length(1)
-            logger.info('Field: %.1f ms', field / args.sample_rate * 1000)
+            logger.info('Field: %.1f ms', field / args.experiment.sample_rate * 1000)
         return
 
     assert args.batch_size % distrib.world_size == 0
     args.batch_size //= distrib.world_size
 
-    length = int(args.segment * args.sample_rate)
-    stride = int(args.stride * args.sample_rate)
+    length = int(args.experiment.segment * args.experiment.sample_rate)
+    stride = int(args.experiment.stride * args.experiment.sample_rate)
     # Demucs requires a specific number of samples to avoid 0 padding during training
     if hasattr(model, 'valid_length'):
         length = model.calculate_valid_length(length)
-    kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
+    kwargs = {"matching": args.dset.matching, "sample_rate": args.experiment.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(
-        args.dset.train, length=length, stride=stride, pad=args.pad, **kwargs)
+        args.dset.train, length=length, stride=stride, pad=args.experiment.pad, **kwargs)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
