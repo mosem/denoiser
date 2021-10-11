@@ -1,7 +1,7 @@
 import itertools
 import torch
 import torch.nn.functional as F
-from denoiser.batch_solvers.DemucsHifiBS import DemucsHifiBS
+from denoiser.batch_solvers.demucs_hifi_bs import DemucsHifiBS
 from denoiser.models.demucs_hifi_gen import load_features_model, DemucsEn, DemucsToEmbeddedDim
 from denoiser.models.hifi_gan_models import HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator, discriminator_loss, \
     feature_loss, generator_loss, HifiGenerator
@@ -24,8 +24,8 @@ class DemucsHifiWithFeaturesBS(DemucsHifiBS):
         device = 'cuda' if torch.cuda.is_available() and self.args.device != 'cpu' else 'cpu'
         encoder = DemucsEn(self.args.experiment.demucs).to(device)
         d2e = DemucsToEmbeddedDim(d2e_args).to(device)
-        decoder = HifiGenerator(**self.args.hifi).to(device)
-        ft = load_features_model(self.args.features_model.feature_model, self.args.features_model.state_dict_path).to(device)
+        decoder = HifiGenerator(**self.args.experiment.hifi).to(device)
+        ft = load_features_model(self.args.experiment.features_model.feature_model, self.args.experiment.features_model.state_dict_path).to(device)
         mpd = HifiMultiPeriodDiscriminator().to(device)
         msd = HifiMultiScaleDiscriminator().to(device)
         return {self.ENC: encoder, self.D2E: d2e, self.FT: ft, self.DEC: decoder, self.MPD: mpd, self.MSD: msd}
@@ -104,13 +104,13 @@ class DemucsHifiWithFeaturesBS(DemucsHifiBS):
         loss_gen_all += generator_loss(y_df_hat_g)[0]
         loss_gen_all += generator_loss(y_ds_hat_g)[0]
 
-        if self.args.hifi.with_spec:
+        if self.args.experiment.hifi.with_spec:
             y_g_hat = self._mel(y_g_hat.squeeze(1))
             y = self._mel(y.squeeze(1))
-        loss_audio = F.l1_loss(y, y_g_hat) * self.args.hifi.l1_factor
+        loss_audio = F.l1_loss(y, y_g_hat) * self.args.experiment.hifi.l1_factor
 
-        loss_gen_all = self.args.hifi.gen_factor * loss_gen_all + loss_audio \
-                       + self.args.features_model.features_factor * emb_loss
+        loss_gen_all = self.args.experiment.hifi.gen_factor * loss_gen_all + loss_audio \
+                       + self.args.experiment.features_model.features_factor * emb_loss
 
         if not cross_valid:
             loss_gen_all.backward()
@@ -123,6 +123,6 @@ class DemucsHifiWithFeaturesBS(DemucsHifiBS):
                 self.LOSS_NAMES[2]: loss_disc_all, self.LOSS_NAMES[3]: emb_loss}
 
     def get_evaluation_loss(self, losses_dict):
-        return losses_dict['Gen_loss'] * self.args.hifi.gen_factor + losses_dict['L1'] \
-               + self.args.features_model.features_factor * losses_dict['Embedded_L1_loss']
+        return losses_dict['Gen_loss'] * self.args.experiment.hifi.gen_factor + losses_dict['L1'] \
+               + self.args.experiment.features_model.features_factor * losses_dict['Embedded_L1_loss']
 

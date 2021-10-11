@@ -14,7 +14,7 @@ import hydra
 import argparse
 
 from denoiser.executor import start_ddp_workers
-from denoiser.batch_solvers.BatchSolverFactory import BatchSolverFactory
+from denoiser.batch_solvers.batch_solver_factory import BatchSolverFactory
 
 logger = logging.getLogger(__name__)
 

@@ -184,35 +184,18 @@ class DemucsEn(nn.Module):
         return std * x
 
 
-class DemucsHifi(nn.Module):
-
-    def __init__(self, demucs_args, demucs2embedded_args, hifi_args):
-        super().__init__()
-        self.d = DemucsEn(**demucs_args)
-        self.d2e = DemucsToEmbeddedDim(**demucs2embedded_args)
-        self.h = HifiGenerator(**hifi_args)
-        kw = {"d2e": demucs2embedded_args, "hifi": hifi_args}
-        self._init_args_kwargs = (demucs_args, kw)
-
-    def forward(self, x):
-        x = self.d(x)
-        x = self.d2e(x)
-        x = self.h(x)
-        return x
-
-
-def load_features_model(feature_model, state_dict_path):
+def load_features_model(feature_model, state_dict_path, device):
     if feature_model == 'hubert':
-        return huBERT(state_dict_path, 6)
+        return huBERT(state_dict_path, 6, device=device)
     elif feature_model == 'cpc':
-        return CPC()
+        return CPC(device=device)
     elif feature_model == 'asr':
-        return AsrFeatExtractor()
+        return AsrFeatExtractor(device=device)
     else:
         raise ValueError("Unknown model.")
 
 
-class DemucsHifiNew(nn.Module):
+class DemucsHifi(nn.Module):
     def __init__(self, args, output_length):
         super().__init__()
 
@@ -220,21 +203,20 @@ class DemucsHifiNew(nn.Module):
         demucs_args = args.experiment.demucs
         demucs2embedded_args = args.experiment.demucs2embedded
         hifi_args = args.experiment.hifi
-        demucs_hifi_args = args.experiment.demucs_hifi
         self.chin = demucs_args.chin
         self.chout = demucs_args.chout
         self.hidden = demucs_args.hidden
         self.depth = demucs_args.depth
         self.kernel_size = demucs_args.kernel_size
         self.stride = demucs_args.stride
-        self.dialation = demucs_args.dialation
+        self.dialation = demucs2embedded_args.dialation
         self.causal = demucs_args.causal
         self.floor = demucs_args.floor
         self.resample = demucs_args.resample
         self.normalize = demucs_args.normalize
         self.scale_factor = demucs_args.scale_factor
-        self.include_skip = demucs_hifi_args.include_skip_connections
-        self.ft_loss = demucs_hifi_args.include_hubert_features_loss
+        self.include_skip = demucs2embedded_args.include_skip_connections
+        self.ft_loss = demucs2embedded_args.include_ft
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
         self.target_training_length = output_length
@@ -279,7 +261,9 @@ class DemucsHifiNew(nn.Module):
         # linear embedded dim
         if self.ft_loss:
             self.resampler = torchaudio.transforms.Resample(output_length // (2**demucs_args.depth),
-                                                            int(args.source_sample_rate * args.segment * demucs2embedded_args.slice_rate))
+                                                            int(args.experiment.source_sample_rate *
+                                                                args.experiment.segment *
+                                                                demucs2embedded_args.slice_rate))
 
         # hifi generator
         self.num_kernels = len(hifi_args.resblock_kernel_sizes)

@@ -114,6 +114,9 @@ class Solver(object):
             info = " ".join(f"{k.capitalize()}={v:.5f}" for k, v in metrics.items())
             logger.info(f"Epoch {epoch + 1}: {info}")
 
+        logger.info('-' * 70)
+        logger.info("Training...")
+
         for epoch in range(len(self.history), self.epochs):
             # Train one epoch
             self.batch_solver.train()
@@ -122,13 +125,11 @@ class Solver(object):
             logger.info("Trainable Params:")
             for name, model in self.batch_solver.get_models().items():
                 logger.info(f"{name}: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
-            logger.info('-' * 70)
-            logger.info("Training...")
             losses = self._run_one_epoch(epoch)
             logger_msg = f'Train Summary | End of Epoch {epoch + 1} | Time {time.time() - start:.2f}s | ' \
                          + ' | '.join([f'{k} Loss {v:.5f}' for k,v in losses.items()])
             logger.info(bold(logger_msg))
-
+            logger.info('-' * 70)
             if self.cv_loader:
                 # Cross validation
                 logger.info('-' * 70)

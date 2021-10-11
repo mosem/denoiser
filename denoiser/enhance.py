@@ -72,15 +72,7 @@ def get_estimate(model, noisy, args):
     return estimate
 
 
-def save_wavs(estimates, noisy_sigs, filenames, out_dir, noisy_sr=16_000, enhanced_sr=16_000):
-    # Write result
-    for estimate, noisy, filename in zip(estimates, noisy_sigs, filenames):
-        filename = os.path.join(out_dir, os.path.basename(filename).rsplit(".", 1)[0])
-        write(noisy, filename + "_noisy.wav", sr=noisy_sr)
-        write(estimate, filename + "_enhanced.wav", sr=enhanced_sr)
-
-
-def save_wavs_new(estimates, noisy_sigs, clean_sigs, filenames, out_dir, noisy_sr=16_000, out_sr=16_000):
+def save_wavs(estimates, noisy_sigs, clean_sigs, filenames, out_dir, noisy_sr=16_000, out_sr=16_000):
     # Write result
     for estimate, noisy, clean, filename in zip(estimates, noisy_sigs, clean_sigs, filenames):
         filename = os.path.join(out_dir, os.path.basename(filename).rsplit(".", 1)[0])
@@ -116,7 +108,7 @@ def get_dataset(args):
 def _estimate_and_save(model, noisy, clean, filename, out_dir, args):
     estimate = model(noisy)
     noisy_sr = args.experiment.source_sample_rate
-    save_wavs_new(estimate, noisy, clean, filename, out_dir, noisy_sr, args.experiment.sample_rate)
+    save_wavs(estimate, noisy, clean, filename, out_dir, noisy_sr, args.experiment.sample_rate)
 
 
 def enhance(args, model=None, local_out_dir=None, loader=None):
@@ -144,13 +136,13 @@ def enhance(args, model=None, local_out_dir=None, loader=None):
             if args.device == 'cpu' and args.num_workers > 1:
                 pendings.append(
                     pool.submit(_estimate_and_save,
-                                model, noisy_signals, [f"{i}"], out_dir, args))
+                                model, noisy_signals, clean, [f"{i}"], out_dir, args))
             else:
 
                 # Forward
                 estimate = get_estimate(model, noisy_signals, args)
                 noisy_sr = math.ceil(args.experiment.sample_rate / args.experiment.scale_factor)
-                save_wavs_new(estimate, noisy_signals, clean, [f"{i}"], out_dir, noisy_sr=noisy_sr, out_sr=args.experiment.sample_rate)
+                save_wavs(estimate, noisy_signals, clean, [f"{i}"], out_dir, noisy_sr=noisy_sr, out_sr=args.experiment.sample_rate)
 
         if pendings:
             print('Waiting for pending jobs...')

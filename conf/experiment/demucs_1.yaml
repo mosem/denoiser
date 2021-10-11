@@ -1,4 +1,4 @@
-experiment_name: example_experiment
+experiment_name: demucs_1
 
 # Dataset related
 sample_rate: 16000 # target sample rate #should be included in training cfg
@@ -7,6 +7,7 @@ segment: 2
 stride: 2    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
 
+scale_factor: 1
 upsampled: false # if upsampling from input dataset to target dataset
 
 # models related
@@ -55,6 +56,7 @@ hifi:
   with_spec: True
   l1_factor: 45
   gen_factor: 2
+  dialation: 1
 
 demucs2embedded:  # used in demucs_hifi for embedded dim creation. (also with asr conditioning)
   sample_rate: 16000 # dummy - alter this in batch_solver
@@ -65,7 +67,6 @@ demucs2embedded:  # used in demucs_hifi for embedded dim creation. (also with as
   include_ft: true
   ft_reg_factor: 1e-2
   include_skip_connections: true
-  dialation: 1
 
 features_model:
   feature_model: 'hubert'

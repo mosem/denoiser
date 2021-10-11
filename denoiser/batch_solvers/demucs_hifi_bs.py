@@ -2,7 +2,7 @@ import itertools
 import torch
 import torch.nn.functional as F
 from denoiser.batch_solvers.batch_solver import BatchSolver
-from denoiser.models.demucs_hifi_gen import DemucsHifi, DemucsHifiNew
+from denoiser.models.demucs_hifi_gen import DemucsHifi, load_features_model
 from denoiser.models.hifi_gan_models import HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator, discriminator_loss, \
     feature_loss, generator_loss
 from torchaudio.transforms import MelSpectrogram
@@ -22,10 +22,20 @@ class DemucsHifiBS(BatchSolver):
         self._opt_dict = self._construct_optimizers()
         self.LOSS_NAMES = ['L1', 'Gen_loss', 'Disc_loss']
         self._mel = MelSpectrogram(sample_rate=args.experiment.sample_rate,
-                                   n_fft=args.hifi.n_fft,
-                                   win_length=args.hifi.win_size,
-                                   hop_length=args.hifi.hop_size,
-                                   n_mels=args.hifi.n_mels).to(args.device)
+                                   n_fft=args.experiment.hifi.n_fft,
+                                   win_length=args.experiment.hifi.win_size,
+                                   hop_length=args.experiment.hifi.hop_size,
+                                   n_mels=args.experiment.hifi.n_mels).to(args.device)
+        self.ft_loss = self.args.experiment.demucs2embedded.include_ft
+        if self.args.experiment.demucs2embedded.include_ft:
+            self.ft_model = load_features_model(self.args.experiment.features_model.feature_model,
+                                                self.args.experiment.features_model.state_dict_path,
+                                                device=args.device)
+            self.ft_factor = self.args.experiment.demucs2embedded.ft_reg_factor
+        else:
+            self.ft_model = None
+            self.ft_factor = 0
+
 
     def get_generator_for_evaluation(self, best_states):
         generator = self.get_generator_model()
@@ -58,11 +68,10 @@ class DemucsHifiBS(BatchSolver):
         sample_rate = self.args.experiment.sample_rate
         d2e_args = self.args.experiment.demucs2embedded
         d2e_args.sample_rate = sample_rate
-        device = 'cuda' if torch.cuda.is_available() and self.args.device != 'cpu' else 'cpu'
-        # gen = DemucsHifi(self.args.experiment.demucs, d2e_args, self.args.hifi).to(device)
-        gen = DemucsHifiNew(self.args, int(self.args.experiment.sample_rate * self.args.experiment.segment)).to(device)
-        mpd = HifiMultiPeriodDiscriminator().to(device)
-        msd = HifiMultiScaleDiscriminator().to(device)
+        gen = DemucsHifi(self.args, int(self.args.experiment.sample_rate *
+                                        self.args.experiment.segment)).to(self.args.device)
+        mpd = HifiMultiPeriodDiscriminator().to(self.args.device)
+        msd = HifiMultiScaleDiscriminator().to(self.args.device)
         return {self.GEN: gen, self.MPD: mpd, self.MSD: msd}
 
     def _construct_optimizers(self):
@@ -80,8 +89,11 @@ class DemucsHifiBS(BatchSolver):
 
         optim_g, optim_d = self._opt_dict[self.G_OPT], self._opt_dict[self.D_OPT]
 
-        y_g_hat = generator(x)
-
+        if self.ft_loss:
+            y_g_hat, x_ft = generator(x)
+        else:
+            y_g_hat = generator(x)
+            x_ft = 0
         if y.shape[2] < y_g_hat.shape[2]:
             y_g_hat = y_g_hat[:, :, :y.shape[2]]
         elif y.shape[2] > y_g_hat.shape[2]:
@@ -117,12 +129,19 @@ class DemucsHifiBS(BatchSolver):
         loss_gen_all += generator_loss(y_df_hat_g)[0]
         loss_gen_all += generator_loss(y_ds_hat_g)[0]
 
-        if self.args.hifi.with_spec:
+        if self.ft_loss:
+            with torch.no_grad:
+                y_ft = self.ft_model(y)
+                asr_ft_loss = F.l1_loss(y_ft, x_ft) * self.args.experiment.demucs2embedded.ft_reg_factor
+        else:
+            asr_ft_loss = 0
+
+        if self.args.experiment.hifi.with_spec:
             y_g_hat = self._mel(y_g_hat.squeeze(1))
             y = self._mel(y.squeeze(1))
-        loss_audio = F.l1_loss(y, y_g_hat) * self.args.hifi.l1_factor
+        loss_audio = F.l1_loss(y, y_g_hat) * self.args.experiment.hifi.l1_factor
 
-        loss_gen_all = self.args.hifi.gen_factor * loss_gen_all + loss_audio
+        loss_gen_all = self.args.experiment.hifi.gen_factor * loss_gen_all + loss_audio + asr_ft_loss
 
         if not cross_valid:
             loss_gen_all.backward()
@@ -136,5 +155,5 @@ class DemucsHifiBS(BatchSolver):
                 self.LOSS_NAMES[2]: loss_disc_all.item()}
 
     def get_evaluation_loss(self, losses_dict):
-        return losses_dict[self.LOSS_NAMES[1]] * self.args.hifi.gen_factor + losses_dict[self.LOSS_NAMES[0]]
+        return losses_dict[self.LOSS_NAMES[1]] * self.args.experiment.hifi.gen_factor + losses_dict[self.LOSS_NAMES[0]]
 
