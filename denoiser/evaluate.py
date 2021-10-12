@@ -11,7 +11,13 @@ import json
 import logging
 import sys
 
-from pesq import pesq
+from scipy.io.wavfile import write
+
+import torchaudio
+import matplotlib.pyplot as plt
+
+from pesq import pesq, PesqError
+# from pypesq import pesq
 from pystoi import stoi
 import torch
 
@@ -47,7 +53,9 @@ def evaluate(args, model=None, data_loader=None):
 
     # Load data
     if data_loader is None:
-        dataset = NoisyCleanSet(args.data_dir, matching=args.matching, sample_rate=args.sample_rate)
+        dataset = NoisyCleanSet(args, args.data_dir, matching=args.matching,
+                                sample_rate=args.experiment.sample_rate,
+                                scale_factor=args.experiment.scale_factor)
         data_loader = distrib.loader(dataset, batch_size=1, num_workers=2)
     pendings = []
     with ProcessPoolExecutor(args.num_workers) as pool:
@@ -63,6 +71,8 @@ def evaluate(args, model=None, data_loader=None):
                 else:
                     estimate = get_estimate(model, noisy, args)
                     estimate = estimate.cpu()
+                    # TODO: fix this
+                    estimate = estimate.flatten().unsqueeze(0).unsqueeze(0)
                     clean = clean.cpu()
                     pendings.append(
                         pool.submit(_run_metrics, clean, estimate, args))
@@ -72,6 +82,33 @@ def evaluate(args, model=None, data_loader=None):
             pesq_i, stoi_i = pending.result()
             total_pesq += pesq_i
             total_stoi += stoi_i
+
+    # # (or) excluded multiprocessing
+    # with torch.no_grad():
+    #     iterator = LogProgress(logger, data_loader, name="Eval estimates")
+    #     for i, data in enumerate(iterator):
+    #         # Get batch data
+    #         noisy, clean = [x.to(args.device) for x in data]
+    #         # If device is CPU, we do parallel evaluation in each CPU worker.
+    #         if args.device == 'cpu':
+    #             pendings.append(_estimate_and_run_metrics(clean, model, noisy, args))
+    #         else:
+    #             estimate = get_estimate(model, noisy, args)
+    #             estimate = estimate.cpu()
+    #
+    #             clean = clean.cpu()
+    #
+    #             # TODO: fix this
+    #             estimate = estimate.flatten().unsqueeze(0).unsqueeze(0)
+    #
+    #
+    #             pendings.append(_run_metrics(clean, estimate, args))
+    #         total_cnt += clean.shape[0]
+    #
+    # for pending in LogProgress(logger, pendings, updates, name="Eval metrics"):
+    #     pesq_i, stoi_i = pending
+    #     total_pesq += pesq_i
+    #     total_stoi += stoi_i
 
     metrics = [total_pesq, total_stoi]
     pesq, stoi = distrib.average([m/total_cnt for m in metrics], total_cnt)
@@ -87,11 +124,19 @@ def _estimate_and_run_metrics(clean, model, noisy, args):
 def _run_metrics(clean, estimate, args):
     estimate = estimate.numpy()[:, 0]
     clean = clean.numpy()[:, 0]
+
+    if clean.shape != estimate.shape:
+        # logger.info(f"_run_metrics: non-equal sizes. estimate: {estimate.shape}, clean: {clean.shape}")
+        min_len = min(estimate.shape[-1], clean.shape[-1])
+        # logger.info(f"min_len: {min_len}")
+        estimate = estimate[:,:min_len]
+        clean = clean[:,:min_len]
+        # logger.info(f"_run_metrics: fixed sizes. estimate: {estimate.shape}, clean: {clean.shape}")
     if args.pesq:
-        pesq_i = get_pesq(clean, estimate, sr=args.sample_rate)
+        pesq_i = get_pesq(clean, estimate, sr=args.experiment.sample_rate)
     else:
         pesq_i = 0
-    stoi_i = get_stoi(clean, estimate, sr=args.sample_rate)
+    stoi_i = get_stoi(clean, estimate, sr=args.experiment.sample_rate)
     return pesq_i, stoi_i
 
 
@@ -105,7 +150,9 @@ def get_pesq(ref_sig, out_sig, sr):
     """
     pesq_val = 0
     for i in range(len(ref_sig)):
-        pesq_val += pesq(sr, ref_sig[i], out_sig[i], 'wb')
+        # tmp = pesq(ref_sig[i], out_sig[i], sr)  # from pypesq
+        tmp = pesq(sr, ref_sig[i], out_sig[i], 'wb')  # from pesq
+        pesq_val += tmp
     return pesq_val
 
 

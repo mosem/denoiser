@@ -10,6 +10,7 @@ import logging
 from contextlib import contextmanager
 import inspect
 import time
+from torch.nn.utils import weight_norm
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,7 @@ class LogProgress:
                 self._log()
 
     def _log(self):
-        self._speed = (1 + self._index) / (time.time() - self._begin)
+        self._speed = (1 + self._index) / (time.time() - self._begin + 1e-6)
         infos = " | ".join(f"{k.capitalize()} {v}" for k, v in self._infos.items())
         if self._speed < 1e-4:
             speed = "oo sec/it"
@@ -163,3 +164,19 @@ def bold(text):
     Display text in bold in the terminal.
     """
     return colorize(text, "1")
+
+
+def init_weights(m, mean=0.0, std=0.01):
+    classname = m.__class__.__name__
+    if classname.find("Conv") != -1:
+        m.weight.data.normal_(mean, std)
+
+
+def apply_weight_norm(m):
+    classname = m.__class__.__name__
+    if classname.find("Conv") != -1:
+        weight_norm(m)
+
+
+def get_padding(kernel_size, dilation=1):
+    return int((kernel_size*dilation - dilation)/2)

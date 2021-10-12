@@ -5,7 +5,6 @@ egs/
 outputs/
 enhanced/
 .vim
-models/
 private/
 dist
 build

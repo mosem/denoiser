@@ -1,13 +1,8 @@
 defaults:
+  - experiment: example_file
   - dset: debug
   - hydra/job_logging: colorlog
   - hydra/hydra_logging: colorlog
-
-# Dataset related
-sample_rate: 16000
-segment: 4
-stride: 1    # in seconds, how much to stride between training examples
-pad: true   # if training sample is too short, pad it
 
 # Dataset Augmentation
 remix: false   # remix noise and clean
@@ -19,7 +14,7 @@ revecho: 0  # add reverb like augment
 # Logging and printing, and does not impact training
 num_prints: 5
 device: cuda
-num_workers: 5
+num_workers: 2
 verbose: 0
 show: 0   # just show the model and its size and exit
 
@@ -27,7 +22,7 @@ show: 0   # just show the model and its size and exit
 checkpoint: true
 continue_from: '' # Path the a checkpoint.th file to start from.
                   # this is not used in the name of the experiment!
-                  # so use a dummy=something not to mixup experiments.
+                  # so use a dummy=something not to mixup experiment.
 continue_best: false  # continue from best, not last state if continue_from is set.
 continue_pretrained:   # use either dns48, dns64 or master64 to fine tune from pretrained-model
 restart: false # Ignore existing checkpoints
@@ -42,37 +37,22 @@ dummy:  # use this if you want twice the same exp, with a different name
 
 # Evaluation stuff
 pesq: True # compute pesq?
-eval_every: 10  # compute test metrics every so epochs
+eval_every: 1  # compute test metrics every so epochs
 dry: 0.  # dry/wet knob value at eval
 streaming: False  # use streaming evaluation for Demucs
 
 # Optimization related
 optim: adam
 lr: 3e-4
+beta1: 0.8
 beta2: 0.999
 loss: l1
 stft_loss: False
 stft_sc_factor: .5
 stft_mag_factor: .5
-epochs: 400
-batch_size: 64
-
-# Models
-model: demucs # either demucs or dwave
-demucs:
-  chin: 1
-  chout: 1
-  hidden: 48
-  max_hidden: 10000
-  causal: true
-  glu: true
-  depth: 5
-  kernel_size: 8
-  stride: 4
-  normalize: true
-  resample: 4
-  growth: 2
-  rescale: 0.1
+epochs: 10
+batch_size: 16
+#batch_size: 32
 
 # Experiment launching, distributed
 ddp: false
@@ -86,7 +66,7 @@ world_size:
 # Hydra config
 hydra:
   run:
-    dir: ./outputs/exp_${hydra.job.override_dirname}
+    dir: ./outputs/${experiment.experiment_name}_${hydra.job.override_dirname}
   job:
     config:
       # configuration for the ${hydra.job.override_dirname} runtime variable

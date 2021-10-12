@@ -14,7 +14,7 @@ import sys
 
 import torchaudio
 from torch.nn import functional as F
-
+from scipy.io.wavfile import write
 
 Info = namedtuple("Info", ["length", "sample_rate", "channels"])
 
@@ -48,28 +48,33 @@ def find_audio_files(path, exts=[".wav"], progress=True):
 
 class Audioset:
     def __init__(self, files=None, length=None, stride=None,
-                 pad=True, with_path=False, sample_rate=None, upsampled = False):
+                 pad=True, with_path=False, sample_rate=None, source_sample_rate=None):
         """
         files should be a list [(file, length)]
         """
         self.files = files
         self.num_examples = []
-        self.length = length
+        # if source_sample_rate is not None and sample_rate is not None and source_sample_rate != sample_rate:
+        #     length = int(length * source_sample_rate/sample_rate)
         self.stride = stride or length
+        # # force even sample length over target rate samples
+        # self.length = length if length is None or length % 2 == 0 or \
+        #                         (source_sample_rate is not None and source_sample_rate != sample_rate) \
+        #     else length - 1
+        self.length = length
         self.with_path = with_path
         self.sample_rate = sample_rate
-        self.upsampled = upsampled
+        self.ssr = source_sample_rate
+
         for file, file_length in self.files:
-            if upsampled:
-                file_length = math.ceil(file_length/2)
             if length is None:
                 examples = 1
             elif file_length < length:
                 examples = 1 if pad else 0
             elif pad:
-                examples = int(math.ceil((file_length - self.length) / self.stride) + 1)
+                examples = int(math.ceil((file_length - self.length) / self.stride))
             else:
-                examples = (file_length - self.length) // self.stride + 1
+                examples = (file_length - self.length) // self.stride
             self.num_examples.append(examples)
 
     def __len__(self):
@@ -85,8 +90,7 @@ class Audioset:
             if self.length is not None:
                 offset = self.stride * index
                 num_frames = self.length
-                if self.upsampled:
-                    num_frames *= 2
+
             if torchaudio.get_audio_backend() in ['soundfile', 'sox_io']:
                 out, sr = torchaudio.load(str(file),
                                           frame_offset=offset,
@@ -97,8 +101,9 @@ class Audioset:
                 if sr != self.sample_rate:
                     raise RuntimeError(f"Expected {file} to have sample rate of "
                                        f"{self.sample_rate}, but got {sr}")
-            if num_frames:
-                out = F.pad(out, (0, num_frames - out.shape[-1]))
+
+            if num_frames or (self.length is not None and out.shape[-1] < self.length):
+                out = F.pad(out, (0, self.length - out.shape[-1]))
             if self.with_path:
                 return out, file
             else:

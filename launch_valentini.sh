@@ -8,16 +8,12 @@
 
 python train.py \
   dset=valentini \
-  demucs.causal=1 \
-  demucs.hidden=24 \
-  bandmask=0.2 \
-  demucs.resample=4 \
-  remix=1 \
-  shift=8000 \
-  shift_same=True \
+  model=demucs \
   stft_loss=True \
-  segment=4.5 \
-  stride=0.5 \
+  segment=2 \
+  stride=2 \
   ddp=0 \
-  batch_size=32
+  batch_size=16 \
+  scale_factor=2 \
+  dummy='demucs_bs' \
 

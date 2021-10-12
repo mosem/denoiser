@@ -7,53 +7,37 @@
 
 import json
 import logging
+import math
 from pathlib import Path
 import os
 import time
 
 import torch
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 from . import augment, distrib, pretrained
+from .augment import Augment
 from .enhance import enhance
 from .evaluate import evaluate
 from .stft_loss import MultiResolutionSTFTLoss
 from .utils import bold, copy_state, pull_metric, serialize_model, swap_state, LogProgress
-from .resample import downsample2
+from .resample import downsample2, upsample2
+from .preprocess import  TorchSignalToFrames, TorchOLA
+
+from scipy.io.wavfile import write
 
 logger = logging.getLogger(__name__)
 
 
-class MultipleInputsSequential(torch.nn.Sequential):
-    def forward(self, *inputs):
-        for module in self._modules.values():
-            if type(inputs) == tuple:
-                inputs = module(*inputs)
-            else:
-                inputs = module(inputs)
-        return inputs
-
 class Solver(object):
-    def __init__(self, data, model, optimizer, args):
+    def __init__(self, data, batch_solver, args):
         self.tr_loader = data['tr_loader']
         self.cv_loader = data['cv_loader']
         self.tt_loader = data['tt_loader']
-        self.model = model
-        self.dmodel = distrib.wrap(model)
-        self.optimizer = optimizer
+        self.batch_solver = batch_solver
 
-        # data augment
-        augments = []
-        if args.remix:
-            augments.append(augment.Remix())
-        if args.bandmask:
-            augments.append(augment.BandMask(args.bandmask, sample_rate=args.sample_rate))
-        if args.shift:
-            augments.append(augment.Shift(args.shift, args.shift_same))
-        if args.revecho:
-            augments.append(
-                augment.RevEcho(args.revecho))
-        self.augment = MultipleInputsSequential(*augments)
+        self.augment = Augment(args)
 
         # Training config
         self.device = args.device
@@ -69,7 +53,7 @@ class Solver(object):
             logger.debug("Checkpoint will be saved to %s", self.checkpoint_file.resolve())
         self.history_file = args.history_file
 
-        self.best_state = None
+        self.best_states = None
         self.restart = args.restart
         self.history = []  # Keep track of loss
         self.samples_dir = args.samples_dir  # Where to save samples
@@ -81,10 +65,9 @@ class Solver(object):
 
     def _serialize(self):
         package = {}
-        package['model'] = serialize_model(self.model)
-        package['optimizer'] = self.optimizer.state_dict()
+        package['models'], package['optimizers'] = self.batch_solver.serialize()
         package['history'] = self.history
-        package['best_state'] = self.best_state
+        package['best_states'] = self.best_states
         package['args'] = self.args
         tmp_path = str(self.checkpoint_file) + ".tmp"
         torch.save(package, tmp_path)
@@ -93,11 +76,14 @@ class Solver(object):
         os.rename(tmp_path, self.checkpoint_file)
 
         # Saving only the latest best model.
-        model = package['model']
-        model['state'] = self.best_state
-        tmp_path = str(self.best_file) + ".tmp"
-        torch.save(model, tmp_path)
-        os.rename(tmp_path, self.best_file)
+        models = package['models']
+        for model_name, best_state in package['best_states'].items():
+            models[model_name]['state'] = best_state
+            model_filename = model_name + '_' + self.best_file.name
+            tmp_path = os.path.join(self.best_file.parent, model_filename) + ".tmp"
+            torch.save(models[model_name], tmp_path)
+            model_path = Path(self.best_file.parent / model_filename)
+            os.rename(tmp_path, model_path)
 
     def _reset(self):
         """_reset."""
@@ -115,20 +101,10 @@ class Solver(object):
         if load_from:
             logger.info(f'Loading checkpoint model: {load_from}')
             package = torch.load(load_from, 'cpu')
-            if load_best:
-                self.model.load_state_dict(package['best_state'])
-            else:
-                self.model.load_state_dict(package['model']['state'])
-            if 'optimizer' in package and not load_best:
-                self.optimizer.load_state_dict(package['optimizer'])
+            self.batch_solver.load(package, load_best)
             if keep_history:
                 self.history = package['history']
-            self.best_state = package['best_state']
-        continue_pretrained = self.args.continue_pretrained
-        if continue_pretrained:
-            logger.info("Fine tuning from pre-trained model %s", continue_pretrained)
-            model = getattr(pretrained, self.args.continue_pretrained)()
-            self.model.load_state_dict(model.state_dict())
+            self.best_states = package['best_states']
 
     def train(self):
         # Optimizing the model
@@ -138,36 +114,44 @@ class Solver(object):
             info = " ".join(f"{k.capitalize()}={v:.5f}" for k, v in metrics.items())
             logger.info(f"Epoch {epoch + 1}: {info}")
 
+        logger.info('-' * 70)
+        logger.info("Training...")
+
         for epoch in range(len(self.history), self.epochs):
             # Train one epoch
-            self.model.train()
+            self.batch_solver.train()
             start = time.time()
+            # added logging support for printing out model params
+            logger.info("Trainable Params:")
+            for name, model in self.batch_solver.get_models().items():
+                logger.info(f"{name}: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
+            losses = self._run_one_epoch(epoch)
+            logger_msg = f'Train Summary | End of Epoch {epoch + 1} | Time {time.time() - start:.2f}s | ' \
+                         + ' | '.join([f'{k} Loss {v:.5f}' for k,v in losses.items()])
+            logger.info(bold(logger_msg))
             logger.info('-' * 70)
-            logger.info("Training...")
-            train_loss = self._run_one_epoch(epoch)
-            logger.info(
-                bold(f'Train Summary | End of Epoch {epoch + 1} | '
-                     f'Time {time.time() - start:.2f}s | Train Loss {train_loss:.5f}'))
-
             if self.cv_loader:
                 # Cross validation
                 logger.info('-' * 70)
                 logger.info('Cross validation...')
-                self.model.eval()
+                self.batch_solver.eval()
                 with torch.no_grad():
-                    valid_loss = self._run_one_epoch(epoch, cross_valid=True)
-                logger.info(
-                    bold(f'Valid Summary | End of Epoch {epoch + 1} | '
-                         f'Time {time.time() - start:.2f}s | Valid Loss {valid_loss:.5f}'))
+                    valid_losses = self._run_one_epoch(epoch, cross_valid=True)
+                evaluation_loss = self.batch_solver.get_evaluation_loss(valid_losses)
+                logger_msg = f'Train Summary | End of Epoch {epoch + 1} | Time {time.time() - start:.2f}s | ' \
+                             + ' | '.join([f'{k} Valid Loss {v:.5f}' for k, v in valid_losses.items()])
+                logger.info(bold(logger_msg))
+                valid_losses = {'valid_'  + k: v for k,v in valid_losses.items()}
             else:
-                valid_loss = 0
+                valid_losses = {}
+                evaluation_loss = 0
 
-            best_loss = min(pull_metric(self.history, 'valid') + [valid_loss])
-            metrics = {'train': train_loss, 'valid': valid_loss, 'best': best_loss}
+            best_loss = min(pull_metric(self.history, 'evaluation') + [evaluation_loss])
+            metrics = {**losses, **valid_losses, 'evaluation': evaluation_loss, 'best': best_loss}
             # Save the best model
-            if valid_loss == best_loss:
-                logger.info(bold('New best valid loss %.4f'), valid_loss)
-                self.best_state = copy_state(self.model.state_dict())
+            if evaluation_loss == best_loss:
+                logger.info(bold('New best evaluation loss %.4f'), evaluation_loss)
+                self.best_states = self.batch_solver.copy_models_states()
 
             # evaluate and enhance samples every 'eval_every' argument number of epochs
             # also evaluate on last epoch
@@ -175,15 +159,16 @@ class Solver(object):
                 # Evaluate on the testset
                 logger.info('-' * 70)
                 logger.info('Evaluating on the test set...')
-                # We switch to the best known model for testing
-                with swap_state(self.model, self.best_state):
-                    pesq, stoi = evaluate(self.args, self.model, self.tt_loader)
 
-                metrics.update({'pesq': pesq, 'stoi': stoi})
+                generator = self.batch_solver.get_generator_for_evaluation(self.best_states)
+                with torch.no_grad():
+                    pesq, stoi = evaluate(self.args, generator, self.tt_loader)
+
+                    metrics.update({'pesq': pesq, 'stoi': stoi})
 
                 # enhance some samples
                 logger.info('Enhance and save samples...')
-                enhance(self.args, self.model, self.samples_dir)
+                enhance(self.args, generator, self.samples_dir, loader=self.tt_loader)
 
             self.history.append(metrics)
             info = " | ".join(f"{k.capitalize()} {v:.5f}" for k, v in metrics.items())
@@ -196,14 +181,10 @@ class Solver(object):
                 if self.checkpoint:
                     self._serialize()
                     logger.debug("Checkpoint saved to %s", self.checkpoint_file.resolve())
-                    if not os.path.exists("./results"):
-                        os.mkdir("./results")
-                    if not os.path.exists("./results/state_dicts"):
-                        os.mkdir("./results/state_dicts")
-                    torch.save(self.best_state, f"./results/state_dicts/{epoch}.pt")
+
 
     def _run_one_epoch(self, epoch, cross_valid=False):
-        total_loss = 0
+        total_losses = {k:0 for k in self.batch_solver.get_losses_names()}
         data_loader = self.tr_loader if not cross_valid else self.cv_loader
 
         # get a different order for distributed training, otherwise this will get ignored
@@ -212,38 +193,86 @@ class Solver(object):
         label = ["Train", "Valid"][cross_valid]
         name = label + f" | Epoch {epoch + 1}"
         logprog = LogProgress(logger, data_loader, updates=self.num_prints, name=name)
-        for i, data in enumerate(logprog):
-            noisy, clean = [x.to(self.device) for x in data]
-            clean_downsampled = downsample2(clean)
+
+        for i, (noisy, clean) in enumerate(logprog):
+            noisy = noisy.to(self.device)
+            clean = clean.to(self.device)
             if not cross_valid:
-                sources = torch.stack([noisy - clean_downsampled, clean_downsampled])
-                sources, clean = self.augment(sources, clean)
-                noise, clean_downsampled = sources
-                noisy = noise + clean_downsampled
-            estimate = self.dmodel(noisy)
-            # apply a loss function after each layer
-            with torch.autograd.set_detect_anomaly(True):
-                if self.args.loss == 'l1':
-                    loss = F.l1_loss(clean, estimate)
-                elif self.args.loss == 'l2':
-                    loss = F.mse_loss(clean, estimate)
-                elif self.args.loss == 'huber':
-                    loss = F.smooth_l1_loss(clean, estimate)
-                else:
-                    raise ValueError(f"Invalid loss {self.args.loss}")
-                # MultiResolution STFT loss
-                if self.args.stft_loss:
-                    sc_loss, mag_loss = self.mrstftloss(estimate.squeeze(1), clean.squeeze(1))
-                    loss += sc_loss + mag_loss
+                noisy, clean = self.augment.augment_data(noisy, clean)
 
-                # optimize model in training mode
-                if not cross_valid:
-                    self.optimizer.zero_grad()
-                    loss.backward()
-                    self.optimizer.step()
+            losses = self.batch_solver.run((noisy, clean), cross_valid)
+            for k in self.batch_solver.get_losses_names():
+                total_losses[k] += losses[k]
+            losses_info = {k: format(v/(i+1), ".5f") for k,v in total_losses.items()}
+            logprog.update(**losses_info)
+            del losses
 
-            total_loss += loss.item()
-            logprog.update(loss=format(total_loss / (i + 1), ".5f"))
-            # Just in case, clear some memory
-            del loss, estimate
-        return distrib.average([total_loss / (i + 1)], i + 1)[0]
+        for k,v in total_losses.items():
+            total_losses[k] = v/(i+1)
+
+        return total_losses
+
+    def get_loss(self, clean, estimate, cross_valid):
+        with torch.autograd.set_detect_anomaly(True):
+            if self.args.loss == 'l1':
+                loss = F.l1_loss(clean, estimate)
+            elif self.args.loss == 'l2':
+                loss = F.mse_loss(clean, estimate)
+            elif self.args.loss == 'huber':
+                loss = F.smooth_l1_loss(clean, estimate)
+            else:
+                raise ValueError(f"Invalid loss {self.args.loss}")
+            # MultiResolution STFT loss
+            if self.args.stft_loss:
+                sc_loss, mag_loss = self.mrstftloss(estimate.squeeze(1), clean.squeeze(1))
+                loss += sc_loss + mag_loss
+
+            # optimize model in training mode
+            if not cross_valid:
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+            return loss
+
+    def get_adversarial_losses(self, clean, estimate, cross_valid):
+        disc_fake_detached = self.disc(estimate.detach())
+        disc_real = self.disc(clean)
+
+        loss_D = 0
+        for scale in disc_fake_detached:
+            loss_D += F.relu(1+ scale[-1]).mean() # TODO: check if this is a mean over time domain or batch domain
+
+        for scale in disc_real:
+            loss_D += F.relu(1-scale[-1]).mean()  # TODO: check if this is a mean over time domain or batch domain
+
+        if not cross_valid:
+            # self.dDisc.zero_grad() # should I do this?
+            self.disc_opt.zero_grad()
+            loss_D.backward()
+            self.disc_opt.step()
+
+        disc_fake = self.disc(estimate)
+
+        loss_G = 0
+        for scale in disc_fake:
+            loss_G += F.relu(1-scale[-1]).mean()  # TODO: check if this is a mean over time domain or batch domain
+
+        loss_feat = 0
+        feat_weights = 4.0 / (self.args.discriminator.n_layers + 1)
+        D_weights = 1.0 / self.args.discriminator.num_D
+        wt = D_weights * feat_weights
+
+        for i in range(self.args.discriminator.num_D):
+            for j in range(len(disc_fake[i]) -1):
+                loss_feat += wt * F.l1_loss(disc_fake[i][j], disc_real[i][j].detach())
+
+        total_loss_G = (loss_G + self.args.lambda_feat * loss_feat)
+        if not cross_valid:
+            # self.dModel.zero_grad() # should I do this?
+            self.optimizer.zero_grad()
+            total_loss_G.backward()
+            self.optimizer.step()
+
+        return total_loss_G, loss_D
+

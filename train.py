@@ -5,77 +5,74 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # authors: adiyoss and adefossez
-
 import logging
+import math
 import os
-
+import shutil
+from datetime import datetime
 import hydra
+import argparse
 
 from denoiser.executor import start_ddp_workers
+from denoiser.batch_solvers.batch_solver_factory import BatchSolverFactory
 
 logger = logging.getLogger(__name__)
-
 
 def run(args):
     import torch
 
+    from denoiser.batch_solvers import demucs_bs
     from denoiser import distrib
     from denoiser.data import NoisyCleanSet
-    from denoiser.demucs import Demucs
     from denoiser.solver import Solver
     distrib.init(args)
 
-    model = Demucs(**args.demucs)
+    # torch also initialize cuda seed if available
+    torch.manual_seed(args.seed)
+
+    # (or) added batch solver factory
+    batch_solver = BatchSolverFactory.get_bs(args)
 
     if args.show:
-        logger.info(model)
-        mb = sum(p.numel() for p in model.parameters()) * 4 / 2**20
-        logger.info('Size: %.1f MB', mb)
-        if hasattr(model, 'valid_length'):
-            field = model.valid_length(1)
-            logger.info('Field: %.1f ms', field / args.sample_rate * 1000)
-        return
+            logger.info(batch_solver)
+            mb = sum(p.numel() for model in batch_solver.models for p in model.parameters()) * 4 / 2**20
+            logger.info('Size: %.1f MB', mb)
+            if hasattr(batch_solver, 'valid_length'):
+                batch_solver.calculate_valid_length(1)
+                field = batch_solver.get_valid_length()
+                logger.info('Field: %.1f ms', field / args.experiment.sample_rate * 1000)
+            return
 
     assert args.batch_size % distrib.world_size == 0
     args.batch_size //= distrib.world_size
 
-    length = int(args.segment * args.sample_rate)
-    stride = int(args.stride * args.sample_rate)
-    # Demucs requires a specific number of samples to avoid 0 padding during training
-    if hasattr(model, 'valid_length'):
-        length = model.valid_length(length)
-    kwargs = {"matching": args.dset.matching, "sample_rate": args.sample_rate}
+    length = int(args.experiment.segment * args.experiment.sample_rate)
+    stride = int(args.experiment.stride * args.experiment.sample_rate)
+    # Define a specific number of samples to avoid 0 padding during training
+    length = batch_solver.calculate_valid_length(math.ceil(length / args.experiment.scale_factor))
+    batch_solver.set_target_training_length(length)
+    kwargs = {"matching": args.dset.matching, "sample_rate": args.experiment.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(
-        args.dset.train, length=length, stride=stride, pad=args.pad, **kwargs)
+            args, args.dset.train, length=length, stride=stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, **kwargs)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
-        cv_dataset = NoisyCleanSet(args.dset.valid, **kwargs)
+        cv_dataset = NoisyCleanSet(
+            args, args.dset.valid, length=length, stride=stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, **kwargs)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         cv_loader = None
     if args.dset.test:
-        tt_dataset = NoisyCleanSet(args.dset.test, **kwargs)
+        tt_dataset = NoisyCleanSet(
+            args, args.dset.test, length=length, stride=stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, **kwargs)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         tt_loader = None
     data = {"tr_loader": tr_loader, "cv_loader": cv_loader, "tt_loader": tt_loader}
 
-    # torch also initialize cuda seed if available
-    torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
-        model.cuda()
-
-    # optimizer
-    if args.optim == "adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, args.beta2))
-    else:
-        logger.fatal('Invalid optimizer %s', args.optim)
-        os._exit(1)
-
     # Construct Solver
-    solver = Solver(data, model, optimizer, args)
+    solver = Solver(data, batch_solver, args)
     solver.train()
 
 
@@ -97,8 +94,8 @@ def _main(args):
     else:
         run(args)
 
-
-@hydra.main(config_path="conf/config.yaml")
+# @hydra.main(config_path="conf", config_name="config_demucs_hifi_with_skips") #  for latest version of hydra=1.0
+@hydra.main(config_path="conf", config_name="config") #  for latest version of hydra=1.0
 def main(args):
     try:
         _main(args)

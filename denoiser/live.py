@@ -11,7 +11,7 @@ import sys
 import sounddevice as sd
 import torch
 
-from .demucs import DemucsStreamer
+from denoiser.models.demucs import DemucsStreamer
 from .pretrained import add_model_flags, get_model
 from .utils import bold
 
@@ -94,7 +94,7 @@ def main():
     channels_in = min(caps['max_input_channels'], 2)
     stream_in = sd.InputStream(
         device=device_in,
-        samplerate=args.sample_rate,
+        samplerate=args.experiment.sample_rate,
         channels=channels_in)
 
     device_out = parse_audio_device(args.out)
@@ -102,7 +102,7 @@ def main():
     channels_out = min(caps['max_output_channels'], 2)
     stream_out = sd.OutputStream(
         device=device_out,
-        samplerate=args.sample_rate,
+        samplerate=args.experiment.sample_rate,
         channels=channels_out)
 
     stream_in.start()
@@ -113,7 +113,7 @@ def main():
     last_error_time = 0
     cooldown_time = 2
     log_delta = 10
-    sr_ms = args.sample_rate / 1000
+    sr_ms = args.experiment.sample_rate / 1000
     stride_ms = streamer.stride / sr_ms
     print(f"Ready to process audio, total lag: {streamer.total_length / sr_ms:.1f}ms.")
     while True:
@@ -128,7 +128,7 @@ def main():
 
             length = streamer.total_length if first else streamer.stride
             first = False
-            current_time += length / args.sample_rate
+            current_time += length / args.experiment.sample_rate
             frame, overflow = stream_in.read(length)
             frame = torch.from_numpy(frame).mean(dim=1).to(args.device)
             with torch.no_grad():

@@ -6,6 +6,7 @@
 # author: adiyoss
 
 import argparse
+import math
 from concurrent.futures import ProcessPoolExecutor
 import json
 import logging
@@ -17,7 +18,8 @@ import torchaudio
 
 from .audio import Audioset, find_audio_files
 from . import distrib, pretrained
-from .demucs import DemucsStreamer
+from denoiser.models.demucs import DemucsStreamer
+from .resample import downsample2
 
 from .utils import LogProgress
 
@@ -66,16 +68,17 @@ def get_estimate(model, noisy, args):
     else:
         with torch.no_grad():
             estimate = model(noisy)
-            estimate = (1 - args.dry) * estimate + args.dry * noisy
+            # estimate = (1 - args.dry) * estimate + args.dry * noisy
     return estimate
 
 
-def save_wavs(estimates, noisy_sigs, filenames, out_dir, sr=16_000):
+def save_wavs(estimates, noisy_sigs, clean_sigs, filenames, out_dir, noisy_sr=16_000, out_sr=16_000):
     # Write result
-    for estimate, noisy, filename in zip(estimates, noisy_sigs, filenames):
+    for estimate, noisy, clean, filename in zip(estimates, noisy_sigs, clean_sigs, filenames):
         filename = os.path.join(out_dir, os.path.basename(filename).rsplit(".", 1)[0])
-        write(noisy, filename + "_noisy.wav", sr=sr)
-        write(estimate, filename + "_enhanced.wav", sr=sr)
+        write(noisy, filename + "_noisy.wav", sr=noisy_sr)
+        write(estimate, filename + "_enhanced.wav", sr=out_sr)
+        write(clean, filename + "_clean.wav", sr=out_sr)
 
 
 def write(wav, filename, sr=16_000):
@@ -99,15 +102,16 @@ def get_dataset(args):
             "Small sample set was not provided by either noisy_dir or noisy_json. "
             "Skipping enhancement.")
         return None
-    return Audioset(files, with_path=True, sample_rate=args.sample_rate)
+    return Audioset(files, with_path=True, sample_rate=args.experiment.sample_rate)
 
 
-def _estimate_and_save(model, noisy_signals, filenames, out_dir, args):
-    estimate = get_estimate(model, noisy_signals, args)
-    save_wavs(estimate, noisy_signals, filenames, out_dir, sr=args.sample_rate)
+def _estimate_and_save(model, noisy, clean, filename, out_dir, args):
+    estimate = model(noisy)
+    noisy_sr = args.experiment.source_sample_rate
+    save_wavs(estimate, noisy, clean, filename, out_dir, noisy_sr, args.experiment.sample_rate)
 
 
-def enhance(args, model=None, local_out_dir=None):
+def enhance(args, model=None, local_out_dir=None, loader=None):
     # Load model
     if not model:
         model = pretrained.get_model(args).to(args.device)
@@ -117,11 +121,6 @@ def enhance(args, model=None, local_out_dir=None):
     else:
         out_dir = args.out_dir
 
-    dset = get_dataset(args)
-    if dset is None:
-        return
-    loader = distrib.loader(dset, batch_size=1)
-
     if distrib.rank == 0:
         os.makedirs(out_dir, exist_ok=True)
     distrib.barrier()
@@ -129,18 +128,21 @@ def enhance(args, model=None, local_out_dir=None):
     with ProcessPoolExecutor(args.num_workers) as pool:
         iterator = LogProgress(logger, loader, name="Generate enhanced files")
         pendings = []
-        for data in iterator:
+        for i, data in enumerate(iterator):
             # Get batch data
-            noisy_signals, filenames = data
+            noisy_signals, clean = data
+
             noisy_signals = noisy_signals.to(args.device)
             if args.device == 'cpu' and args.num_workers > 1:
                 pendings.append(
                     pool.submit(_estimate_and_save,
-                                model, noisy_signals, filenames, out_dir, args))
+                                model, noisy_signals, clean, [f"{i}"], out_dir, args))
             else:
+
                 # Forward
                 estimate = get_estimate(model, noisy_signals, args)
-                save_wavs(estimate, noisy_signals, filenames, out_dir, sr=args.sample_rate)
+                noisy_sr = math.ceil(args.experiment.sample_rate / args.experiment.scale_factor)
+                save_wavs(estimate, noisy_signals, clean, [f"{i}"], out_dir, noisy_sr=noisy_sr, out_sr=args.experiment.sample_rate)
 
         if pendings:
             print('Waiting for pending jobs...')
