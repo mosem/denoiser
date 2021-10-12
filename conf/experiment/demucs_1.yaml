@@ -64,7 +64,7 @@ demucs2embedded:  # used in demucs_hifi for embedded dim creation. (also with as
   ch_in: 128
   len_in: 256
   emb_dim: 768
-  include_ft: true
+  include_ft: false
   ft_reg_factor: 1e-2
   include_skip_connections: true
 

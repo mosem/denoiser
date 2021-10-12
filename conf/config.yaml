@@ -50,8 +50,8 @@ loss: l1
 stft_loss: False
 stft_sc_factor: .5
 stft_mag_factor: .5
-epochs: 100
-batch_size: 2
+epochs: 10
+batch_size: 16
 #batch_size: 32
 
 # Experiment launching, distributed
