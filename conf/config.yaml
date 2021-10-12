@@ -1,6 +1,6 @@
 defaults:
   - experiment: example_file
-  - dset: valentini
+  - dset: debug
   - hydra/job_logging: colorlog
   - hydra/hydra_logging: colorlog
 

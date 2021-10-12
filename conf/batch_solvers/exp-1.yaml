@@ -1,3 +1,0 @@
-batch_solver_factory:
-  batch_solver: demucs_hifi_features
-  loss:
