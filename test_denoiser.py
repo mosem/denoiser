@@ -2,17 +2,15 @@ import subprocess
 
 OUTPUT_DIR = './outputs/tmp'
 
-TEST_COMMANDS = {'demucs': ['train.py', 'dset=valentini_dummy', 'model=demucs', 'stft_loss=True',
-                       'segment=2', 'stride=2','ddp=0', 'batch_size=16', 'scale_factor=2', 'eval_every=1',
-                       'epochs=2', f'hydra.run.dir={OUTPUT_DIR}'],
-                 'demucs skipless': ['train.py', 'dset=valentini_dummy', 'model=demucs_skipless', 'stft_loss=True',
-                            'segment=2', 'stride=2', 'ddp=0', 'batch_size=16', 'scale_factor=2', 'eval_every=1',
-                            'epochs=2', f'hydra.run.dir={OUTPUT_DIR}']
+TEST_COMMANDS = {'demucs': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_1', 'stft_loss=True',
+                       'experiment.segment=2', 'experiment.stride=2','ddp=0', 'batch_size=16', 'experiment.scale_factor=2',
+                        'eval_every=1', 'epochs=2', f'hydra.run.dir={OUTPUT_DIR}']
                  }
 REMOVE_OUTPUT_FILE_COMMAND = ['rm', '-r', OUTPUT_DIR]
 
 successful_tests = []
 failed_tests = []
+outputs = []
 
 def test_denoiser():
     for exp_name, command in TEST_COMMANDS.items():
@@ -28,6 +26,7 @@ def test_denoiser():
             print(f'{exp_name} passed!\n')
             successful_tests.append(exp_name)
         finally:
+            outputs.append(output)
             print(output.returncode)
             print(output.stdout)
             print(output.stderr)
