@@ -173,8 +173,8 @@ class BandMask(nn.Module):
         mels = dsp.mel_frequencies(bands, 40, self.source_sample_rate / 2) / self.source_sample_rate
         low = random.randrange(bands)
         high = random.randrange(low, min(bands, low + bandwidth))
-        filters = dsp.LowPassFilters([mels[low], mels[high]]).to(wav.device)
-        low, midlow = filters(wav)
+        filters = dsp.LowPassFilters([mels[low], mels[high]]).to(sources.device)
+        sources_low, sources_midlow = filters(sources)
         
         # band pass filtering
         sources_out = sources - sources_midlow + sources_low

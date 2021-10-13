@@ -7,25 +7,18 @@
 
 import json
 import logging
-import math
 from pathlib import Path
 import os
 import time
 
 import torch
-import torch.nn.functional as F
-from torch.autograd import Variable
 
-from . import augment, distrib, pretrained
+from . import distrib
 from .augment import Augment
 from .enhance import enhance
 from .evaluate import evaluate
 from .stft_loss import MultiResolutionSTFTLoss
-from .utils import bold, copy_state, pull_metric, serialize_model, swap_state, LogProgress
-from .resample import downsample2, upsample2
-from .preprocess import  TorchSignalToFrames, TorchOLA
-
-from scipy.io.wavfile import write
+from .utils import bold, pull_metric, LogProgress
 
 logger = logging.getLogger(__name__)
 
@@ -211,68 +204,4 @@ class Solver(object):
             total_losses[k] = v/(i+1)
 
         return total_losses
-
-    def get_loss(self, clean, estimate, cross_valid):
-        with torch.autograd.set_detect_anomaly(True):
-            if self.args.loss == 'l1':
-                loss = F.l1_loss(clean, estimate)
-            elif self.args.loss == 'l2':
-                loss = F.mse_loss(clean, estimate)
-            elif self.args.loss == 'huber':
-                loss = F.smooth_l1_loss(clean, estimate)
-            else:
-                raise ValueError(f"Invalid loss {self.args.loss}")
-            # MultiResolution STFT loss
-            if self.args.stft_loss:
-                sc_loss, mag_loss = self.mrstftloss(estimate.squeeze(1), clean.squeeze(1))
-                loss += sc_loss + mag_loss
-
-            # optimize model in training mode
-            if not cross_valid:
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
-
-            return loss
-
-    def get_adversarial_losses(self, clean, estimate, cross_valid):
-        disc_fake_detached = self.disc(estimate.detach())
-        disc_real = self.disc(clean)
-
-        loss_D = 0
-        for scale in disc_fake_detached:
-            loss_D += F.relu(1+ scale[-1]).mean() # TODO: check if this is a mean over time domain or batch domain
-
-        for scale in disc_real:
-            loss_D += F.relu(1-scale[-1]).mean()  # TODO: check if this is a mean over time domain or batch domain
-
-        if not cross_valid:
-            # self.dDisc.zero_grad() # should I do this?
-            self.disc_opt.zero_grad()
-            loss_D.backward()
-            self.disc_opt.step()
-
-        disc_fake = self.disc(estimate)
-
-        loss_G = 0
-        for scale in disc_fake:
-            loss_G += F.relu(1-scale[-1]).mean()  # TODO: check if this is a mean over time domain or batch domain
-
-        loss_feat = 0
-        feat_weights = 4.0 / (self.args.discriminator.n_layers + 1)
-        D_weights = 1.0 / self.args.discriminator.num_D
-        wt = D_weights * feat_weights
-
-        for i in range(self.args.discriminator.num_D):
-            for j in range(len(disc_fake[i]) -1):
-                loss_feat += wt * F.l1_loss(disc_fake[i][j], disc_real[i][j].detach())
-
-        total_loss_G = (loss_G + self.args.lambda_feat * loss_feat)
-        if not cross_valid:
-            # self.dModel.zero_grad() # should I do this?
-            self.optimizer.zero_grad()
-            total_loss_G.backward()
-            self.optimizer.step()
-
-        return total_loss_G, loss_D
 

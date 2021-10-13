@@ -2,12 +2,9 @@ import subprocess
 
 OUTPUT_DIR = './outputs/tmp'
 
-TEST_COMMANDS = {'demucs': ['train.py', 'dset=debug', 'experiment=demucs_1', 'stft_loss=True',
+TEST_COMMANDS = {'demucs': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_1', 'stft_loss=True',
                             'experiment.segment=2', 'experiment.stride=2','ddp=0', 'batch_size=16', 'experiment.scale_factor=2',
-                            'eval_every=1', 'epochs=2', f'hydra.run.dir={OUTPUT_DIR}'],
-                 'demucs_hifi': ['train.py', 'dset=debug', 'experiment=demucs_hifi_1', 'stft_loss=True',
-                            'experiment.segment=2', 'experiment.stride=2','ddp=0', 'batch_size=16', 'experiment.scale_factor=2',
-                            'eval_every=1', 'epochs=2', f'hydra.run.dir={OUTPUT_DIR}']
+                            'eval_every=1', 'epochs=2', f'hydra.run.dir={OUTPUT_DIR}', 'device=cpu'],
                  }
 REMOVE_OUTPUT_FILE_COMMAND = ['rm', '-r', OUTPUT_DIR]
 

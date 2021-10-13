@@ -69,14 +69,6 @@ class BatchSolver(ABC):
     def get_evaluation_loss(self, losses_dict):
         pass
 
-    # @abstractmethod
-    # def get_generator_model(self):
-    #     pass
-    #
-    # @abstractmethod
-    # def get_generator_state(self, best_states):
-    #     pass
-
     @abstractmethod
     def get_generator_for_evaluation(self, best_states):
         """

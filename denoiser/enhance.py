@@ -68,7 +68,6 @@ def get_estimate(model, noisy, args):
     else:
         with torch.no_grad():
             estimate = model(noisy)
-            # estimate = (1 - args.dry) * estimate + args.dry * noisy
     return estimate
 
 
@@ -85,24 +84,6 @@ def write(wav, filename, sr=16_000):
     # Normalize audio if it prevents clipping
     wav = wav / max(wav.abs().max().item(), 1)
     torchaudio.save(filename, wav.cpu(), sr)
-
-
-def get_dataset(args):
-    if hasattr(args, 'dset'):
-        paths = args.dset
-    else:
-        paths = args
-    if paths.noisy_json:
-        with open(paths.noisy_json) as f:
-            files = json.load(f)
-    elif paths.noisy_dir:
-        files = find_audio_files(paths.noisy_dir)
-    else:
-        logger.warning(
-            "Small sample set was not provided by either noisy_dir or noisy_json. "
-            "Skipping enhancement.")
-        return None
-    return Audioset(files, with_path=True, sample_rate=args.experiment.sample_rate)
 
 
 def _estimate_and_save(model, noisy, clean, filename, out_dir, args):

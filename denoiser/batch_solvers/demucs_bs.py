@@ -42,8 +42,7 @@ class DemucsBS(BatchSolver):
 
     def run(self, data, cross_valid=False):
         noisy, clean = data
-        target_length = clean.size(-1) if cross_valid else None
-        estimate = self.models['generator'](noisy, target_length)
+        estimate = self.models['generator'](noisy)
         loss = self._get_loss(clean, estimate)
         if not cross_valid:
             self._optimize(loss)

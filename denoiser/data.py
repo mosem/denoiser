@@ -7,11 +7,9 @@
 
 import json
 import logging
+import math
 import os
 import re
-
-from os import path
-import torchaudio
 
 from .audio import Audioset
 from .resample import downsample2
@@ -71,20 +69,28 @@ def match_files(noisy, clean, matching="sort"):
 
 
 class NoisyCleanSet:
-    def __init__(self, args, json_dir, matching="sort", length=None, stride=None,
-                 pad=True, sample_rate=None, scale_factor=1, with_path=False):
+    def __init__(self, json_dir, calc_valid_length_func, matching="sort", clean_length=None, stride=None,
+                 pad=True, sample_rate=None, scale_factor=1, with_path=False, is_training=False):
         """__init__.
         :param json_dir: directory containing both clean.json and noisy.json
         :param matching: matching function for the files
-        :param length: maximum sequence length
+        :param clean_length: maximum sequence length
         :param stride: the stride used for splitting audio sequences
         :param pad: pad the end of the sequence with zeros
         :param sample_rate: the signals sampling rate
         """
         self.scale_factor = scale_factor
         self.with_path = with_path
-        self.length = length
-        self.scale_factor = scale_factor
+        self.clean_length = clean_length
+        self.calc_valid_length_func = calc_valid_length_func
+        self.is_training = is_training
+
+        if self.is_training:
+            input_training_length = math.ceil(self.clean_length / self.scale_factor)
+            self.valid_length = self.calc_valid_length_func(input_training_length)
+        else:
+            self.valid_length = None
+
         noisy_json = os.path.join(json_dir, 'noisy.json')
         clean_json = os.path.join(json_dir, 'clean.json')
         with open(noisy_json, 'r') as f:
@@ -93,7 +99,7 @@ class NoisyCleanSet:
             clean = json.load(f)
 
         match_files(noisy, clean, matching)
-        kw = {'length': length, 'stride': stride, 'pad': pad, 'with_path': with_path}
+        kw = {'length': clean_length, 'stride': stride, 'pad': pad, 'with_path': with_path}
         self.clean_set = Audioset(clean, sample_rate=sample_rate, **kw)
         self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw)
 
@@ -102,12 +108,6 @@ class NoisyCleanSet:
     def __getitem__(self, index):
         noisy, clean = self.noisy_set[index], self.clean_set[index]
 
-        if clean.shape[-1] < self.length:
-            clean = F.pad(clean, (0, 0, self.scale_factor - clean.shape[-1]))
-
-        if noisy.shape[-1] < self.length:
-            noisy = F.pad(noisy, (0, 0, self.length - noisy.shape[-1]))
-
         if self.scale_factor == 2:
             noisy = downsample2(noisy)
         elif self.scale_factor == 4:
@@ -115,6 +115,15 @@ class NoisyCleanSet:
             noisy = downsample2(noisy)
         elif self.scale_factor != 1:
             raise RuntimeError(f"Scale factor should be 1, 2, or 4")
+
+        if not self.is_training:
+            self.valid_length = self.calc_valid_length_func(noisy.shape[-1])
+
+        if self.valid_length < clean.shape[-1]:
+            clean = clean[...,:self.valid_length]
+        elif self.valid_length > clean.shape[-1]:
+            clean = F.pad(clean, (0, 0, self.valid_length - clean.shape[-1]))
+
 
         return noisy, clean
 

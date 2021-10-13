@@ -48,23 +48,16 @@ def find_audio_files(path, exts=[".wav"], progress=True):
 
 class Audioset:
     def __init__(self, files=None, length=None, stride=None,
-                 pad=True, with_path=False, sample_rate=None, source_sample_rate=None):
+                 pad=True, with_path=False, sample_rate=None):
         """
         files should be a list [(file, length)]
         """
         self.files = files
         self.num_examples = []
-        # if source_sample_rate is not None and sample_rate is not None and source_sample_rate != sample_rate:
-        #     length = int(length * source_sample_rate/sample_rate)
         self.stride = stride or length
-        # # force even sample length over target rate samples
-        # self.length = length if length is None or length % 2 == 0 or \
-        #                         (source_sample_rate is not None and source_sample_rate != sample_rate) \
-        #     else length - 1
         self.length = length
         self.with_path = with_path
         self.sample_rate = sample_rate
-        self.ssr = source_sample_rate
 
         for file, file_length in self.files:
             if length is None:
@@ -101,9 +94,6 @@ class Audioset:
                 if sr != self.sample_rate:
                     raise RuntimeError(f"Expected {file} to have sample rate of "
                                        f"{self.sample_rate}, but got {sr}")
-
-            if num_frames or (self.length is not None and out.shape[-1] < self.length):
-                out = F.pad(out, (0, self.length - out.shape[-1]))
             if self.with_path:
                 return out, file
             else:

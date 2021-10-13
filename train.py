@@ -8,10 +8,7 @@
 import logging
 import math
 import os
-import shutil
-from datetime import datetime
 import hydra
-import argparse
 
 from denoiser.executor import start_ddp_workers
 from denoiser.batch_solvers.batch_solver_factory import BatchSolverFactory
@@ -21,7 +18,6 @@ logger = logging.getLogger(__name__)
 def run(args):
     import torch
 
-    from denoiser.batch_solvers import demucs_bs
     from denoiser import distrib
     from denoiser.data import NoisyCleanSet
     from denoiser.solver import Solver
@@ -30,7 +26,6 @@ def run(args):
     # torch also initialize cuda seed if available
     torch.manual_seed(args.seed)
 
-    # (or) added batch solver factory
     batch_solver = BatchSolverFactory.get_bs(args)
 
     if args.show:
@@ -46,26 +41,29 @@ def run(args):
     assert args.batch_size % distrib.world_size == 0
     args.batch_size //= distrib.world_size
 
-    length = int(args.experiment.segment * args.experiment.sample_rate)
-    stride = int(args.experiment.stride * args.experiment.sample_rate)
+    target_training_length = int(args.experiment.segment * args.experiment.sample_rate)
+    training_stride = int(args.experiment.stride * args.experiment.sample_rate)
     # Define a specific number of samples to avoid 0 padding during training
-    length = batch_solver.calculate_valid_length(math.ceil(length / args.experiment.scale_factor))
-    batch_solver.set_target_training_length(length)
+    input_training_length = math.ceil(target_training_length / args.experiment.scale_factor)
+    valid_target_training_length = batch_solver.calculate_valid_length(input_training_length)
+    batch_solver.set_target_training_length(valid_target_training_length) # TODO: fix this, add this inside.
     kwargs = {"matching": args.dset.matching, "sample_rate": args.experiment.sample_rate}
     # Building datasets and loaders
-    tr_dataset = NoisyCleanSet(
-            args, args.dset.train, length=length, stride=stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, **kwargs)
+
+    tr_dataset = NoisyCleanSet(args.dset.train, batch_solver.calculate_valid_length, clean_length=target_training_length,
+                stride=training_stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, is_training=True,
+                **kwargs)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
-        cv_dataset = NoisyCleanSet(
-            args, args.dset.valid, length=length, stride=stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, **kwargs)
+        cv_dataset = NoisyCleanSet(args.dset.valid, batch_solver.calculate_valid_length,
+            scale_factor=args.experiment.scale_factor, **kwargs)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         cv_loader = None
     if args.dset.test:
-        tt_dataset = NoisyCleanSet(
-            args, args.dset.test, length=length, stride=stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, **kwargs)
+        tt_dataset = NoisyCleanSet(args.dset.test, batch_solver.calculate_valid_length,
+            scale_factor=args.experiment.scale_factor, **kwargs)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         tt_loader = None
@@ -94,7 +92,6 @@ def _main(args):
     else:
         run(args)
 
-# @hydra.main(config_path="conf", config_name="config_demucs_hifi_with_skips") #  for latest version of hydra=1.0
 @hydra.main(config_path="conf", config_name="config") #  for latest version of hydra=1.0
 def main(args):
     try:

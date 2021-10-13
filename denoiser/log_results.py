@@ -41,10 +41,10 @@ def log_results(args):
 
     logger.info('logging results...')
     df = pd.DataFrame(columns=['filename', 'snr', 'estimated snr', 'pesq', 'stoi'])
-    dataset = NoisyCleanSet(args, args.json_dir, with_path=True)
+    dataset = NoisyCleanSet(args.json_dir, with_path=True)
     loader = distrib.loader(dataset, batch_size=1)
     iterator = LogProgress(logger, loader, name="Iterate over noisy/clean dataset")
-    for i, ((noisy, noisy_path), (clean, clean_path)) in enumerate(iterator):
+    for i, ((noisy, noisy_path), (clean, clean_path)) in enumerate(iterator): # TODO: fix this. iterate directly over files in output directory.
         noisy_path = str(noisy_path)
         clean_path = str(clean_path)
         filename = os.path.basename(clean_path).rsplit(".", 1)[0]

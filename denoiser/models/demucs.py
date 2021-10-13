@@ -10,7 +10,6 @@ import time
 
 import torch
 from torch import nn
-from torch.nn import ConstantPad1d
 from torch.nn import functional as F
 
 from denoiser.models.modules import BLSTM
@@ -142,7 +141,7 @@ class Demucs(nn.Module):
     def total_stride(self):
         return self.stride ** self.depth // self.resample
 
-    def forward(self, mix, target_length=None):
+    def forward(self, mix):
         if mix.dim() == 2:
             mix = mix.unsqueeze(1)
 
@@ -185,14 +184,7 @@ class Demucs(nn.Module):
             x = downsample2(x)
         else:
             pass
-        if target_length == None:
-            target_length = self.target_training_length
 
-        if x.size(-1) < target_length:
-            pad = ConstantPad1d((0, target_length-x.size(-1)), 0)
-            x = pad(x)
-        elif x.size(-1) > target_length:
-            x = x[..., :target_length]
         return std * x
 
 
