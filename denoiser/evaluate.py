@@ -63,7 +63,7 @@ def evaluate(args, model=None, data_loader=None):
                     pendings.append(
                         pool.submit(_estimate_and_run_metrics, clean, model, noisy, args))
                 else:
-                    estimate = get_estimate(model, noisy, args)
+                    estimate = get_estimate(model, noisy)
                     estimate = estimate.cpu()
                     # TODO: fix this
                     estimate = estimate.flatten().unsqueeze(0).unsqueeze(0)
@@ -84,7 +84,7 @@ def evaluate(args, model=None, data_loader=None):
 
 
 def _estimate_and_run_metrics(clean, model, noisy, args):
-    estimate = get_estimate(model, noisy, args)
+    estimate = get_estimate(model, noisy)
     return _run_metrics(clean, estimate, args)
 
 

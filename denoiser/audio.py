@@ -97,7 +97,9 @@ class Audioset:
                 if sr != self.sample_rate:
                     raise RuntimeError(f"Expected {file} to have sample rate of "
                                        f"{self.sample_rate}, but got {sr}")
-            logger.info(f'index: {index}, offset: {offset}, num_frames: {num_frames}, out shape: {out.shape}, path: {file}')
+            # logger.info(f'index: {index}, offset: {offset}, num_frames: {num_frames}, out shape: {out.shape}, path: {file}')
+            if num_frames:
+                out = F.pad(out, (0, num_frames - out.shape[-1]))
             if self.with_path:
                 return out, file
             else:

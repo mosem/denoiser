@@ -161,7 +161,7 @@ class Solver(object):
 
                 # enhance some samples
                 logger.info('Enhance and save samples...')
-                enhance(self.args, generator, self.samples_dir, loader=self.tt_loader)
+                enhance(self.args, generator, self.samples_dir)
 
             self.history.append(metrics)
             info = " | ".join(f"{k.capitalize()} {v:.5f}" for k, v in metrics.items())

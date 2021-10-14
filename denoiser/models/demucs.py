@@ -16,6 +16,10 @@ from denoiser.models.modules import BLSTM
 from denoiser.resample import downsample2, upsample2
 from denoiser.utils import capture_init
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def rescale_conv(conv, reference):
     std = conv.weight.std().detach()
     scale = (std / reference)**0.5
@@ -141,25 +145,31 @@ class Demucs(nn.Module):
     def total_stride(self):
         return self.stride ** self.depth // self.resample
 
-    def forward(self, mix):
-        if mix.dim() == 2:
-            mix = mix.unsqueeze(1)
+    def forward(self, signal):
+        if signal.dim() == 2:
+            signal = signal.unsqueeze(1)
 
         if self.normalize:
-            mono = mix.mean(dim=1, keepdim=True)
+            mono = signal.mean(dim=1, keepdim=True)
             std = mono.std(dim=-1, keepdim=True)
-            mix = mix / (self.floor + std)
+            signal = signal / (self.floor + std)
         else:
             std = 1
-        length = mix.shape[-1]
-        x = mix
-        x = F.pad(x, (0, self.calculate_valid_length(length) - length))
+        original_length = signal.shape[-1]
+        valid_length = self.calculate_valid_length(original_length)
+        target_length = math.ceil(original_length*self.scale_factor)
+        x = signal
 
         if self.scale_factor == 2:
             x = upsample2(x)
         elif self.scale_factor == 4:
             x = upsample2(x)
             x = upsample2(x)
+
+        logger.info(f'x shape: {x.shape}')
+        logger.info(f'valid length: {valid_length}')
+        logger.info(f'padding with {valid_length - x.shape[-1]}')
+        x = F.pad(x, (0, valid_length - x.shape[-1])) # pad signal to match valid length
 
         if self.resample == 2:
             x = upsample2(x)
@@ -185,6 +195,10 @@ class Demucs(nn.Module):
         else:
             pass
 
+        logger.info(f'x shape: {x.shape}')
+        if x.shape[-1] > target_length:
+            logger.info(f'trimming: {x.shape[-1] - target_length}')
+            x = x[..., :target_length]
         return std * x
 
 

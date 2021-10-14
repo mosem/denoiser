@@ -18,7 +18,6 @@ import torchaudio
 
 from .audio import Audioset, find_audio_files
 from . import distrib, pretrained
-from denoiser.models.demucs import DemucsStreamer
 from .resample import downsample2
 
 from .utils import LogProgress
@@ -41,8 +40,8 @@ def add_flags(parser):
 
 
 parser = argparse.ArgumentParser(
-        'denoiser.enhance',
-        description="Speech enhancement using Demucs - Generate enhanced files")
+    'denoiser.enhance',
+    description="Speech enhancement using Demucs - Generate enhanced files")
 add_flags(parser)
 parser.add_argument("--out_dir", type=str, default="enhanced",
                     help="directory putting enhanced wav files")
@@ -57,27 +56,19 @@ group.add_argument("--noisy_json", type=str, default=None,
                    help="json file including noisy wav files")
 
 
-def get_estimate(model, noisy, args):
+def get_estimate(model, noisy):
     torch.set_num_threads(1)
-    if args.streaming:
-        streamer = DemucsStreamer(model, dry=args.dry)
-        with torch.no_grad():
-            estimate = torch.cat([
-                streamer.feed(noisy[0]),
-                streamer.flush()], dim=1)[None]
-    else:
-        with torch.no_grad():
-            estimate = model(noisy)
+    with torch.no_grad():
+        estimate = model(noisy)
     return estimate
 
 
-def save_wavs(estimates, noisy_sigs, clean_sigs, filenames, out_dir, noisy_sr=16_000, out_sr=16_000):
+def save_wavs(estimates, noisy_sigs, filenames, out_dir, noisy_sr=16_000, enhanced_sr=16_000):
     # Write result
-    for estimate, noisy, clean, filename in zip(estimates, noisy_sigs, clean_sigs, filenames):
+    for estimate, noisy, filename in zip(estimates, noisy_sigs, filenames):
         filename = os.path.join(out_dir, os.path.basename(filename).rsplit(".", 1)[0])
         write(noisy, filename + "_noisy.wav", sr=noisy_sr)
-        write(estimate, filename + "_enhanced.wav", sr=out_sr)
-        write(clean, filename + "_clean.wav", sr=out_sr)
+        write(estimate, filename + "_enhanced.wav", sr=enhanced_sr)
 
 
 def write(wav, filename, sr=16_000):
@@ -86,13 +77,30 @@ def write(wav, filename, sr=16_000):
     torchaudio.save(filename, wav.cpu(), sr)
 
 
-def _estimate_and_save(model, noisy, clean, filename, out_dir, args):
-    estimate = model(noisy)
-    noisy_sr = args.experiment.source_sample_rate
-    save_wavs(estimate, noisy, clean, filename, out_dir, noisy_sr, args.experiment.sample_rate)
+def get_dataset(args):
+    if hasattr(args, 'dset'):
+        paths = args.dset
+    else:
+        paths = args
+    if paths.noisy_json:
+        with open(paths.noisy_json) as f:
+            files = json.load(f)
+    elif paths.noisy_dir:
+        files = find_audio_files(paths.noisy_dir)
+    else:
+        logger.warning(
+            "Small sample set was not provided by either noisy_dir or noisy_json. "
+            "Skipping enhancement.")
+        return None
+    return Audioset(files, with_path=True, sample_rate=args.experiment.sample_rate)
 
 
-def enhance(args, model=None, local_out_dir=None, loader=None):
+def _estimate_and_save(model, noisy_signals, filenames, out_dir, args):
+    estimate = get_estimate(model, noisy_signals)
+    save_wavs(estimate, noisy_signals, filenames, out_dir, sr=args.experiment.sample_rate)
+
+
+def enhance(args, model=None, local_out_dir=None):
     # Load model
     if not model:
         model = pretrained.get_model(args).to(args.device)
@@ -102,6 +110,11 @@ def enhance(args, model=None, local_out_dir=None, loader=None):
     else:
         out_dir = args.out_dir
 
+    dset = get_dataset(args)
+    if dset is None:
+        return
+    loader = distrib.loader(dset, batch_size=1)
+
     if distrib.rank == 0:
         os.makedirs(out_dir, exist_ok=True)
     distrib.barrier()
@@ -109,21 +122,26 @@ def enhance(args, model=None, local_out_dir=None, loader=None):
     with ProcessPoolExecutor(args.num_workers) as pool:
         iterator = LogProgress(logger, loader, name="Generate enhanced files")
         pendings = []
-        for i, data in enumerate(iterator):
+        for data in iterator:
             # Get batch data
-            noisy_signals, clean = data
+            noisy_signals, filenames = data
 
             noisy_signals = noisy_signals.to(args.device)
+            if args.experiment.scale_factor == 2:
+                noisy_signals = downsample2(noisy_signals)
+            elif args.experiment.scale_factor == 4:
+                noisy_signals = downsample2(noisy_signals)
+                noisy_signals = downsample2(noisy_signals)
+
             if args.device == 'cpu' and args.num_workers > 1:
                 pendings.append(
                     pool.submit(_estimate_and_save,
-                                model, noisy_signals, clean, [f"{i}"], out_dir, args))
+                                model, noisy_signals, filenames, out_dir, args))
             else:
-
                 # Forward
-                estimate = get_estimate(model, noisy_signals, args)
+                estimate = get_estimate(model, noisy_signals)
                 noisy_sr = math.ceil(args.experiment.sample_rate / args.experiment.scale_factor)
-                save_wavs(estimate, noisy_signals, clean, [f"{i}"], out_dir, noisy_sr=noisy_sr, out_sr=args.experiment.sample_rate)
+                save_wavs(estimate, noisy_signals, filenames, out_dir, noisy_sr=noisy_sr, enhanced_sr=args.experiment.sample_rate)
 
         if pendings:
             print('Waiting for pending jobs...')
