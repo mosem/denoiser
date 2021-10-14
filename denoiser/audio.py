@@ -16,6 +16,9 @@ import torchaudio
 from torch.nn import functional as F
 from scipy.io.wavfile import write
 
+import logging
+logger = logging.getLogger(__name__)
+
 Info = namedtuple("Info", ["length", "sample_rate", "channels"])
 
 
@@ -94,6 +97,7 @@ class Audioset:
                 if sr != self.sample_rate:
                     raise RuntimeError(f"Expected {file} to have sample rate of "
                                        f"{self.sample_rate}, but got {sr}")
+            logger.info(f'index: {index}, offset: {offset}, num_frames: {num_frames}, out shape: {out.shape}, path: {file}')
             if self.with_path:
                 return out, file
             else:

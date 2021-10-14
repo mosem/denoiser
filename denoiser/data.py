@@ -118,11 +118,16 @@ class NoisyCleanSet:
 
         if not self.is_training:
             self.valid_length = self.calc_valid_length_func(noisy.shape[-1])
+        else:
+            logger.info(f'index: {index}')
+            logger.info(f'valid_length: {self.valid_length}')
+            logger.info(f'clean shape: {clean.shape}')
+            logger.info(f'noisy shape: {noisy.shape}')
 
         if self.valid_length < clean.shape[-1]:
             clean = clean[...,:self.valid_length]
         elif self.valid_length > clean.shape[-1]:
-            clean = F.pad(clean, (0, 0, self.valid_length - clean.shape[-1]))
+            clean = F.pad(clean, (0, self.valid_length - clean.shape[-1]))
 
 
         return noisy, clean

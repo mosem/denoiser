@@ -18,7 +18,7 @@ class DemucsBS(BatchSolver):
         self.device = args.device
 
         generator = Demucs(**args.experiment.demucs)
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and args.device == 'cuda':
             generator.cuda()
         generator_optimizer = torch.optim.Adam(generator.parameters(), lr=args.lr, betas=(0.9, args.beta2))
 
