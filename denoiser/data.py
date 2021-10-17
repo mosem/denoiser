@@ -72,7 +72,7 @@ def _pad_signal_to_valid_length(signal, calc_valid_length_func, scale_factor):
     valid_length = calc_valid_length_func(math.ceil(signal.shape[-1] / scale_factor))
 
     if valid_length > signal.shape[-1]:
-        logger.info(f'padding signal: {valid_length - signal.shape[-1]}')
+        # logger.info(f'padding signal: {valid_length - signal.shape[-1]}')
         signal = F.pad(signal, (0, valid_length - signal.shape[-1]))
 
     return signal

@@ -16,30 +16,21 @@ from pystoi import stoi
 import torch
 
 from .data import NoisyCleanSet
-from .enhance import get_estimate
+from .enhance import get_estimate_and_trim
 from . import distrib, pretrained
 from .utils import bold, LogProgress
 
 logger = logging.getLogger(__name__)
 
 
-def evaluate(args, model=None, data_loader=None):
+def evaluate(args, model, data_loader):
     total_pesq = 0
     total_stoi = 0
     total_cnt = 0
     updates = 5
 
-    # Load model
-    if not model:
-        model = pretrained.get_model(args).to(args.device)
     model.eval()
 
-    # Load data
-    if data_loader is None:
-        dataset = NoisyCleanSet(args, args.data_dir, matching=args.matching,
-                                sample_rate=args.experiment.sample_rate,
-                                scale_factor=args.experiment.scale_factor)
-        data_loader = distrib.loader(dataset, batch_size=1, num_workers=2)
     pendings = []
     with ProcessPoolExecutor(args.num_workers) as pool:
         with torch.no_grad():
@@ -52,7 +43,7 @@ def evaluate(args, model=None, data_loader=None):
                     pendings.append(
                         pool.submit(_estimate_and_run_metrics, clean, model, noisy, args))
                 else:
-                    estimate = get_estimate(model, noisy, clean.shape[-1])
+                    estimate = get_estimate_and_trim(model, noisy, clean.shape[-1])
                     estimate = estimate.cpu()
                     # TODO: fix this
                     estimate = estimate.flatten().unsqueeze(0).unsqueeze(0)
@@ -73,7 +64,7 @@ def evaluate(args, model=None, data_loader=None):
 
 
 def _estimate_and_run_metrics(clean, model, noisy, args):
-    estimate = get_estimate(model, noisy, clean.shape[-1])
+    estimate = get_estimate_and_trim(model, noisy, clean.shape[-1])
     return _run_metrics(clean, estimate, args)
 
 

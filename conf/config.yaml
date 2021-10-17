@@ -37,7 +37,7 @@ dummy:  # use this if you want twice the same exp, with a different name
 
 # Evaluation stuff
 pesq: True # compute pesq?
-eval_every: 1  # compute test metrics every so epochs
+eval_every: 10  # compute test metrics every so epochs
 streaming: False  # use streaming evaluation for Demucs
 
 # Optimization related
@@ -49,7 +49,7 @@ loss: l1
 stft_loss: False
 stft_sc_factor: .5
 stft_mag_factor: .5
-epochs: 10
+epochs: 100
 batch_size: 16
 #batch_size: 32
 
