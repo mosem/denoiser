@@ -14,7 +14,6 @@ import sys
 
 import torchaudio
 from torch.nn import functional as F
-from scipy.io.wavfile import write
 
 import logging
 logger = logging.getLogger(__name__)

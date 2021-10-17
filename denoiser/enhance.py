@@ -16,7 +16,7 @@ import torchaudio
 from torch.nn import functional as F
 
 from .audio import Audioset, find_audio_files
-from . import distrib, pretrained
+from . import distrib
 from .resample import downsample2
 
 from .utils import LogProgress
@@ -24,12 +24,12 @@ from .utils import LogProgress
 logger = logging.getLogger(__name__)
 
 
-def get_estimate(model, noisy, target_length = None):
+def get_estimate_and_trim(model, noisy, target_length):
     torch.set_num_threads(1)
     with torch.no_grad():
         estimate = model(noisy)
-    if not target_length and estimate.shape[-1] > target_length:
-        logger.info(f'trimming {estimate.shape[-1] - target_length}')
+    if estimate.shape[-1] > target_length:
+        # logger.info(f'trimming {estimate.shape[-1] - target_length}')
         estimate = estimate[..., :target_length]
     return estimate
 
@@ -67,7 +67,7 @@ def get_dataset(args):
 
 
 def _estimate_and_save(model, noisy_signals, filenames, out_dir, sample_rate, target_length):
-    estimate = get_estimate(model, noisy_signals, target_length)
+    estimate = get_estimate_and_trim(model, noisy_signals, target_length)
     save_wavs(estimate, noisy_signals, filenames, out_dir, sr=sample_rate)
 
 
@@ -75,7 +75,7 @@ def _pad_signal_to_valid_length(signal, calc_valid_length_func, scale_factor):
     valid_length = calc_valid_length_func(math.ceil(signal.shape[-1] / scale_factor))
 
     if valid_length > signal.shape[-1]:
-        logger.info(f'padding signal: {valid_length - signal.shape[-1]}')
+        # logger.info(f'padding signal: {valid_length - signal.shape[-1]}')
         signal = F.pad(signal, (0, valid_length - signal.shape[-1]))
 
     return signal
@@ -119,7 +119,7 @@ def enhance(args, model, out_dir, calc_valid_length_func):
                                 model, noisy_signal, filenames, out_dir, args.experiment.sample_rate, target_length))
             else:
                 # Forward
-                estimate = get_estimate(model, noisy_signal, target_length)
+                estimate = get_estimate_and_trim(model, noisy_signal, target_length)
                 noisy_sr = math.ceil(args.experiment.sample_rate / args.experiment.scale_factor)
                 save_wavs(estimate, noisy_signal, filenames, out_dir, noisy_sr=noisy_sr, enhanced_sr=args.experiment.sample_rate)
 

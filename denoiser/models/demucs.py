@@ -10,7 +10,6 @@ import time
 
 import torch
 from torch import nn
-from torch.nn import functional as F
 
 from denoiser.models.modules import BLSTM
 from denoiser.resample import downsample2, upsample2

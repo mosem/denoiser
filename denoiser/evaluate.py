@@ -5,19 +5,16 @@
 # LICENSE file in the root directory of this source tree.
 # author: adiyoss
 
-import argparse
 from concurrent.futures import ProcessPoolExecutor
-import json
 import logging
-import sys
 
 from pesq import pesq
 from pystoi import stoi
 import torch
 
-from .data import NoisyCleanSet
+from .data import NoisyCleanSet # TODO: remove?
 from .enhance import get_estimate_and_trim
-from . import distrib, pretrained
+from . import distrib
 from .utils import bold, LogProgress
 
 logger = logging.getLogger(__name__)
@@ -72,10 +69,6 @@ def _run_metrics(clean, estimate, args):
     estimate = estimate.numpy()[:, 0]
     clean = clean.numpy()[:, 0]
 
-    if clean.shape != estimate.shape:
-        min_len = min(estimate.shape[-1], clean.shape[-1])
-        estimate = estimate[:,:min_len]
-        clean = clean[:,:min_len]
     if args.pesq:
         pesq_i = get_pesq(clean, estimate, sr=args.experiment.sample_rate)
     else:

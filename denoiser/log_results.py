@@ -10,7 +10,7 @@ from denoiser.audio import Audioset, find_audio_files
 from denoiser.data import NoisyCleanSet
 
 
-from denoiser import distrib, pretrained
+from denoiser import distrib
 from denoiser.utils import LogProgress
 from denoiser.evaluate import _run_metrics
 
