@@ -68,6 +68,16 @@ def match_files(noisy, clean, matching="sort"):
         raise ValueError(f"Invalid value for matching {matching}")
 
 
+def _pad_signal_to_valid_length(signal, calc_valid_length_func, scale_factor):
+    valid_length = calc_valid_length_func(math.ceil(signal.shape[-1] / scale_factor))
+
+    if valid_length > signal.shape[-1]:
+        logger.info(f'padding signal: {valid_length - signal.shape[-1]}')
+        signal = F.pad(signal, (0, valid_length - signal.shape[-1]))
+
+    return signal
+
+
 class NoisyCleanSet:
     def __init__(self, json_dir, calc_valid_length_func, matching="sort", clean_length=None, stride=None,
                  pad=True, sample_rate=None, scale_factor=1, with_path=False, is_training=False):
@@ -109,26 +119,8 @@ class NoisyCleanSet:
         noisy, clean = self.noisy_set[index], self.clean_set[index]
 
         if not self.is_training:
-            self.valid_length = self.calc_valid_length_func(math.ceil(clean.shape[-1]/self.scale_factor))
-
-        logger.info(f'index: {index}')
-        logger.info(f'valid_length: {self.valid_length}')
-        logger.info(f'clean shape: {clean.shape}')
-        logger.info(f'noisy shape: {noisy.shape}')
-
-        if self.valid_length < clean.shape[-1]:
-            logger.info(f'trimming clean: {clean.shape[-1]-self.valid_length}')
-            clean = clean[..., :self.valid_length]
-        elif self.valid_length > clean.shape[-1]:
-            logger.info(f'padding clean: {self.valid_length-clean.shape[-1]}')
-            clean = F.pad(clean, (0, self.valid_length - clean.shape[-1]))
-
-        if self.valid_length < noisy.shape[-1]:
-            logger.info(f'trimming noisy: {noisy.shape[-1] - self.valid_length}')
-            noisy = noisy[..., :self.valid_length]
-        elif self.valid_length > noisy.shape[-1]:
-            logger.info(f'padding noisy: {self.valid_length - noisy.shape[-1]}')
-            noisy = F.pad(noisy, (0, self.valid_length - noisy.shape[-1]))
+            noisy = _pad_signal_to_valid_length(noisy, self.calc_valid_length_func, self.scale_factor)
+            clean = _pad_signal_to_valid_length(clean, self.calc_valid_length_func, self.scale_factor)
 
         if self.scale_factor == 2:
             noisy = downsample2(noisy)
@@ -137,19 +129,6 @@ class NoisyCleanSet:
             noisy = downsample2(noisy)
         elif self.scale_factor != 1:
             raise RuntimeError(f"Scale factor should be 1, 2, or 4")
-
-        # estimated_length = noisy.shape[-1] * self.scale_factor
-        # if estimated_length < clean.shape[-1]:
-        #     logger.info('trimming!')
-        #     logger.info(f'estimated shape: {estimated_length}')
-        #     logger.info(f'clean shape: {clean.shape}')
-        #     clean = clean[...,:estimated_length]
-        # elif estimated_length > clean.shape[-1]:
-        #     logger.info('padding!')
-        #     logger.info(f'estimated shape: {estimated_length}')
-        #     logger.info(f'clean shape: {clean.shape}')
-        #     clean = F.pad(clean, (0, estimated_length - clean.shape[-1]))
-
 
         return noisy, clean
 

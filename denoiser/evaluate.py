@@ -16,22 +16,11 @@ from pystoi import stoi
 import torch
 
 from .data import NoisyCleanSet
-from .enhance import add_flags, get_estimate
+from .enhance import get_estimate
 from . import distrib, pretrained
 from .utils import bold, LogProgress
 
 logger = logging.getLogger(__name__)
-
-parser = argparse.ArgumentParser(
-        'denoiser.evaluate',
-        description='Speech enhancement using Demucs - Evaluate model performance')
-add_flags(parser)
-parser.add_argument('--data_dir', help='directory including noisy.json and clean.json files')
-parser.add_argument('--matching', default="sort", help='set this to dns for the dns dataset.')
-parser.add_argument('--no_pesq', action="store_false", dest="pesq", default=True,
-                    help="Don't compute PESQ.")
-parser.add_argument('-v', '--verbose', action='store_const', const=logging.DEBUG,
-                    default=logging.INFO, help="More loggging")
 
 
 def evaluate(args, model=None, data_loader=None):
@@ -63,7 +52,7 @@ def evaluate(args, model=None, data_loader=None):
                     pendings.append(
                         pool.submit(_estimate_and_run_metrics, clean, model, noisy, args))
                 else:
-                    estimate = get_estimate(model, noisy)
+                    estimate = get_estimate(model, noisy, clean.shape[-1])
                     estimate = estimate.cpu()
                     # TODO: fix this
                     estimate = estimate.flatten().unsqueeze(0).unsqueeze(0)
@@ -84,7 +73,7 @@ def evaluate(args, model=None, data_loader=None):
 
 
 def _estimate_and_run_metrics(clean, model, noisy, args):
-    estimate = get_estimate(model, noisy)
+    estimate = get_estimate(model, noisy, clean.shape[-1])
     return _run_metrics(clean, estimate, args)
 
 
@@ -131,16 +120,3 @@ def get_stoi(ref_sig, out_sig, sr):
     for i in range(len(ref_sig)):
         stoi_val += stoi(ref_sig[i], out_sig[i], sr, extended=False)
     return stoi_val
-
-
-def main():
-    args = parser.parse_args()
-    logging.basicConfig(stream=sys.stderr, level=args.verbose)
-    logger.debug(args)
-    pesq, stoi = evaluate(args)
-    json.dump({'pesq': pesq, 'stoi': stoi}, sys.stdout)
-    sys.stdout.write('\n')
-
-
-if __name__ == '__main__':
-    main()
