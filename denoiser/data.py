@@ -127,8 +127,8 @@ class NoisyCleanSet:
             logger.info(f'trimming noisy: {noisy.shape[-1] - self.valid_length}')
             noisy = noisy[..., :self.valid_length]
         elif self.valid_length > noisy.shape[-1]:
-            logger.info(f'padding noisy: {self.valid_length - clean.shape[-1]}')
-            noisy = F.pad(noisy, (0, self.valid_length - clean.shape[-1]))
+            logger.info(f'padding noisy: {self.valid_length - noisy.shape[-1]}')
+            noisy = F.pad(noisy, (0, self.valid_length - noisy.shape[-1]))
 
         if self.scale_factor == 2:
             noisy = downsample2(noisy)
