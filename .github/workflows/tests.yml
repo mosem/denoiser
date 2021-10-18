@@ -23,7 +23,7 @@ jobs:
     - name: Demucs Dummy Training
       run: |	
         ./make_debug.sh
-        python train.py num_workers=0 device=cpu epochs=1 dset.test= experiment=demucs_1 experiment.scale_factor=2 experiment.demucs.hidden=1 experiment.demucs.depth=3
+        python train.py num_workers=0 device=cpu epochs=1 dset.test='' experiment=demucs_1 experiment.scale_factor=2 experiment.demucs.hidden=1 experiment.demucs.depth=3
         
   test_setup:
     runs-on: ubuntu-latest
