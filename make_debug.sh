@@ -6,9 +6,17 @@
 # LICENSE file in the root directory of this source tree.
 # authors: adiyoss and adefossez
 
-path=egs/debug/tr
-if [[ ! -e $path ]]; then
-    mkdir -p $path
+tr_path=egs/debug/tr
+cv_path=egs/debug/cv
+if [[ ! -e $tr_path ]]; then
+    mkdir -p $tr_path
 fi
-python3 -m denoiser.audio dataset/debug/noisy > $path/noisy.json
-python3 -m denoiser.audio dataset/debug/clean > $path/clean.json
+if [[ ! -e cv_path ]]; then
+    mkdir -p cv_path
+fi
+
+python3 -m denoiser.audio dataset/debug/noisy > $tr_path/noisy.json
+python3 -m denoiser.audio dataset/debug/clean > $tr_path/clean.json
+
+python3 -m denoiser.audio dataset/debug/noisy > $cv_path/noisy.json
+python3 -m denoiser.audio dataset/debug/clean > $cv_path/clean.json
