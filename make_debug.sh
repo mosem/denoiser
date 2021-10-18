@@ -11,7 +11,7 @@ cv_path=egs/debug/cv
 if [[ ! -e $tr_path ]]; then
     mkdir -p $tr_path
 fi
-if [[ ! -e cv_path ]]; then
+if [[ ! -e $cv_path ]]; then
     mkdir -p $cv_path
 fi
 
