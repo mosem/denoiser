@@ -31,7 +31,7 @@ def test_denoiser():
             print(output.stdout)
             print(output.stderr)
 
-        # subprocess.run(REMOVE_OUTPUT_FILE_COMMAND)
+        subprocess.run(REMOVE_OUTPUT_FILE_COMMAND)
 
     print(f'done running tests. {len(successful_tests)}/{len(TEST_COMMANDS)} tests passed.')
     print(f'successful tests: {successful_tests}')
