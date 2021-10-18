@@ -6,7 +6,9 @@ class BatchSolver(ABC):
     @abstractmethod
     def __init__(self, args):
         self.args = args
-        self.valid_length = 0
+        self._models = {}
+        self._optimizers = {}
+        self._losses_names = []
 
     def train(self):
         for model in self.get_models().values():
@@ -41,28 +43,27 @@ class BatchSolver(ABC):
             states[name] = copy_state(model.state_dict())
         return states
 
-    @abstractmethod
     def get_models(self) -> dict:
-        pass
+        return self._models
 
-    @abstractmethod
     def get_optimizers(self) -> dict:
-        pass
+        return self._optimizers
 
-    @abstractmethod
     def get_losses_names(self) -> list:
-        pass
+        return self._losses_names
 
     @abstractmethod
-    def set_target_training_length(self, target_length):
-        pass
-
-    @abstractmethod
-    def calculate_valid_length(self, length):
+    def estimate_valid_length(self, input_length):
+        """
+        estimates the input length that will run smoothly through full pipeline.
+        """
         pass
 
     @abstractmethod
     def run(self, data, cross_valid=False):
+        """
+        run on single batch
+        """
         pass
 
     @abstractmethod

@@ -25,53 +25,34 @@ class DemucsBS(BatchSolver):
         self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
                                                   factor_mag=args.stft_mag_factor).to(self.device)
 
-        self.models = {'generator': generator}
-        self.optimizers = {'generator_optimizer': generator_optimizer}
-        self.losses_names = ['generator']
+        self._models.update({'generator': generator})
+        self._optimizers.update({'generator_optimizer': generator_optimizer})
+        self._losses_names += ['generator']
 
     def get_generator_for_evaluation(self, best_states):
-        generator = self.get_generator_model()
-        generator.load_state_dict(self.get_generator_state(best_states))
+        generator = self._models['generator']
+        generator.load_state_dict(best_states['generator'])
         return generator
 
-    def calculate_valid_length(self, length):
-        return self.models['generator'].calculate_valid_length(length)
-
-    def set_target_training_length(self, target_length):
-        self.models['generator'].target_training_length = target_length
+    def estimate_valid_length(self, input_length):
+        return self._models['generator'].estimate_valid_length(input_length)
 
     def run(self, data, cross_valid=False):
         noisy, clean = data
-        estimate = self.models['generator'](noisy)
+        estimate = self._models['generator'](noisy)
         loss = self._get_loss(clean, estimate)
         if not cross_valid:
             self._optimize(loss)
-        losses = {self.losses_names[0]: loss.item()}
+        losses = {self._losses_names[0]: loss.item()}
         return losses
 
-    def get_models(self):
-        return self.models
-
-    def get_optimizers(self):
-        return self.optimizers
-
     def get_evaluation_loss(self, losses_dict):
-        return losses_dict[self.losses_names[0]]
-
-    def get_generator_model(self):
-        return self.models['generator']
-
-    def get_generator_state(self, best_states):
-        return best_states['generator']
-
-    def get_losses_names(self):
-        return self.losses_names
+        return losses_dict[self._losses_names[0]]
 
     def _optimize(self, loss):
-        self.optimizers['generator_optimizer'].zero_grad()
+        self._optimizers['generator_optimizer'].zero_grad()
         loss.backward()
-        self.optimizers['generator_optimizer'].step()
-
+        self._optimizers['generator_optimizer'].step()
 
     def _get_loss(self, clean, estimate):
         with torch.autograd.set_detect_anomaly(True):

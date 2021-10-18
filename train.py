@@ -30,12 +30,8 @@ def run(args):
 
     if args.show:
             logger.info(batch_solver)
-            mb = sum(p.numel() for model in batch_solver.models for p in model.parameters()) * 4 / 2**20
+            mb = sum(p.numel() for model in batch_solver._models for p in model.parameters()) * 4 / 2 ** 20
             logger.info('Size: %.1f MB', mb)
-            if hasattr(batch_solver, 'valid_length'):
-                batch_solver.calculate_valid_length(1)
-                field = batch_solver.get_valid_length()
-                logger.info('Field: %.1f ms', field / args.experiment.sample_rate * 1000)
             return
 
     assert args.batch_size % distrib.world_size == 0
@@ -43,27 +39,22 @@ def run(args):
 
     target_training_length = int(args.experiment.segment * args.experiment.sample_rate)
     training_stride = int(args.experiment.stride * args.experiment.sample_rate)
-    # Define a specific number of samples to avoid 0 padding during training
-    input_training_length = math.ceil(target_training_length / args.experiment.scale_factor)
-    valid_target_training_length = batch_solver.calculate_valid_length(input_training_length)
-    batch_solver.set_target_training_length(valid_target_training_length) # TODO: fix this, add this inside.
     kwargs = {"matching": args.dset.matching, "sample_rate": args.experiment.sample_rate}
     # Building datasets and loaders
-
-    tr_dataset = NoisyCleanSet(args.dset.train, batch_solver.calculate_valid_length, clean_length=target_training_length,
-                stride=training_stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, is_training=True,
-                **kwargs)
+    tr_dataset = NoisyCleanSet(args.dset.train, batch_solver.estimate_valid_length, clean_length=target_training_length,
+                               stride=training_stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, is_training=True,
+                               **kwargs)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
-        cv_dataset = NoisyCleanSet(args.dset.valid, batch_solver.calculate_valid_length,
-            scale_factor=args.experiment.scale_factor, **kwargs)
+        cv_dataset = NoisyCleanSet(args.dset.valid, batch_solver.estimate_valid_length,
+                                   scale_factor=args.experiment.scale_factor, **kwargs)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         cv_loader = None
     if args.dset.test:
-        tt_dataset = NoisyCleanSet(args.dset.test, batch_solver.calculate_valid_length,
-            scale_factor=args.experiment.scale_factor, **kwargs)
+        tt_dataset = NoisyCleanSet(args.dset.test, batch_solver.estimate_valid_length,
+                                   scale_factor=args.experiment.scale_factor, **kwargs)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         tt_loader = None

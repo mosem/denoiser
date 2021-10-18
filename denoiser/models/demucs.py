@@ -122,7 +122,7 @@ class Demucs(nn.Module):
         if rescale:
             rescale_module(self, reference=rescale)
 
-    def calculate_valid_length(self, length):
+    def estimate_valid_length(self, length):
         """
         Return the nearest valid length to use with the model so that
         there is no time steps left over in a convolutions, e.g. for all
@@ -241,7 +241,7 @@ class DemucsStreamer:
         self.resample_lookahead = resample_lookahead
         resample_buffer = min(demucs.total_stride, resample_buffer)
         self.resample_buffer = resample_buffer
-        self.frame_length = demucs.calculate_valid_length(1) + demucs.total_stride * (num_frames - 1)
+        self.frame_length = demucs.estimate_valid_length(1) + demucs.total_stride * (num_frames - 1)
         self.total_length = self.frame_length + self.resample_lookahead
         self.stride = demucs.total_stride * num_frames
         self.resample_in = torch.zeros(demucs.chin, resample_buffer, device=device)
