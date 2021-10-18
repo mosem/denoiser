@@ -50,7 +50,6 @@ stft_sc_factor: .5
 stft_mag_factor: .5
 epochs: 100
 batch_size: 16
-#batch_size: 32
 
 # Experiment launching, distributed
 ddp: false
