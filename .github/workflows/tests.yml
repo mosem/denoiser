@@ -17,19 +17,13 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements_or.txt
-
-    - name: Demucs benchmark
-      run: |
-        python -m denoiser.demucs
-        
-    - name: enhance
-      run: python -m denoiser.enhance --dns48 --noisy_dir dataset/debug/noisy/
+        pip install -r requirements.txt
   
-    - name: Dummy Training
+    - name: Demucs Dummy Training
       run: |	
-        ./make_debug.sh	
-        python train.py num_workers=0 device=cpu epochs=1 dset.test= demucs.hidden=1 demucs.depth=3	
+        ./make_debug.sh
+        python train.py num_workers=0 device=cpu epochs=1 dset.test= \
+              experiment=demucs_1 experiment.scale_factor=2 experiment.demucs.hidden=1 experiment.demucs.depth=3
         
   test_setup:
     runs-on: ubuntu-latest
@@ -43,7 +37,4 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -U .
-
-    - name: enhance
-      run: python -m denoiser.enhance --dns48 --noisy_dir dataset/debug/noisy/
   

@@ -10,5 +10,3 @@ dist
 build
 *.egg-info
 *.th
-launch_master.sh
-conf/dset/master.yaml
