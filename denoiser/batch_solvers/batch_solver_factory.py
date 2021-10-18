@@ -11,4 +11,4 @@ class BatchSolverFactory:
         elif args.experiment.model == "demucs_hifi":
             return DemucsHifiBS(args)
         else:
-            raise ValueError("Given model name is not supported")
+            raise ValueError(f"Given model name is not supported: {args.experiment.model}")
