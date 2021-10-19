@@ -39,14 +39,14 @@ class DemucsHifiBS(BatchSolver):
             self.ft_factor = 0
 
     def estimate_valid_length(self, input_length):
-        length = math.ceil(input_length * self.args.demucs.scale_factor)
-        length = math.ceil(length * self.args.demucs.resample)
-        for idx in range(self.args.demucs.depth):
-            length = math.ceil((length - self.args.demucs.kernel_size) / self.args.demucs.stride) + 1
+        length = math.ceil(input_length * self.args.experiment.demucs.scale_factor)
+        length = math.ceil(length * self.args.experiment.demucs.resample)
+        for idx in range(self.args.experiment.demucs.depth):
+            length = math.ceil((length - self.args.experiment.demucs.kernel_size) / self.args.experiment.demucs.stride) + 1
             length = max(length, 1)
-        for idx in range(self.args.demucs.depth):
-            length = (length - 1) * self.args.demucs.stride + self.args.demucs.kernel_size
-        length = int(math.ceil(length / self.args.demucs.resample))
+        for idx in range(self.args.experiment.demucs.depth):
+            length = (length - 1) * self.args.experiment.demucs.stride + self.args.experiment.demucs.kernel_size
+        length = int(math.ceil(length / self.args.experiment.demucs.resample))
         return int(length)
 
     def get_generator_for_evaluation(self, best_states):
