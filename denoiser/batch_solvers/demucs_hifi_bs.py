@@ -95,6 +95,10 @@ class DemucsHifiBS(BatchSolver):
 
     def run(self, data, cross_valid=False):
         x, y = data
+        xshape = x.shape
+        yshape = y.shape
+        print(f"x: {x.shape}")
+        print(f"y: {y.shape}")
         generator = self._models_dict[self.GEN]
         mpd = self._models_dict[self.MPD]
         msd = self._models_dict[self.MSD]
@@ -106,11 +110,12 @@ class DemucsHifiBS(BatchSolver):
         else:
             y_g_hat = generator(x)
             x_ft = 0
-        if y.shape[2] < y_g_hat.shape[2]:
-            y_g_hat = y_g_hat[:, :, :y.shape[2]]
-        elif y.shape[2] > y_g_hat.shape[2]:
-            y = y[:, :, :y_g_hat.shape[2]]
+        # if y.shape[2] < y_g_hat.shape[2]:
+        #     y_g_hat = y_g_hat[:, :, :y.shape[2]]
+        # elif y.shape[2] > y_g_hat.shape[2]:
+        #     y = y[:, :, :y_g_hat.shape[2]]
 
+        print(f"y_g_h: {y_g_hat.shape}")
         if not cross_valid:
             optim_d.zero_grad()
 
