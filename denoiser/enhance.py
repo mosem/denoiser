@@ -48,37 +48,9 @@ def write(wav, filename, sr=16_000):
     torchaudio.save(filename, wav.cpu(), sr)
 
 
-def get_dataset(args):
-    if hasattr(args, 'dset'):
-        paths = args.dset
-    else:
-        paths = args
-    if paths.noisy_json:
-        with open(paths.noisy_json) as f:
-            files = json.load(f)
-    elif paths.noisy_dir:
-        files = find_audio_files(paths.noisy_dir)
-    else:
-        logger.warning(
-            "Small sample set was not provided by either noisy_dir or noisy_json. "
-            "Skipping enhancement.")
-        return None
-    return Audioset(files, with_path=True, sample_rate=args.experiment.sample_rate)
-
-
 def _estimate_and_save(model, noisy, clean, filename, out_dir, sample_rate, target_length):
     estimate = get_estimate_and_trim(model, noisy, target_length)
     save_wavs(estimate, noisy, clean, filename, out_dir, sr=sample_rate)
-
-
-def _pad_signal_to_valid_length(signal, calc_valid_length_func, scale_factor):
-    valid_length = calc_valid_length_func(math.ceil(signal.shape[-1] / scale_factor))
-
-    if valid_length > signal.shape[-1]:
-        # logger.info(f'padding signal: {valid_length - signal.shape[-1]}')
-        signal = F.pad(signal, (0, valid_length - signal.shape[-1]))
-
-    return signal
 
 
 def enhance(args, model, out_dir, data_loader):
