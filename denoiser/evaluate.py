@@ -12,8 +12,7 @@ from pesq import pesq
 from pystoi import stoi
 import torch
 
-from .data import NoisyCleanSet # TODO: remove?
-from .enhance import get_estimate_and_trim
+from .enhance import get_estimate
 from . import distrib
 from .utils import bold, LogProgress
 
@@ -42,7 +41,7 @@ def evaluate(args, model, data_loader):
                     pendings.append(
                         pool.submit(_estimate_and_run_metrics, clean, model, noisy, args))
                 else:
-                    estimate = get_estimate_and_trim(model, noisy, clean.shape[-1])
+                    estimate = get_estimate(model, noisy)
                     estimate = estimate.cpu()
                     clean = clean.cpu()
                     pendings.append(
@@ -61,7 +60,7 @@ def evaluate(args, model, data_loader):
 
 
 def _estimate_and_run_metrics(clean, model, noisy, args):
-    estimate = get_estimate_and_trim(model, noisy, clean.shape[-1])
+    estimate = get_estimate(model, noisy)
     return _run_metrics(clean, estimate, args)
 
 

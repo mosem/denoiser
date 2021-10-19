@@ -7,15 +7,11 @@
 
 import math
 from concurrent.futures import ProcessPoolExecutor
-import json
 import logging
 import os
 
 import torch
 import torchaudio
-from torch.nn import functional as F
-
-from .audio import Audioset, find_audio_files
 from . import distrib
 
 from .utils import LogProgress
@@ -23,13 +19,10 @@ from .utils import LogProgress
 logger = logging.getLogger(__name__)
 
 
-def get_estimate_and_trim(model, noisy, target_length):
+def get_estimate(model, noisy):
     torch.set_num_threads(1)
     with torch.no_grad():
         estimate = model(noisy)
-    if estimate.shape[-1] > target_length:
-        # logger.info(f'trimming {estimate.shape[-1] - target_length}')
-        estimate = estimate[..., :target_length]
     return estimate
 
 
@@ -48,8 +41,8 @@ def write(wav, filename, sr=16_000):
     torchaudio.save(filename, wav.cpu(), sr)
 
 
-def _estimate_and_save(model, noisy, clean, filename, out_dir, sample_rate, target_length):
-    estimate = get_estimate_and_trim(model, noisy, target_length)
+def _estimate_and_save(model, noisy, clean, filename, out_dir, sample_rate):
+    estimate = get_estimate(model, noisy)
     save_wavs(estimate, noisy, clean, filename, out_dir, sr=sample_rate)
 
 
@@ -75,10 +68,10 @@ def enhance(args, model, out_dir, data_loader):
             if args.device == 'cpu' and args.num_workers > 1:
                 pendings.append(
                     pool.submit(_estimate_and_save,
-                                model, noisy, clean, noisy_path, out_dir, args.experiment.sample_rate, target_length))
+                                model, noisy, clean, noisy_path, out_dir, args.experiment.sample_rate))
             else:
                 # Forward
-                estimate = get_estimate_and_trim(model, noisy, target_length)
+                estimate = get_estimate(model, noisy)
                 noisy_sr = math.ceil(args.experiment.sample_rate / args.experiment.scale_factor)
                 save_wavs(estimate, noisy, clean, noisy_path, out_dir, source_sr=noisy_sr, target_sr=args.experiment.sample_rate)
 

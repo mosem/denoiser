@@ -1,4 +1,3 @@
-import json
 import os
 import argparse
 import sys
@@ -6,10 +5,6 @@ import sys
 import pandas as pd
 import torchaudio
 
-from denoiser.data import NoisyCleanSet
-
-from denoiser import distrib
-from denoiser.utils import LogProgress
 from .resample import upsample2
 from denoiser.evaluate import _run_metrics
 
