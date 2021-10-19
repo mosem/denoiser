@@ -6,7 +6,6 @@
 # author: adefossez
 
 import math
-import time
 
 import torch
 from torch import nn
