@@ -42,8 +42,6 @@ def evaluate(args, model, data_loader):
                 else:
                     estimate = get_estimate_and_trim(model, noisy, clean.shape[-1])
                     estimate = estimate.cpu()
-                    # TODO: fix this
-                    estimate = estimate.flatten().unsqueeze(0).unsqueeze(0)
                     clean = clean.cpu()
                     pendings.append(
                         pool.submit(_run_metrics, clean, estimate, args))
