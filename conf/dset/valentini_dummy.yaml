@@ -1,6 +1,6 @@
-train: egs/valentini/16k-dummy/tr
-valid: egs/valentini/16k-dummy/cv
-test: egs/valentini/16k-dummy/tt
+train: egs/valentini_dummy/16k-dummy/tr
+valid: egs/valentini_dummy/16k-dummy/cv
+test: egs/valentini_dummy/16k-dummy/tt
 noisy_json: egs/valentini/16k-dummy/tt/noisy.json
 noisy_dir:
 matching: sort
