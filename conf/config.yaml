@@ -18,6 +18,10 @@ num_workers: 2
 verbose: 0
 show: 0   # just show the model and its size and exit
 
+# log results
+log_results: true
+n_bins: 10
+
 # Checkpointing, by default automatically load last checkpoint
 checkpoint: true
 continue_from: '' # Path the a checkpoint.th file to start from.

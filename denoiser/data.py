@@ -115,9 +115,7 @@ class NoisyCleanSet:
 
         assert len(self.clean_set) == len(self.noisy_set)
 
-    def __getitem__(self, index):
-        noisy, clean = self.noisy_set[index], self.clean_set[index]
-
+    def _process_data(self, noisy, clean):
         if not self.is_training:
             noisy = _pad_signal_to_valid_length(noisy, self.calc_valid_length_func, self.scale_factor)
             clean = _pad_signal_to_valid_length(clean, self.calc_valid_length_func, self.scale_factor)
@@ -131,6 +129,24 @@ class NoisyCleanSet:
             raise RuntimeError(f"Scale factor should be 1, 2, or 4")
 
         return noisy, clean
+
+
+    def _get_item_with_path(self, index):
+        (noisy, noisy_path), (clean, clean_path) = self.noisy_set[index], self.clean_set[index]
+        noisy, clean = self._process_data(noisy, clean)
+        return (noisy, noisy_path), (clean, clean_path)
+
+    def _get_item_without_path(self, index):
+        noisy, clean = self.noisy_set[index], self.clean_set[index]
+        noisy, clean = self._process_data(noisy, clean)
+        return noisy, clean
+
+
+    def __getitem__(self, index):
+        if self.with_path:
+            return self._get_item_with_path(index)
+        else:
+            return self._get_item_without_path(index)
 
     def __len__(self):
         return len(self.noisy_set)
