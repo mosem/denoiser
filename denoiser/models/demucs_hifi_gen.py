@@ -33,23 +33,6 @@ def rescale_module(module, reference):
 
 LRELU_SLOPE = 0.1
 
-class DemucsToEmbeddedDim(nn.Module):
-
-    def __init__(self, sample_rate=16000, slice_rate=20e-3, ch_in=128, len_in=256, emb_dim=768):
-        """
-
-        """
-        super().__init__()
-        self.l1 = nn.Linear(len_in, int(sample_rate * slice_rate)) # first match the num of expected feature vectors dim
-        # self.l2 = nn.Linear(ch_in, emb_dim) # then match embedded dim, requires transpose
-
-    def forward(self, x):
-         x = nn.ReLU()(self.l1(x))
-         # x = torch.transpose(x, 1, 2)
-         return x
-         # return nn.ReLU()(self.l2(x))
-
-
 class DemucsEn(nn.Module):
     """
     Demucs speech enhancement model (only encoder - No skip connections).
