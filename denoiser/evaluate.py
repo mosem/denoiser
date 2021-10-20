@@ -39,13 +39,13 @@ def evaluate(args, model, data_loader):
                 # If device is CPU, we do parallel evaluation in each CPU worker.
                 if args.device == 'cpu':
                     pendings.append(
-                        pool.submit(_estimate_and_run_metrics, clean, model, noisy, args))
+                        pool.submit(estimate_and_run_metrics, clean, model, noisy, args))
                 else:
                     estimate = get_estimate(model, noisy)
                     estimate = estimate.cpu()
                     clean = clean.cpu()
                     pendings.append(
-                        pool.submit(_run_metrics, clean, estimate, args))
+                        pool.submit(run_metrics, clean, estimate, args))
                 total_cnt += clean.shape[0]
 
         for pending in LogProgress(logger, pendings, updates, name="Eval metrics"):
@@ -59,12 +59,12 @@ def evaluate(args, model, data_loader):
     return pesq, stoi
 
 
-def _estimate_and_run_metrics(clean, model, noisy, args):
+def estimate_and_run_metrics(clean, model, noisy, args):
     estimate = get_estimate(model, noisy)
-    return _run_metrics(clean, estimate, args)
+    return run_metrics(clean, estimate, args)
 
 
-def _run_metrics(clean, estimate, args):
+def run_metrics(clean, estimate, args):
     estimate = estimate.numpy()[:, 0]
     clean = clean.numpy()[:, 0]
 

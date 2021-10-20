@@ -68,7 +68,7 @@ def match_files(noisy, clean, matching="sort"):
         raise ValueError(f"Invalid value for matching {matching}")
 
 
-def _pad_signal_to_valid_length(signal, calc_valid_length_func, scale_factor):
+def pad_signal_to_valid_length(signal, calc_valid_length_func, scale_factor):
     valid_length = calc_valid_length_func(math.ceil(signal.shape[-1] / scale_factor))
 
     if valid_length > signal.shape[-1]:
@@ -116,8 +116,8 @@ class NoisyCleanSet:
 
     def _process_data(self, noisy, clean):
         if not self.is_training:
-            noisy = _pad_signal_to_valid_length(noisy, self.calc_valid_length_func, self.scale_factor)
-            clean = _pad_signal_to_valid_length(clean, self.calc_valid_length_func, self.scale_factor)
+            noisy = pad_signal_to_valid_length(noisy, self.calc_valid_length_func, self.scale_factor)
+            clean = pad_signal_to_valid_length(clean, self.calc_valid_length_func, self.scale_factor)
 
         if self.scale_factor == 2:
             noisy = downsample2(noisy)
@@ -129,7 +129,6 @@ class NoisyCleanSet:
 
         return noisy, clean
 
-
     def _get_item_with_path(self, index):
         (noisy, noisy_path), (clean, clean_path) = self.noisy_set[index], self.clean_set[index]
         noisy, clean = self._process_data(noisy, clean)
@@ -139,7 +138,6 @@ class NoisyCleanSet:
         noisy, clean = self.noisy_set[index], self.clean_set[index]
         noisy, clean = self._process_data(noisy, clean)
         return noisy, clean
-
 
     def __getitem__(self, index):
         if self.with_path:

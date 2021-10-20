@@ -4,7 +4,7 @@ import torchaudio
 from torch.nn import functional as F
 
 from .resample import upsample2
-from .evaluate import _run_metrics
+from .evaluate import run_metrics
 from .audio import find_audio_files
 
 import logging
@@ -29,8 +29,8 @@ def _process_signals_lengths(args, clean, noisy, enhanced):
 
     return clean, noisy, enhanced
 
-def _create_results_df(args):
-    df = pd.DataFrame(columns=['filename', 'snr', 'estimated snr', 'pesq', 'stoi'])
+def create_results_df(args):
+    df = pd.DataFrame(columns=['filename', 'snr', 'enhanced snr', 'pesq', 'stoi'])
     files = find_audio_files(args.samples_dir, progress=False)
     clean_paths = [str(data[0]) for data in files if '_clean' in str(data[0])]
     noisy_paths = [str(data[0]) for data in files if '_noisy' in str(data[0])]
@@ -48,14 +48,14 @@ def _create_results_df(args):
 
         noisy_snr = _snr(noisy, noisy - clean).item()
         enhanced_snr = _snr(enhanced, enhanced - clean).item()
-        pesq, stoi = _run_metrics(clean, enhanced, args)
+        pesq, stoi = run_metrics(clean, enhanced, args)
 
         filename = os.path.basename(clean_path).rstrip('_clean.wav')
         df.loc[i] = [filename, noisy_snr, enhanced_snr, pesq, stoi]
     return df
 
 
-def _create_results_histogram_df(results_df, n_bins):
+def create_results_histogram_df(results_df, n_bins):
     results_histogram_df = pd.DataFrame(columns=['range', 'n_samples','avg pesq', 'avg stoi'])
     bin_indices, bins = pd.cut(results_df['snr'], n_bins, labels=False, retbins=True, right=False)
     for i in range(n_bins):
@@ -73,11 +73,11 @@ def log_results(args):
     if os.path.isfile(results_out_path):
         results_df = pd.read_csv(results_out_path)
     else:
-        results_df = _create_results_df(args)
+        results_df = create_results_df(args)
         results_df.to_csv(results_out_path)
 
     n_bins = args.n_bins
     histogram_out_path = 'results_histogram_' + str(n_bins) + '.csv'
     if not os.path.isfile(histogram_out_path):
-        results_histogram_df = _create_results_histogram_df(results_df, n_bins)
+        results_histogram_df = create_results_histogram_df(results_df, n_bins)
         results_histogram_df.to_csv(histogram_out_path)
