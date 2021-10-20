@@ -9,6 +9,7 @@ import math
 from concurrent.futures import ProcessPoolExecutor
 import logging
 import os
+import json
 
 import torch
 import torchaudio
@@ -19,20 +20,29 @@ from .utils import LogProgress
 logger = logging.getLogger(__name__)
 
 
-def get_estimate(model, noisy):
+def get_estimate(model, noisy_sigs):
     torch.set_num_threads(1)
     with torch.no_grad():
-        estimate = model(noisy)
+        estimate = model(noisy_sigs)
     return estimate
 
 
-def save_wavs(estimate_sigs, noisy_sigs, clean_sigs, filenames, out_dir, source_sr=16_000, target_sr=16_000):
+def trim(noisy, clean, enhanced, raw_lengths_pair):
+     noisy_raw_length, clean_raw_length = raw_lengths_pair
+     noisy = noisy[...,: noisy_raw_length]
+     clean = clean[..., :clean_raw_length]
+     enhanced = enhanced[..., : clean_raw_length]
+     return noisy, clean, enhanced
+
+
+def save_wavs(noisy_sigs, clean_sigs, enhanced_sigs, raw_lengths_pairs, filenames, source_sr=16_000, target_sr=16_000):
     # Write result
-    for estimate, noisy, clean, filename in zip(estimate_sigs, noisy_sigs, clean_sigs, filenames):
-        filename = os.path.join(out_dir, os.path.basename(filename).rsplit(".", 1)[0])
+    for noisy, clean, enhanced, raw_lengths_pair, filename in zip(noisy_sigs, clean_sigs, enhanced_sigs,
+                                                                  raw_lengths_pairs, filenames):
+        noisy, clean, enhanced = trim(noisy, clean, enhanced, raw_lengths_pair)
         write(noisy, filename + "_noisy.wav", sr=source_sr)
         write(clean, filename + "_clean.wav", sr=target_sr)
-        write(estimate, filename + "_enhanced.wav", sr=target_sr)
+        write(enhanced, filename + "_enhanced.wav", sr=target_sr)
 
 
 def write(wav, filename, sr=16_000):
@@ -41,9 +51,22 @@ def write(wav, filename, sr=16_000):
     torchaudio.save(filename, wav.cpu(), sr)
 
 
-def _estimate_and_save(model, noisy, clean, filename, out_dir, sample_rate):
-    estimate = get_estimate(model, noisy)
-    save_wavs(estimate, noisy, clean, filename, out_dir, sr=sample_rate)
+def _estimate_and_save(model, noisy_sigs, clean_sigs, raw_lengths_pairs, filenames, sample_rate):
+    estimate_sigs = get_estimate(model, noisy_sigs)
+    save_wavs(noisy_sigs, clean_sigs, estimate_sigs, raw_lengths_pairs, filenames, sr=sample_rate)
+
+
+def get_raw_lengths_pairs(args, noisy_file_paths, clean_file_paths):
+    noisy_json_path = os.path.join(args.dset.test, 'noisy.json')
+    clean_json_path = os.path.join(args.dset.test, 'clean.json')
+    with open(noisy_json_path, 'r') as f:
+        noisy_json = json.load(f)
+    with open(clean_json_path, 'r') as f:
+        clean_json = json.load(f)
+    noisy_json_dict = {path: int(math.ceil(length / args.experiment.scale_factor)) for (path, length) in noisy_json}
+    clean_json_dict = {path: length for (path, length) in clean_json}
+    return [(noisy_json_dict[noisy_file_path], clean_json_dict[clean_file_path])
+            for noisy_file_path, clean_file_path in zip(noisy_file_paths, clean_file_paths)]
 
 
 def enhance(args, model, out_dir, data_loader):
@@ -58,22 +81,23 @@ def enhance(args, model, out_dir, data_loader):
         iterator = LogProgress(logger, data_loader, name="Generate enhanced files")
         pendings = []
         for data in iterator:
-            # Get batch data
-            (noisy, noisy_path), (clean, clean_path) = data
-            noisy = noisy.to(args.device)
-            clean = clean.to(args.device)
+            # Get batch data, expected to be batch size of 1
+            (noisy_sigs, noisy_paths), (clean_sigs, clean_paths) = data
+            noisy_sigs = noisy_sigs.to(args.device)
+            clean_sigs = clean_sigs.to(args.device)
 
-            target_length = clean.shape[-1]
+            basenames = [os.path.join(out_dir, os.path.basename(path).rsplit(".", 1)[0]) for path in noisy_paths]
+            raw_lengths_pairs = get_raw_lengths_pairs(args, noisy_paths, clean_paths)
 
             if args.device == 'cpu' and args.num_workers > 1:
                 pendings.append(
                     pool.submit(_estimate_and_save,
-                                model, noisy, clean, noisy_path, out_dir, args.experiment.sample_rate))
+                                model, noisy_sigs, clean_sigs, raw_lengths_pairs, basenames, args.experiment.sample_rate))
             else:
                 # Forward
-                estimate = get_estimate(model, noisy)
+                estimate = get_estimate(model, noisy_sigs)
                 noisy_sr = math.ceil(args.experiment.sample_rate / args.experiment.scale_factor)
-                save_wavs(estimate, noisy, clean, noisy_path, out_dir, source_sr=noisy_sr, target_sr=args.experiment.sample_rate)
+                save_wavs(noisy_sigs, clean_sigs, estimate, raw_lengths_pairs, basenames, source_sr=noisy_sr, target_sr=args.experiment.sample_rate)
 
         if pendings:
             print('Waiting for pending jobs...')
