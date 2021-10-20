@@ -114,7 +114,9 @@ class Solver(object):
             n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
             mb = n_params * 4 / 2 ** 20
             logger.info(f"{name}: parameters: {n_params}, size: {mb} MB")
-        logger.info("Training...")
+
+        if (self.epochs > len(self.history)):
+            logger.info("Training...")
 
         for epoch in range(len(self.history), self.epochs):
             # Train one epoch
