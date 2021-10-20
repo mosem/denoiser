@@ -54,7 +54,7 @@ def run(args):
         cv_loader = None
     if args.dset.test:
         tt_dataset = NoisyCleanSet(args.dset.test, batch_solver.estimate_valid_length,
-                                   scale_factor=args.experiment.scale_factor, **kwargs)
+                                   scale_factor=args.experiment.scale_factor, with_path=True, **kwargs)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         tt_loader = None

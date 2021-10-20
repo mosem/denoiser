@@ -12,8 +12,7 @@ from pesq import pesq
 from pystoi import stoi
 import torch
 
-from .data import NoisyCleanSet # TODO: remove?
-from .enhance import get_estimate_and_trim
+from .enhance import get_estimate
 from . import distrib
 from .utils import bold, LogProgress
 
@@ -34,17 +33,19 @@ def evaluate(args, model, data_loader):
             iterator = LogProgress(logger, data_loader, name="Eval estimates")
             for i, data in enumerate(iterator):
                 # Get batch data
-                noisy, clean = [x.to(args.device) for x in data]
+                (noisy, noisy_path), (clean, clean_path) = data
+                noisy = noisy.to(args.device)
+                clean = clean.to(args.device)
                 # If device is CPU, we do parallel evaluation in each CPU worker.
                 if args.device == 'cpu':
                     pendings.append(
-                        pool.submit(_estimate_and_run_metrics, clean, model, noisy, args))
+                        pool.submit(estimate_and_run_metrics, clean, model, noisy, args))
                 else:
-                    estimate = get_estimate_and_trim(model, noisy, clean.shape[-1])
+                    estimate = get_estimate(model, noisy)
                     estimate = estimate.cpu()
                     clean = clean.cpu()
                     pendings.append(
-                        pool.submit(_run_metrics, clean, estimate, args))
+                        pool.submit(run_metrics, clean, estimate, args))
                 total_cnt += clean.shape[0]
 
         for pending in LogProgress(logger, pendings, updates, name="Eval metrics"):
@@ -58,12 +59,12 @@ def evaluate(args, model, data_loader):
     return pesq, stoi
 
 
-def _estimate_and_run_metrics(clean, model, noisy, args):
-    estimate = get_estimate_and_trim(model, noisy, clean.shape[-1])
-    return _run_metrics(clean, estimate, args)
+def estimate_and_run_metrics(clean, model, noisy, args):
+    estimate = get_estimate(model, noisy)
+    return run_metrics(clean, estimate, args)
 
 
-def _run_metrics(clean, estimate, args):
+def run_metrics(clean, estimate, args):
     estimate = estimate.numpy()[:, 0]
     clean = clean.numpy()[:, 0]
 
