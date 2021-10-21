@@ -15,10 +15,6 @@ from denoiser.resample import downsample2, upsample2
 from denoiser.utils import capture_init
 
 
-import logging
-
-logger = logging.getLogger(__name__)
-
 def rescale_conv(conv, reference):
     std = conv.weight.std().detach()
     scale = (std / reference)**0.5

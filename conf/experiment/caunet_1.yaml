@@ -15,3 +15,4 @@ caunet:
   frame_size: 512
   hidden: 64
   scale_factor: ${experiment.scale_factor}
+  depth: 4
