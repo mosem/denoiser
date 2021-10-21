@@ -89,7 +89,7 @@ class Caunet(nn.Module):
         super(Caunet, self).__init__()
         self.frame_size = frame_size
         self.frame_shift = self.frame_size // 2
-        self.depth=
+        
         # todo: remove redundant self parameters. or use them in code.
         self.N = 256
         self.B = 256
