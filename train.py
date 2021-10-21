@@ -34,8 +34,8 @@ def run(args):
             logger.info('Size: %.1f MB', mb)
             return
 
-    assert args.batch_size % distrib.world_size == 0
-    args.batch_size //= distrib.world_size
+    assert args.experiment.batch_size % distrib.world_size == 0
+    args.experiment.batch_size //= distrib.world_size
 
     target_training_length = int(args.experiment.segment * args.experiment.sample_rate)
     training_stride = int(args.experiment.stride * args.experiment.sample_rate)
@@ -45,7 +45,7 @@ def run(args):
                                stride=training_stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, is_training=True,
                                **kwargs)
     tr_loader = distrib.loader(
-        tr_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+        tr_dataset, batch_size=args.experiment.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
         cv_dataset = NoisyCleanSet(args.dset.valid, batch_solver.estimate_valid_length,
                                    scale_factor=args.experiment.scale_factor, **kwargs)

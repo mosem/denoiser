@@ -6,8 +6,7 @@ source_sample_rate: 16000 # source sample rate, added to support BWE #should be 
 segment: 2
 stride: 2    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
-
-upsampled: false # if upsampling from input dataset to target dataset
+batch_size: 16
 
 # models related
 model: demucs # demucs/demucs_adversarial/demucs_hifi/demucs_hifi_features
@@ -39,6 +38,7 @@ caunet:
   width: 64
   frame_size: 512
   frame_shift: 256
+  scale_factor: ${experiment.scale_factor}
 
 hifi:
   resblock: 1
