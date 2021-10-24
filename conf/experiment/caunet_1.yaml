@@ -16,3 +16,6 @@ caunet:
   hidden: 64
   scale_factor: ${experiment.scale_factor}
   depth: 4
+  dense_block_depth: 3
+  kernel_size: 3
+  stride: 2

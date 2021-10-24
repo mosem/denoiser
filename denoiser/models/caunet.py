@@ -93,11 +93,8 @@ class DecodeLayer(nn.Module):
         self.decode_block = decode_block
 
     def forward(self, x, skip):
-        logger.info(f'decode layer input shape: {x.shape}')
         dense_out = self.dense_block(x)
-        logger.info(f'dense_out shape: {x.shape}')
         cat_out = torch.cat([dense_out, skip], dim=1)
-        logger.info(f'cat_out shape: {x.shape}')
         out = self.decode_block(cat_out)
         return out
 
@@ -105,25 +102,17 @@ class DecodeLayer(nn.Module):
 class Caunet(nn.Module):
 
     @capture_init
-    def __init__(self, frame_size=512, hidden=64, scale_factor=1, depth=4, dense_block_depth=3):
+    def __init__(self, frame_size=512, hidden=64, scale_factor=1, depth=4, dense_block_depth=3, kernel_size=3, stride=2):
         super(Caunet, self).__init__()
         self.frame_size = frame_size
         self.frame_shift = self.frame_size // 2
         self.depth= depth
         self.dense_block_depth = dense_block_depth
-        # todo: remove redundant self parameters. or use them in code.
-        self.N = 256
-        self.B = 256
-        self.H = 512
-        self.P = 3
-        # self.device = device
         self.in_channels = 1
         self.out_channels = 1
-        self.kernel_size = (1, 3)
-        self.stride = 2
-        # self.elu = nn.SELU(inplace=True)
-        self.pad = nn.ConstantPad2d((1, 1, 1, 0), value=0.)
-        self.pad1 = nn.ConstantPad2d((1, 1, 0, 0), value=0.)
+        self.kernel_size = (1, kernel_size)
+        self.stride = stride
+        self.pad = nn.ConstantPad2d((1, 1, 0, 0), value=0.)
         self.hidden = hidden
         self.scale_factor = scale_factor
 
@@ -139,7 +128,7 @@ class Caunet(nn.Module):
         self.encoder.append(nn.Sequential(*input_layer))
         for i in range(self.depth):
             encode_layer = [DenseBlock(tmp_frame_size, self.dense_block_depth, self.hidden),
-                       self.pad1,
+                       self.pad,
                        nn.Conv2d(in_channels=self.hidden, out_channels=self.hidden, kernel_size=self.kernel_size,
                                  stride=(1,self.stride)),
                       nn.LayerNorm(math.ceil(tmp_frame_size / self.stride)),
@@ -148,9 +137,10 @@ class Caunet(nn.Module):
             tmp_frame_size = math.ceil(tmp_frame_size / self.stride)
 
             dense_block = DenseBlock(tmp_frame_size, self.dense_block_depth, self.hidden)
-            decode_block = nn.Sequential(SPConvTranspose2d(in_channels=self.hidden * 2, out_channels=self.hidden,
-                                                           kernel_size=self.kernel_size,r=2),
-                                         nn.LayerNorm(tmp_frame_size*self.stride),
+            decode_block = nn.Sequential(self.pad,
+                                         SPConvTranspose2d(in_channels=self.hidden * 2, out_channels=self.hidden,
+                                                           kernel_size=self.kernel_size, r=self.stride),
+                                         nn.LayerNorm(tmp_frame_size * self.stride),
                                          nn.PReLU(self.hidden))
             decode_layer = DecodeLayer(dense_block, decode_block)
 
@@ -160,29 +150,7 @@ class Caunet(nn.Module):
             logger.info(f'{i}: {tmp_frame_size}')
 
 
-
-        self.dual_transformer = Dual_Transformer(self.hidden, self.hidden, nhead=4,
-                                                 num_layers=6)  # [batch, hidden, nframes, 8]
-
-        self.dec_dense4 = DenseBlock(32, 3, self.hidden)
-        self.dec_conv4 = SPConvTranspose2d(in_channels=self.hidden * 2, out_channels=self.hidden, kernel_size=self.kernel_size, r=2)
-        self.dec_norm4 = nn.LayerNorm(64)
-        self.dec_prelu4 = nn.PReLU(self.hidden)
-
-        self.dec_dense3 = DenseBlock(64, 3, self.hidden)
-        self.dec_conv3 = SPConvTranspose2d(in_channels=self.hidden * 2, out_channels=self.hidden, kernel_size=self.kernel_size, r=2)
-        self.dec_norm3 = nn.LayerNorm(128)
-        self.dec_prelu3 = nn.PReLU(self.hidden)
-
-        self.dec_dense2 = DenseBlock(128, 3, self.hidden)
-        self.dec_conv2 = SPConvTranspose2d(in_channels=self.hidden * 2, out_channels=self.hidden, kernel_size=self.kernel_size, r=2)
-        self.dec_norm2 = nn.LayerNorm(256)
-        self.dec_prelu2 = nn.PReLU(self.hidden)
-
-        self.dec_dense1 = DenseBlock(256, 3, self.hidden)
-        self.dec_conv1 = SPConvTranspose2d(in_channels=self.hidden * 2, out_channels=self.hidden, kernel_size=self.kernel_size, r=2)
-        self.dec_norm1 = nn.LayerNorm(512)
-        self.dec_prelu1 = nn.PReLU(self.hidden)
+        self.dual_transformer = Dual_Transformer(self.hidden, self.hidden, nhead=4, num_layers=6)
 
         self.out_conv = nn.Conv2d(in_channels=self.hidden, out_channels=self.out_channels, kernel_size=(1, 1))
         self.ola = TorchOLA(self.frame_shift)
@@ -196,10 +164,12 @@ class Caunet(nn.Module):
         If the mixture has a valid length, the estimated sources
         will have exactly the same length.
         """
+        logger.info(f'valid length input: {length}')
         length = math.ceil(length * self.scale_factor)
         n_frames = math.ceil((length - self.frame_size) / self.frame_shift + 1)
         # todo: add pipeline of convolutions + dual transformer + transposed convolutions.
         length = (n_frames - 1) * self.frame_shift + self.frame_size
+        logger.info(f'valid length output: {length}')
         return int(length)
 
     def forward(self, x):
@@ -209,58 +179,26 @@ class Caunet(nn.Module):
             x = upsample2(x)
             x = upsample2(x)
 
+        logger.info(f'input shape: {x.shape}')
         skips = []
         out = self.signalPreProcessor(x)
+        logger.info(f'signalPreProcess output shape: {out.shape}')
 
         for i, encode in enumerate(self.encoder):
-            logger.info(f'encoder layer: {i}')
             out = encode(out)
+            logger.info(f'encode {i} output shape: {out.shape}')
             skips.append(out)
-
-        # out = self.inp_prelu(self.inp_norm(self.inp_conv(out)))
-        #
-        # out = self.enc_dense1(out)
-        # out = self.enc_prelu1(self.enc_norm1(self.enc_conv1(self.pad1(out))))
-        # skips.append(out)
-        #
-        # out = self.enc_dense2(out)
-        # out = self.enc_prelu2(self.enc_norm2(self.enc_conv2(self.pad1(out))))
-        # skips.append(out)
-        #
-        # out = self.enc_dense3(out)
-        # out = self.enc_prelu3(self.enc_norm3(self.enc_conv3(self.pad1(out))))
-        # skips.append(out)
-        #
-        # out = self.enc_dense4(out)
-        # out = self.enc_prelu4(self.enc_norm4(self.enc_conv4(self.pad1(out))))
-        # skips.append(out)
 
         out = self.dual_transformer(out)
 
-        logger.info(f'dual transformer output shape: {out.shape}')
-
-        # for i, decode in enumerate(self.decoder):
-        #     logger.info(f'decoder layer: {i}')
-        #     skip = skips.pop(-1)
-        #     out = decode(out, skip)
-
-        out = self.dec_dense4(out)
-        out = torch.cat([out, skips[-1]], dim=1)
-        out = self.dec_prelu4(self.dec_norm4(self.dec_conv4(self.pad1(out))))
-
-        out = self.dec_dense3(out)
-        out = torch.cat([out, skips[-2]], dim=1)
-        out = self.dec_prelu3(self.dec_norm3(self.dec_conv3(self.pad1(out))))
-
-        out = self.dec_dense2(out)
-        out = torch.cat([out, skips[-3]], dim=1)
-        out = self.dec_prelu2(self.dec_norm2(self.dec_conv2(self.pad1(out))))
-
-        out = self.dec_dense1(out)
-        out = torch.cat([out, skips[-4]], dim=1)
-        out = self.dec_prelu1(self.dec_norm1(self.dec_conv1(self.pad1(out))))
+        for i, decode in enumerate(self.decoder):
+            skip = skips.pop(-1)
+            out = decode(out, skip)
+            logger.info(f'decode {i} output shape: {out.shape}')
 
         out = self.out_conv(out)
+        logger.info(f'output convolution output shape: {out.shape}')
         out = self.ola(out)
+        logger.info(f'ola output shape: {out.shape}')
 
         return out
