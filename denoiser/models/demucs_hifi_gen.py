@@ -5,10 +5,8 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 from torch.nn import Conv1d, ConvTranspose1d, ConstantPad1d
-from denoiser.models.hifi_gan_models import ResBlock1, ResBlock2
 
-from denoiser.models.hifi_gan_models import HifiGenerator
-from denoiser.models.modules import BLSTM
+from denoiser.models.modules import BLSTM, ResBlock1, ResBlock2
 from denoiser.resample import upsample2
 from denoiser.utils import capture_init, init_weights
 
@@ -32,139 +30,6 @@ def rescale_module(module, reference):
             rescale_conv(sub, reference)
 
 LRELU_SLOPE = 0.1
-
-class DemucsEn(nn.Module):
-    """
-    Demucs speech enhancement model (only encoder - No skip connections).
-    Args:
-        - chin (int): number of input channels.
-        - chout (int): number of output channels.
-        - hidden (int): number of initial hidden channels.
-        - depth (int): number of layers.
-        - kernel_size (int): kernel size for each layer.
-        - stride (int): stride for each layer.
-        - causal (bool): if false, uses BiLSTM instead of LSTM.
-        - resample (int): amount of resampling to apply to the input/output.
-            Can be one of 1, 2 or 4.
-        - growth (float): number of channels is multiplied by this for every layer.
-        - max_hidden (int): maximum number of channels. Can be useful to
-            control the size/speed of the model.
-        - normalize (bool): if true, normalize the input.
-        - glu (bool): if true uses GLU instead of ReLU in 1x1 convolutions.
-        - rescale (float): controls custom weight initialization.
-            See https://arxiv.org/abs/1911.13254.
-        - floor (float): stability flooring when normalizing.
-
-    """
-    @capture_init
-    def __init__(self,
-                 chin=1,
-                 chout=1,
-                 hidden=48,
-                 depth=5,
-                 kernel_size=8,
-                 stride=4,
-                 causal=True,
-                 resample=4,
-                 growth=2,
-                 max_hidden=10_000,
-                 normalize=True,
-                 glu=True,
-                 rescale=0.1,
-                 floor=1e-3,
-                 scale_factor=1):
-
-        super().__init__()
-        if resample not in [1, 2, 4]:
-            raise ValueError("Resample should be 1, 2 or 4.")
-
-        self.chin = chin
-        self.chout = chout
-        self.hidden = hidden
-        self.depth = depth
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.causal = causal
-        self.floor = floor
-        self.resample = resample
-        self.normalize = normalize
-        self.scale_factor = scale_factor
-
-        self.encoder = nn.ModuleList()
-        activation = nn.GLU(1) if glu else nn.ReLU()
-        ch_scale = 2 if glu else 1
-
-        for index in range(depth):
-            encode = []
-            encode += [
-                nn.Conv1d(chin, hidden, kernel_size, stride),
-                nn.ReLU(),
-                nn.Conv1d(hidden, hidden * ch_scale, 1), activation,
-            ]
-            self.encoder.append(nn.Sequential(*encode))
-
-            chin = hidden
-            hidden = min(int(growth * hidden), max_hidden)
-
-        self.lstm = BLSTM(chin, bi=not causal)
-        if rescale:
-            rescale_module(self, reference=rescale)
-
-    def valid_length(self, length):
-        """
-        Return the nearest valid length to use with the model so that
-        there is no time steps left over in a convolutions, e.g. for all
-        layers, size of the input - kernel_size % stride = 0.
-
-        If the mixture has a valid length, the estimated sources
-        will have exactly the same length.
-        """
-        length = math.ceil(length * self.scale_factor)
-        length = math.ceil(length * self.resample)
-        for idx in range(self.depth):
-            length = math.ceil((length - self.kernel_size) / self.stride) + 1
-            length = max(length, 1)
-        for idx in range(self.depth):
-            length = (length - 1) * self.stride + self.kernel_size
-        length = int(math.ceil(length / self.resample))
-        return int(length)
-
-    @property
-    def total_stride(self):
-        return self.stride ** self.depth // self.resample
-
-    def forward(self, mix):
-        if mix.dim() == 2:
-            mix = mix.unsqueeze(1)
-
-        if self.normalize:
-            mono = mix.mean(dim=1, keepdim=True)
-            std = mono.std(dim=-1, keepdim=True)
-            mix = mix / (self.floor + std)
-        else:
-            std = 1
-        x = mix
-
-        if self.scale_factor == 2:
-            x = upsample2(x)
-        elif self.scale_factor == 4:
-            x = upsample2(x)
-            x = upsample2(x)
-
-        if self.resample == 2:
-            x = upsample2(x)
-        elif self.resample == 4:
-            x = upsample2(x)
-            x = upsample2(x)
-        skips = []
-        for encode in self.encoder:
-            x = encode(x)
-            skips.append(x)
-        x = x.permute(2, 0, 1)
-        x, _ = self.lstm(x)
-        x = x.permute(1, 2, 0)
-
-        return std * x
 
 
 def load_features_model(feature_model, state_dict_path, device):
@@ -206,7 +71,6 @@ class DemucsHifi(nn.Module):
         self.decoder = nn.ModuleList()
         self.target_training_length = output_length
         activation = nn.GLU(1) if demucs_args.glu else nn.ReLU()
-        # ch_scale = 1
         ch_scale = 2 if demucs_args.glu else 1
 
         kw = {"d2e": demucs2embedded_args, "hifi": hifi_args}
@@ -230,6 +94,7 @@ class DemucsHifi(nn.Module):
 
         channels = []
 
+        # TODO: add support function to override resblocks, encoder and decoder
         self.resblocks = nn.ModuleList()
         self.conv_post = weight_norm(Conv1d(self.hidden // ch_scale, 1, 7, 1, padding=3))
         self.conv_post.apply(init_weights)

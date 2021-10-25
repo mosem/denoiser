@@ -22,14 +22,14 @@ class DemucsHifiBS(BatchSolver):
         self.args = args
         self._models_dict = self._construct_models()
         self._opt_dict = self._construct_optimizers()
-        self.LOSS_NAMES = ['L1', 'Gen_loss', 'Disc_loss']
+        self._losses_names = ['L1', 'Gen_loss', 'Disc_loss']
         self._mel = MelSpectrogram(sample_rate=args.experiment.sample_rate,
                                    n_fft=args.experiment.hifi.n_fft,
                                    win_length=args.experiment.hifi.win_size,
                                    hop_length=args.experiment.hifi.hop_size,
                                    n_mels=args.experiment.hifi.n_mels).to(args.device)
         self.ft_loss = self.args.experiment.demucs2embedded.include_ft
-        if self.args.experiment.demucs2embedded.include_ft:
+        if self.ft_loss:
             self.ft_model = load_features_model(self.args.experiment.features_model.feature_model,
                                                 self.args.experiment.features_model.state_dict_path,
                                                 device=args.device)
@@ -55,7 +55,7 @@ class DemucsHifiBS(BatchSolver):
         return generator
 
     def get_losses_names(self) -> list:
-        return self.LOSS_NAMES
+        return self._losses_names
 
     def set_target_training_length(self, target_length):
         return None
@@ -95,10 +95,6 @@ class DemucsHifiBS(BatchSolver):
 
     def run(self, data, cross_valid=False):
         x, y = data
-        xshape = x.shape
-        yshape = y.shape
-        print(f"x: {x.shape}")
-        print(f"y: {y.shape}")
         generator = self._models_dict[self.GEN]
         mpd = self._models_dict[self.MPD]
         msd = self._models_dict[self.MSD]
@@ -162,9 +158,9 @@ class DemucsHifiBS(BatchSolver):
         del y, y_ds_hat_g, y_df_hat_g, fmap_s_r, fmap_s_g, fmap_f_r, fmap_f_g, \
             y_ds_hat_r, y_df_hat_r
 
-        return {self.LOSS_NAMES[0]: loss_audio.item(),
-                self.LOSS_NAMES[1]: loss_gen_all.item() - loss_audio.item(),
-                self.LOSS_NAMES[2]: loss_disc_all.item()}
+        return {self._losses_names[0]: loss_audio.item(),
+                self._losses_names[1]: loss_gen_all.item() - loss_audio.item(),
+                self._losses_names[2]: loss_disc_all.item()}
 
     def get_evaluation_loss(self, losses_dict):
-        return losses_dict[self.LOSS_NAMES[1]] * self.args.experiment.hifi.gen_factor + losses_dict[self.LOSS_NAMES[0]]
+        return losses_dict[self._losses_names[1]] * self.args.experiment.hifi.gen_factor + losses_dict[self._losses_names[0]]
