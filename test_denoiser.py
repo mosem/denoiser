@@ -1,5 +1,6 @@
 import subprocess
 import argparse
+from pathlib import Path
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--device", default="cuda", required=False)
@@ -15,6 +16,7 @@ TEST_COMMANDS = {
                'experiment.segment=2', 'experiment.stride=2','ddp=0', 'batch_size=16', 'experiment.scale_factor=2',
                'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
 }
+
 REMOVE_OUTPUT_FILE_COMMAND = ['rm', '-r', OUTPUT_DIR]
 
 successful_tests = []
@@ -23,6 +25,8 @@ outputs = []
 
 def test_denoiser():
     for exp_name, command in TEST_COMMANDS.items():
+        if Path(OUTPUT_DIR).exists():
+            subprocess.run(REMOVE_OUTPUT_FILE_COMMAND)
         print('============================')
         print(f'running test: {exp_name}')
         try:

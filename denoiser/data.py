@@ -68,11 +68,10 @@ def match_files(noisy, clean, matching="sort"):
         raise ValueError(f"Invalid value for matching {matching}")
 
 
-def _pad_signal_to_valid_length(signal, calc_valid_length_func, scale_factor):
+def pad_signal_to_valid_length(signal, calc_valid_length_func, scale_factor):
     valid_length = calc_valid_length_func(math.ceil(signal.shape[-1] / scale_factor))
 
     if valid_length > signal.shape[-1]:
-        # logger.info(f'padding signal: {valid_length - signal.shape[-1]}')
         signal = F.pad(signal, (0, valid_length - signal.shape[-1]))
 
     return signal
@@ -115,12 +114,10 @@ class NoisyCleanSet:
 
         assert len(self.clean_set) == len(self.noisy_set)
 
-    def __getitem__(self, index):
-        noisy, clean = self.noisy_set[index], self.clean_set[index]
-
+    def _process_data(self, noisy, clean):
         if not self.is_training:
-            noisy = _pad_signal_to_valid_length(noisy, self.calc_valid_length_func, self.scale_factor)
-            clean = _pad_signal_to_valid_length(clean, self.calc_valid_length_func, self.scale_factor)
+            noisy = pad_signal_to_valid_length(noisy, self.calc_valid_length_func, self.scale_factor)
+            clean = pad_signal_to_valid_length(clean, self.calc_valid_length_func, self.scale_factor)
 
         if self.scale_factor == 2:
             noisy = downsample2(noisy)
@@ -131,6 +128,22 @@ class NoisyCleanSet:
             raise RuntimeError(f"Scale factor should be 1, 2, or 4")
 
         return noisy, clean
+
+    def _get_item_with_path(self, index):
+        (noisy, noisy_path), (clean, clean_path) = self.noisy_set[index], self.clean_set[index]
+        noisy, clean = self._process_data(noisy, clean)
+        return (noisy, noisy_path), (clean, clean_path)
+
+    def _get_item_without_path(self, index):
+        noisy, clean = self.noisy_set[index], self.clean_set[index]
+        noisy, clean = self._process_data(noisy, clean)
+        return noisy, clean
+
+    def __getitem__(self, index):
+        if self.with_path:
+            return self._get_item_with_path(index)
+        else:
+            return self._get_item_without_path(index)
 
     def __len__(self):
         return len(self.noisy_set)

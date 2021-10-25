@@ -1,23 +1,21 @@
 import torch
 import logging
-import os
 
 import torch.nn.functional as F
 
 from denoiser.batch_solvers.batch_solver import BatchSolver
-from denoiser.models.demucs import Demucs
 
 from denoiser.stft_loss import MultiResolutionSTFTLoss
 
 logger = logging.getLogger(__name__)
 
-class DemucsBS(BatchSolver):
 
-    def __init__(self, args):
-        super(DemucsBS, self).__init__(args)
+class GeneratorBS(BatchSolver):
+
+    def __init__(self, args, generator):
+        super(GeneratorBS, self).__init__(args)
         self.device = args.device
 
-        generator = Demucs(**args.experiment.demucs)
         if torch.cuda.is_available() and args.device == 'cuda':
             generator.cuda()
         generator_optimizer = torch.optim.Adam(generator.parameters(), lr=args.lr, betas=(0.9, args.beta2))

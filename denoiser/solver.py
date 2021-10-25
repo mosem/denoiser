@@ -19,6 +19,7 @@ from .enhance import enhance
 from .evaluate import evaluate
 from .stft_loss import MultiResolutionSTFTLoss
 from .utils import bold, pull_metric, LogProgress
+from .log_results import log_results
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,9 @@ class Solver(object):
             n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
             mb = n_params * 4 / 2 ** 20
             logger.info(f"{name}: parameters: {n_params}, size: {mb} MB")
-        logger.info("Training...")
+
+        if (self.epochs > len(self.history)):
+            logger.info("Training...")
 
         for epoch in range(len(self.history), self.epochs):
             # Train one epoch
@@ -134,7 +137,7 @@ class Solver(object):
                 with torch.no_grad():
                     valid_losses = self._run_one_epoch(epoch, cross_valid=True)
                 evaluation_loss = self.batch_solver.get_evaluation_loss(valid_losses)
-                logger_msg = f'Train Summary | End of Epoch {epoch + 1} | Time {time.time() - start:.2f}s | ' \
+                logger_msg = f'Validation Summary | End of Epoch {epoch + 1} | Time {time.time() - start:.2f}s | ' \
                              + ' | '.join([f'{k} Valid Loss {v:.5f}' for k, v in valid_losses.items()])
                 logger.info(bold(logger_msg))
                 valid_losses = {'valid_'  + k: v for k,v in valid_losses.items()}
@@ -164,7 +167,7 @@ class Solver(object):
 
                 # enhance some samples
                 logger.info('Enhance and save samples...')
-                enhance(self.args, generator, self.samples_dir, self.batch_solver.estimate_valid_length)
+                enhance(self.args, generator, self.samples_dir, self.tt_loader)
 
             self.history.append(metrics)
             info = " | ".join(f"{k.capitalize()} {v:.5f}" for k, v in metrics.items())
@@ -177,6 +180,8 @@ class Solver(object):
                 if self.checkpoint:
                     self._serialize()
                     logger.debug("Checkpoint saved to %s", self.checkpoint_file.resolve())
+        if self.args.log_results:
+            log_results(self.args)
 
 
     def _run_one_epoch(self, epoch, cross_valid=False):
