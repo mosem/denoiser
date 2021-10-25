@@ -110,12 +110,7 @@ class DemucsHifiBS(BatchSolver):
         else:
             y_g_hat = generator(x)
             x_ft = 0
-        # if y.shape[2] < y_g_hat.shape[2]:
-        #     y_g_hat = y_g_hat[:, :, :y.shape[2]]
-        # elif y.shape[2] > y_g_hat.shape[2]:
-        #     y = y[:, :, :y_g_hat.shape[2]]
 
-        print(f"y_g_h: {y_g_hat.shape}")
         if not cross_valid:
             optim_d.zero_grad()
 

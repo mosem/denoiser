@@ -189,9 +189,11 @@ class DemucsHifi(nn.Module):
         self.chin = demucs_args.chin
         self.chout = demucs_args.chout
         self.hidden = demucs_args.hidden
+        self.max_hidden = demucs_args.max_hidden
         self.depth = demucs_args.depth
         self.kernel_size = demucs_args.kernel_size
         self.stride = demucs_args.stride
+        self.growth = demucs_args.growth
         self.dialation = demucs2embedded_args.dialation
         self.causal = demucs_args.causal
         self.floor = demucs_args.floor
@@ -210,44 +212,6 @@ class DemucsHifi(nn.Module):
         kw = {"d2e": demucs2embedded_args, "hifi": hifi_args}
         self._init_args_kwargs = (demucs_args, kw)
 
-        channels = []
-
-        for index in range(demucs_args.depth):
-            encode = []
-            encode += [
-                nn.Conv1d(self.chin, self.hidden, demucs_args.kernel_size, demucs_args.stride,
-                          padding=(demucs_args.kernel_size - demucs_args.stride)//2),
-                nn.ReLU(),
-                nn.Conv1d(self.hidden, self.hidden * ch_scale, 1), activation,
-            ]
-            self.encoder.append(nn.Sequential(*encode))
-
-            decode = []
-            decode += [
-                nn.Conv1d(self.hidden, ch_scale * self.hidden, 1), activation,
-                nn.ConvTranspose1d(self.hidden, self.chout, 4, 2, 1),
-            ]
-            if index > 0:
-                decode.append(nn.ReLU())
-            self.decoder.insert(0, nn.Sequential(*decode))
-
-            self.chout = self.hidden
-            self.chin = self.hidden
-            self.hidden = min(int(demucs_args.growth * self.hidden), demucs_args.max_hidden)
-
-            channels.append(self.chout // ch_scale)
-
-        self.lstm = BLSTM(self.chin, bi=not demucs_args.causal)
-        if demucs_args.rescale:
-            rescale_module(self, reference=demucs_args.rescale)
-
-        # linear embedded dim
-        if self.ft_loss:
-            self.resampler = torchaudio.transforms.Resample(output_length // (2**demucs_args.depth),
-                                                            int(args.experiment.source_sample_rate *
-                                                                args.experiment.segment *
-                                                                demucs2embedded_args.slice_rate))
-
         # hifi generator
         self.num_kernels = len(hifi_args.resblock_kernel_sizes)
         self.num_upsamples = len(hifi_args.upsample_rates)
@@ -263,18 +227,50 @@ class DemucsHifi(nn.Module):
             "resblock_dilation_sizes": hifi_args.resblock_dilation_sizes,
         }
         self._init_args_kwargs = (args, None)
-        self.resblocks = nn.ModuleList()
-        ch = 24
-        for i in range(len(self.decoder)):
-            # ch = upsample_initial_channel
-            # ch = max(hifi_args.upsample_initial_channel // (2 ** (i + 1)), 1)
-            ch = channels.pop()
-            for j, (k, d) in enumerate(zip(hifi_args.resblock_kernel_sizes, hifi_args.resblock_dilation_sizes)):
-                self.resblocks.append(resblock(ch, k, d))
 
-        self.conv_post = weight_norm(Conv1d(ch, 1, 7, 1, padding=3))
-        # self.ups.apply(init_weights)
+        channels = []
+
+        self.resblocks = nn.ModuleList()
+        self.conv_post = weight_norm(Conv1d(self.hidden // ch_scale, 1, 7, 1, padding=3))
         self.conv_post.apply(init_weights)
+
+        for index in range(demucs_args.depth):
+            encode = []
+            encode += [
+                nn.Conv1d(self.chin, self.hidden, self.kernel_size, self.stride),
+                nn.ReLU(),
+                nn.Conv1d(self.hidden, self.hidden * ch_scale, 1), activation,
+            ]
+            self.encoder.append(nn.Sequential(*encode))
+
+            # hifi-gan resblocks
+            for (k, d) in zip(hifi_args.resblock_kernel_sizes, hifi_args.resblock_dilation_sizes):
+                self.resblocks.insert(0, resblock(self.hidden, k, d))
+
+            # decoding
+            decode = []
+            decode += [
+                nn.ConvTranspose1d(self.hidden, self.chout, self.kernel_size, self.stride),
+            ]
+            if index > 0:
+                decode.append(nn.ReLU())
+            self.decoder.insert(0, nn.Sequential(*decode))
+            self.chout = self.hidden
+            self.chin = self.hidden
+            self.hidden = min(int(self.growth * self.hidden), self.max_hidden)
+
+            channels.append(self.chout // ch_scale)
+
+        self.lstm = BLSTM(self.chin, bi=not demucs_args.causal)
+        if demucs_args.rescale:
+            rescale_module(self, reference=demucs_args.rescale)
+
+        # linear embedded dim
+        if self.ft_loss:
+            self.resampler = torchaudio.transforms.Resample(output_length // (2**demucs_args.depth),
+                                                            int(args.experiment.source_sample_rate *
+                                                                args.experiment.segment *
+                                                                demucs2embedded_args.slice_rate))
 
     def forward(self, mix):
         if mix.dim() == 2:
@@ -286,9 +282,7 @@ class DemucsHifi(nn.Module):
             mix = mix / (self.floor + std)
         else:
             std = 1
-        # length = mix.shape[-1]
         x = mix
-        # x = F.pad(x, (0, self.valid_length(length) - length))
 
         if self.scale_factor == 2:
             x = upsample2(x)
@@ -302,10 +296,11 @@ class DemucsHifi(nn.Module):
             x = upsample2(x)
             x = upsample2(x)
         skips = []
-        for encode in self.encoder:
+        for i, encode in enumerate(self.encoder):
             x = encode(x)
             if self.include_skip:
                 skips.append(x)
+
         x = x.permute(2, 0, 1)
         x, _ = self.lstm(x)
         x = x.permute(1, 2, 0)
@@ -319,7 +314,6 @@ class DemucsHifi(nn.Module):
             if self.include_skip:
                 skip = skips.pop(-1)
                 x = x + skip[..., :x.shape[-1]]
-            x = decode(x)
             xs = None
             for j in range(self.num_kernels):
                 if xs is None:
@@ -327,18 +321,13 @@ class DemucsHifi(nn.Module):
                 else:
                     xs += self.resblocks[i * self.num_kernels + j](x)
             x = xs / self.num_kernels
+            x = F.leaky_relu(x)
+            x = decode(x)
 
         x = F.leaky_relu(x)
         x = self.conv_post(x)
         x = torch.tanh(x)
 
-        target_length = self.target_training_length
-
-        if x.size(-1) < target_length:
-            pad = ConstantPad1d((0, target_length-x.size(-1)), 0)
-            x = pad(x)
-        elif x.size(-1) > target_length:
-            x = x[..., :target_length]
         if self.ft_loss:
             return x * std, ft
         return x * std
