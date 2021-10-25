@@ -28,7 +28,7 @@ jobs:
     - name: Demucs HiFi - dummy full pipeline
       run: |
         ./make_debug.sh
-        python train.py dset=valentini_dummy device=cpu num_workers=2 epochs=1 experiment=demucs_hifi_1 experiment.scale_factor=2
+        python train.py dset=valentini_dummy device=cpu num_workers=2 epochs=1 experiment=demucs_hifi experiment.scale_factor=2
 
   test_setup:
     runs-on: ubuntu-latest
