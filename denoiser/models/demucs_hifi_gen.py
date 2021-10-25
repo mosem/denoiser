@@ -44,98 +44,90 @@ def load_features_model(feature_model, state_dict_path, device):
 
 
 class DemucsHifi(nn.Module):
-    def __init__(self, args, output_length):
+    def __init__(self,
+                 # demucs args
+                 chin=1,
+                 chout=1,
+                 hidden=48,
+                 depth=5,
+                 kernel_size=8,
+                 stride=4,
+                 causal=True,
+                 resample=4,
+                 growth=2,
+                 max_hidden=10_000,
+                 normalize=True,
+                 glu=True,
+                 rescale=0.1,
+                 floor=1e-3,
+                 scale_factor=1,
+                 # embedded dim args
+                 include_ft=False,
+                 include_skip_connections=True,
+                 # hifi args
+                 resblock=2,
+                 resblock_kernel_sizes=[3, 7, 11],
+                 resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+                 output_length=6_000):
         super().__init__()
 
         # demucs related
-        demucs_args = args.experiment.demucs
-        demucs2embedded_args = args.experiment.demucs2embedded
-        hifi_args = args.experiment.hifi
-        self.chin = demucs_args.chin
-        self.chout = demucs_args.chout
-        self.hidden = demucs_args.hidden
-        self.max_hidden = demucs_args.max_hidden
-        self.depth = demucs_args.depth
-        self.kernel_size = demucs_args.kernel_size
-        self.stride = demucs_args.stride
-        self.growth = demucs_args.growth
-        self.dialation = demucs2embedded_args.dialation
-        self.causal = demucs_args.causal
-        self.floor = demucs_args.floor
-        self.resample = demucs_args.resample
-        self.normalize = demucs_args.normalize
-        self.scale_factor = demucs_args.scale_factor
-        self.include_skip = demucs2embedded_args.include_skip_connections
-        self.ft_loss = demucs2embedded_args.include_ft
+        self.floor = floor
+        self.resample = resample
+        self.normalize = normalize
+        self.scale_factor = scale_factor
+        self.include_skip = include_skip_connections
+        self.ft_loss = include_ft
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
         self.target_training_length = output_length
-        activation = nn.GLU(1) if demucs_args.glu else nn.ReLU()
-        ch_scale = 2 if demucs_args.glu else 1
-
-        kw = {"d2e": demucs2embedded_args, "hifi": hifi_args}
-        self._init_args_kwargs = (demucs_args, kw)
+        self.kernel_size = kernel_size
+        self.depth = depth
+        self.stride = stride
+        activation = nn.GLU(1) if glu else nn.ReLU()
+        ch_scale = 2 if glu else 1
 
         # hifi generator
-        self.num_kernels = len(hifi_args.resblock_kernel_sizes)
-        self.num_upsamples = len(hifi_args.upsample_rates)
-        resblock = ResBlock1 if str(hifi_args.resblock) == '1' else ResBlock2
-        args = {
-            "resblock": resblock,
-            "upsample_rates": hifi_args.upsample_rates,
-            "upsample_kernel_sizes": hifi_args.upsample_kernel_sizes,
-            "upsample_dialation_sizes": hifi_args.upsample_dialation_sizes,
-            "upsample_initial_channel": hifi_args.upsample_initial_channel,
-            "input_initial_channel": hifi_args.input_initial_channel,
-            "resblock_kernel_sizes": hifi_args.resblock_kernel_sizes,
-            "resblock_dilation_sizes": hifi_args.resblock_dilation_sizes,
-        }
-        self._init_args_kwargs = (args, None)
-
+        self.num_kernels = len(resblock_kernel_sizes)
+        resblock = ResBlock1 if str(resblock) == '1' else ResBlock2
         channels = []
 
         # TODO: add support function to override resblocks, encoder and decoder
         self.resblocks = nn.ModuleList()
-        self.conv_post = weight_norm(Conv1d(self.hidden // ch_scale, 1, 7, 1, padding=3))
+        self.conv_post = weight_norm(Conv1d(hidden // ch_scale, 1, 7, 1, padding=3))
         self.conv_post.apply(init_weights)
 
-        for index in range(demucs_args.depth):
+        for index in range(depth):
             encode = []
             encode += [
-                nn.Conv1d(self.chin, self.hidden, self.kernel_size, self.stride),
+                nn.Conv1d(chin, hidden, kernel_size, stride),
                 nn.ReLU(),
-                nn.Conv1d(self.hidden, self.hidden * ch_scale, 1), activation,
+                nn.Conv1d(hidden, hidden * ch_scale, 1), activation,
             ]
             self.encoder.append(nn.Sequential(*encode))
 
             # hifi-gan resblocks
-            for (k, d) in zip(hifi_args.resblock_kernel_sizes, hifi_args.resblock_dilation_sizes):
-                self.resblocks.insert(0, resblock(self.hidden, k, d))
+            for (k, d) in zip(resblock_kernel_sizes, resblock_dilation_sizes):
+                self.resblocks.insert(0, resblock(hidden, k, d))
 
             # decoding
             decode = []
             decode += [
-                nn.ConvTranspose1d(self.hidden, self.chout, self.kernel_size, self.stride),
+                nn.ConvTranspose1d(hidden, chout, kernel_size, stride),
             ]
             if index > 0:
                 decode.append(nn.ReLU())
             self.decoder.insert(0, nn.Sequential(*decode))
-            self.chout = self.hidden
-            self.chin = self.hidden
-            self.hidden = min(int(self.growth * self.hidden), self.max_hidden)
+            chout = hidden
+            chin = hidden
+            hidden = min(int(growth * hidden), max_hidden)
 
-            channels.append(self.chout // ch_scale)
+            channels.append(chout // ch_scale)
 
-        self.lstm = BLSTM(self.chin, bi=not demucs_args.causal)
-        if demucs_args.rescale:
-            rescale_module(self, reference=demucs_args.rescale)
+        self.lstm = BLSTM(chin, bi=not causal)
+        if rescale:
+            rescale_module(self, reference=rescale)
 
-        # linear embedded dim
-        if self.ft_loss:
-            self.resampler = torchaudio.transforms.Resample(output_length // (2**demucs_args.depth),
-                                                            int(args.experiment.source_sample_rate *
-                                                                args.experiment.segment *
-                                                                demucs2embedded_args.slice_rate))
 
     def forward(self, mix):
         if mix.dim() == 2:
@@ -172,7 +164,7 @@ class DemucsHifi(nn.Module):
 
         # embedded dim createion
         if self.ft_loss:
-            ft = self.resampler(x)
+            ft = self.resampler(x)  # todo implement this for ft support
 
         # decode to original dims
         for i, decode in enumerate(self.decoder):
@@ -197,3 +189,14 @@ class DemucsHifi(nn.Module):
             return x * std, ft
         return x * std
 
+    def estimate_valid_length(self, input_length):
+        length = math.ceil(input_length * self.scale_factor)
+        length = math.ceil(length * self.resample)
+        for idx in range(self.depth):
+            length = math.ceil(
+                (length - self.kernel_size) / self.stride) + 1
+            length = max(length, 1)
+        for idx in range(self.depth):
+            length = (length - 1) * self.stride + self.kernel_size
+        length = int(math.ceil(length / self.resample))
+        return int(length)
