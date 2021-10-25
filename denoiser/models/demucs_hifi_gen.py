@@ -31,7 +31,6 @@ def rescale_module(module, reference):
 
 LRELU_SLOPE = 0.1
 
-
 def load_features_model(feature_model, state_dict_path, device):
     if feature_model == 'hubert':
         return huBERT(state_dict_path, 6, device=device)

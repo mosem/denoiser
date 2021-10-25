@@ -41,7 +41,7 @@ class DemucsHifiBS(BatchSolver):
 
     def estimate_valid_length(self, input_length):
         # todo replace to model function
-        return self.get_generator_model().estimate_valid_length()
+        return self.get_generator_model().estimate_valid_length(input_length)
 
     def get_generator_for_evaluation(self, best_states):
         generator = self.get_generator_model()
