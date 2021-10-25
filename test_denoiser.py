@@ -8,9 +8,9 @@ device = parser.parse_args().device
 OUTPUT_DIR = './outputs/tmp'
 
 TEST_COMMANDS = {
-    'demucs': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_1', 'stft_loss=True',
-               'experiment.segment=2', 'experiment.stride=2','ddp=0', 'batch_size=16', 'experiment.scale_factor=2',
-               'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
+    # 'demucs': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_1', 'stft_loss=True',
+    #            'experiment.segment=2', 'experiment.stride=2','ddp=0', 'batch_size=16', 'experiment.scale_factor=2',
+    #            'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
     'demucs_hifi': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_hifi_1',
                'experiment.segment=2', 'experiment.stride=2','ddp=0', 'batch_size=16', 'experiment.scale_factor=2',
                'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
