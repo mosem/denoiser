@@ -85,7 +85,6 @@ class Demucs(nn.Module):
         self.resample = resample
         self.normalize = normalize
         self.scale_factor = scale_factor
-        self.target_training_length = None #todo: remove
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()

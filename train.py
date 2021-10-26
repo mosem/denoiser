@@ -38,7 +38,7 @@ def run(args):
     args.experiment.batch_size //= distrib.world_size
 
     target_training_length = int(args.experiment.segment * args.experiment.sample_rate)
-    training_stride = int(args.experiment.stride_size * args.experiment.sample_rate)
+    training_stride = int(args.experiment.stride * args.experiment.sample_rate)
     kwargs = {"matching": args.dset.matching, "sample_rate": args.experiment.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(args.dset.train, batch_solver.estimate_valid_length, clean_length=target_training_length,

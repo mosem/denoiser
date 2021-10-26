@@ -2,14 +2,8 @@ import math
 import torch
 import torch.nn as nn
 from denoiser.models.modules import TorchSignalToFrames, TorchOLA, Dual_Transformer
-
 from denoiser.resample import upsample2
-
 from denoiser.utils import capture_init
-
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 class Dsconv2d(nn.Module):
@@ -115,8 +109,6 @@ class Caunet(nn.Module):
         self.frame_size = self._estimate_valid_frame_size(frame_size)
         self.frame_shift = self.frame_size // 2
 
-        logger.info(f'caunet args. frame size: {frame_size}, hidden: {hidden}, scale factor: {scale_factor}, depth: {depth}, dense_block_depth: {dense_block_depth}, kernel size: {kernel_size}, stride: {stride_size}')
-
 
         self.signalPreProcessor = TorchSignalToFrames(frame_size=self.frame_size,
                                                       frame_shift=self.frame_shift)
@@ -129,16 +121,11 @@ class Caunet(nn.Module):
         self.encoder.append(nn.Sequential(*input_layer))
         for i in range(self.depth):
             encoder_output_size = (encoder_input_size + 2 * self.padding_size - self.kernel[1]) // self.stride_size + 1
-            logger.info(f'{i}) encoder input size: {encoder_input_size}')
-            logger.info(f'{i}) encoder output size: {encoder_output_size}')
             encode_layer = [DenseBlock(encoder_input_size, self.dense_block_depth, self.hidden),
                             nn.Conv2d(in_channels=self.hidden, out_channels=self.hidden, kernel_size=self.kernel,
                                       stride=(1, self.stride_size), padding=(0, self.padding_size)),
                             nn.LayerNorm(encoder_output_size),
                             nn.PReLU(self.hidden)]
-
-            logger.info(f'{i}) decoder input size: {encoder_output_size}')
-            logger.info(f'{i}) decoder output size: {encoder_input_size}')
 
             dense_block = DenseBlock(encoder_output_size, self.dense_block_depth, self.hidden)
             decode_block = nn.Sequential(SPConvTranspose2d(in_channels=self.hidden * 2, out_channels=self.hidden,
@@ -163,13 +150,11 @@ class Caunet(nn.Module):
 
     def _estimate_valid_frame_size(self, frame_size):
         valid_frame_size = frame_size
-        logger.info(f'valid frame size: {valid_frame_size}')
         for i in range(self.depth):
             valid_frame_size = (valid_frame_size + 2 * self.padding_size - self.kernel[1]) // self.stride_size + 1
             valid_frame_size = max(valid_frame_size, 1)
         for i in range(self.depth):
             valid_frame_size = (valid_frame_size + 2 * self.padding_size - self.kernel[1] + 1) * self.stride_size
-        logger.info(f'valid frame size: {valid_frame_size}')
         return valid_frame_size
 
     def estimate_valid_length(self, length):
@@ -181,11 +166,9 @@ class Caunet(nn.Module):
         If the mixture has a valid length, the estimated sources
         will have exactly the same length.
         """
-        logger.info(f'valid length input: {length}')
         length = math.ceil(length * self.scale_factor)
         n_frames = math.ceil((length - self.frame_size) / self.frame_shift + 1)
         length = (n_frames - 1) * self.frame_shift + self.frame_size
-        logger.info(f'valid length output: {length}')
         return int(length)
 
     def forward(self, x):
@@ -195,14 +178,11 @@ class Caunet(nn.Module):
             x = upsample2(x)
             x = upsample2(x)
 
-        logger.info(f'input shape: {x.shape}')
         skips = []
         out = self.signalPreProcessor(x)
-        logger.info(f'signalPreProcess output shape: {out.shape}')
 
         for i, encode in enumerate(self.encoder):
             out = encode(out)
-            logger.info(f'encode {i} output shape: {out.shape}')
             skips.append(out)
 
         out = self.dual_transformer(out)
@@ -210,11 +190,8 @@ class Caunet(nn.Module):
         for i, decode in enumerate(self.decoder):
             skip = skips.pop(-1)
             out = decode(out, skip)
-            logger.info(f'decode {i} output shape: {out.shape}')
 
         out = self.out_conv(out)
-        logger.info(f'output convolution output shape: {out.shape}')
         out = self.ola(out)
-        logger.info(f'ola output shape: {out.shape}')
 
         return out
