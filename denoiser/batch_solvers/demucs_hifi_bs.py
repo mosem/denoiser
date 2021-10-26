@@ -84,19 +84,11 @@ class DemucsHifiBS(BatchSolver):
                                      lr=self.args.lr, betas=(self.args.beta1, self.args.beta2))
         return {self.G_OPT: gen_opt, self.D_OPT: disc_opt}
 
-    def run(self, data, cross_valid=False):
-        x, y = data
-        generator = self._models_dict[self.GEN]
-        mpd = self._models_dict[self.MPD]
-        msd = self._models_dict[self.MSD]
-
-        optim_g, optim_d = self._opt_dict[self.G_OPT], self._opt_dict[self.D_OPT]
-
-        if self.ft_loss:
-            y_g_hat, x_ft = generator(x)
-        else:
-            y_g_hat = generator(x)
-            x_ft = 0
+    @staticmethod
+    def _disc_step(mpd, msd, y, y_g_hat, cross_valid, optim_d):
+        """
+        takes a discriminator step during training
+        """
 
         if not cross_valid:
             optim_d.zero_grad()
@@ -115,6 +107,14 @@ class DemucsHifiBS(BatchSolver):
             loss_disc_all.backward()
             optim_d.step()
 
+        del y_ds_hat_r, y_df_hat_r
+
+        return loss_disc_all
+
+    def _gen_step(self, cross_valid, optim_g, mpd, msd, y, y_g_hat, x_ft=0):
+        """
+        takes a generator step during training
+        """
         # Generator
         if not cross_valid:
             optim_g.zero_grad()
@@ -146,8 +146,27 @@ class DemucsHifiBS(BatchSolver):
             loss_gen_all.backward()
             optim_g.step()
 
-        del y, y_ds_hat_g, y_df_hat_g, fmap_s_r, fmap_s_g, fmap_f_r, fmap_f_g, \
-            y_ds_hat_r, y_df_hat_r
+        del y, y_ds_hat_g, y_df_hat_g, fmap_s_r, fmap_s_g, fmap_f_r, fmap_f_g
+
+        return loss_gen_all, loss_audio
+
+    def run(self, data, cross_valid=False):
+        x, y = data
+        generator, mpd, msd= self._models_dict[self.GEN], self._models_dict[self.MPD], self._models_dict[self.MSD]
+
+        optim_g, optim_d = self._opt_dict[self.G_OPT], self._opt_dict[self.D_OPT]
+
+        if self.ft_loss:
+            y_g_hat, x_ft = generator(x)
+        else:
+            y_g_hat = generator(x)
+            x_ft = 0
+
+        # take discriminator step
+        loss_disc_all = self._disc_step(mpd, msd, y, y_g_hat, cross_valid, optim_d)
+
+        # take generator step
+        loss_gen_all, loss_audio = self._gen_step(self, cross_valid, optim_g, mpd, msd, y, y_g_hat, x_ft)
 
         return {self._losses_names[0]: loss_audio.item(),
                 self._losses_names[1]: loss_gen_all.item() - loss_audio.item(),
