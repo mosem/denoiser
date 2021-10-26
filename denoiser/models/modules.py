@@ -1,17 +1,14 @@
 import math
 import torch
-from torch import nn
-from torch.nn import functional as F
+from torch import nn, nn as nn
+from torch.nn import Conv1d, functional as F, Conv2d, AvgPool1d
+from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 from torch.nn.modules.module import Module
 from torch.nn.modules.activation import MultiheadAttention
 from torch.nn.modules.dropout import Dropout
 from torch.nn.modules.linear import Linear
 from torch.nn.modules.rnn import GRU
 from torch.nn.modules.normalization import LayerNorm
-import torch
-from torch import nn, nn as nn
-from torch.nn import Conv1d, functional as F, Conv2d, AvgPool1d
-from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
 from denoiser.models.hifi_gan_loss_functions import LRELU_SLOPE
 from denoiser.utils import get_padding, init_weights
