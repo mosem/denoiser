@@ -2,9 +2,9 @@ import subprocess
 from pathlib import Path
 OUTPUT_DIR = './outputs/tmp'
 
-TEST_COMMANDS = {'demucs': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_1', 'stft_loss=True',
-                            'experiment.segment=2', 'experiment.stride=2','ddp=0', 'experiment.scale_factor=2',
-                            'epochs=1', f'hydra.run.dir={OUTPUT_DIR}'],
+TEST_COMMANDS = {#'demucs': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_1', 'stft_loss=True',
+                 #            'experiment.segment=2', 'experiment.stride=2','ddp=0', 'experiment.scale_factor=2',
+                 #            'epochs=1', f'hydra.run.dir={OUTPUT_DIR}'],
                  'caunet': ['train.py', 'dset=valentini_dummy', 'experiment=caunet_1', 'stft_loss=True',
                             'experiment.segment=2', 'experiment.stride=2','ddp=0', 'experiment.scale_factor=2',
                             'epochs=1', f'hydra.run.dir={OUTPUT_DIR}'],

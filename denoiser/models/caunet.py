@@ -40,12 +40,12 @@ class Dsconv2d(nn.Module):
 
 
 class SPConvTranspose2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, r=1):
+    def __init__(self, in_channels, out_channels, kernel_size, padding_size, r=1):
         # upconvolution only along second dimension of image
         # Upsampling using sub pixel layers
         super(SPConvTranspose2d, self).__init__()
         self.out_channels = out_channels
-        self.conv = nn.Conv2d(in_channels, out_channels * r, kernel_size=kernel_size, stride=(1, 1))
+        self.conv = nn.Conv2d(in_channels, out_channels * r, kernel_size=kernel_size, padding=(0, padding_size))
         self.r = r
 
     def forward(self, x):
@@ -62,7 +62,6 @@ class DenseBlock(nn.Module):
         super(DenseBlock, self).__init__()
         self.depth = depth
         self.in_channels = in_channels
-        self.pad = nn.ConstantPad2d((1, 1, 1, 0), value=0.)
         self.twidth = 2
         self.kernel_size = (self.twidth, 3)
         for i in range(self.depth):
@@ -102,58 +101,76 @@ class DecodeLayer(nn.Module):
 class Caunet(nn.Module):
 
     @capture_init
-    def __init__(self, frame_size=512, hidden=64, scale_factor=1, depth=4, dense_block_depth=3, kernel_size=3, stride=2):
+    def __init__(self, frame_size=512, hidden=64, scale_factor=1, depth=4, dense_block_depth=3, kernel_size=3, stride_size=2):
         super(Caunet, self).__init__()
-        self.frame_size = frame_size
-        self.frame_shift = self.frame_size // 2
         self.depth= depth
         self.dense_block_depth = dense_block_depth
         self.in_channels = 1
         self.out_channels = 1
-        self.kernel_size = (1, kernel_size)
-        self.stride = stride
-        self.pad = nn.ConstantPad2d((1, 1, 0, 0), value=0.)
+        self.kernel = (1, kernel_size)
+        self.stride_size = stride_size
+        self.padding_size = kernel_size // 2
         self.hidden = hidden
         self.scale_factor = scale_factor
+        self.frame_size = self._estimate_valid_frame_size(frame_size)
+        self.frame_shift = self.frame_size // 2
+
+        logger.info(f'caunet args. frame size: {frame_size}, hidden: {hidden}, scale factor: {scale_factor}, depth: {depth}, dense_block_depth: {dense_block_depth}, kernel size: {kernel_size}, stride: {stride_size}')
 
 
         self.signalPreProcessor = TorchSignalToFrames(frame_size=self.frame_size,
                                                       frame_shift=self.frame_shift)
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
-        tmp_frame_size = self.frame_size
+        encoder_input_size = self.frame_size
         input_layer = [nn.Conv2d(in_channels=self.in_channels, out_channels=self.hidden, kernel_size=(1, 1)),
-                       nn.LayerNorm(tmp_frame_size),
+                       nn.LayerNorm(encoder_input_size),
                        nn.PReLU(self.hidden)]
         self.encoder.append(nn.Sequential(*input_layer))
         for i in range(self.depth):
-            encode_layer = [DenseBlock(tmp_frame_size, self.dense_block_depth, self.hidden),
-                       self.pad,
-                       nn.Conv2d(in_channels=self.hidden, out_channels=self.hidden, kernel_size=self.kernel_size,
-                                 stride=(1,self.stride)),
-                      nn.LayerNorm(math.ceil(tmp_frame_size / self.stride)),
-                      nn.PReLU(self.hidden)]
+            encoder_output_size = (encoder_input_size + 2 * self.padding_size - self.kernel[1]) // self.stride_size + 1
+            logger.info(f'{i}) encoder input size: {encoder_input_size}')
+            logger.info(f'{i}) encoder output size: {encoder_output_size}')
+            encode_layer = [DenseBlock(encoder_input_size, self.dense_block_depth, self.hidden),
+                            nn.Conv2d(in_channels=self.hidden, out_channels=self.hidden, kernel_size=self.kernel,
+                                      stride=(1, self.stride_size), padding=(0, self.padding_size)),
+                            nn.LayerNorm(encoder_output_size),
+                            nn.PReLU(self.hidden)]
 
-            tmp_frame_size = math.ceil(tmp_frame_size / self.stride)
+            logger.info(f'{i}) decoder input size: {encoder_output_size}')
+            logger.info(f'{i}) decoder output size: {encoder_input_size}')
 
-            dense_block = DenseBlock(tmp_frame_size, self.dense_block_depth, self.hidden)
-            decode_block = nn.Sequential(self.pad,
-                                         SPConvTranspose2d(in_channels=self.hidden * 2, out_channels=self.hidden,
-                                                           kernel_size=self.kernel_size, r=self.stride),
-                                         nn.LayerNorm(tmp_frame_size * self.stride),
+            dense_block = DenseBlock(encoder_output_size, self.dense_block_depth, self.hidden)
+            decode_block = nn.Sequential(SPConvTranspose2d(in_channels=self.hidden * 2, out_channels=self.hidden,
+                                                           kernel_size=self.kernel, padding_size=self.padding_size,
+                                                           r=self.stride_size),
+                                         nn.LayerNorm(encoder_input_size),
                                          nn.PReLU(self.hidden))
             decode_layer = DecodeLayer(dense_block, decode_block)
+
+
 
             self.encoder.append(nn.Sequential(*encode_layer))
             self.decoder.insert(0, decode_layer)
 
-            logger.info(f'{i}: {tmp_frame_size}')
+            encoder_input_size = encoder_output_size
 
 
         self.dual_transformer = Dual_Transformer(self.hidden, self.hidden, nhead=4, num_layers=6)
 
         self.out_conv = nn.Conv2d(in_channels=self.hidden, out_channels=self.out_channels, kernel_size=(1, 1))
         self.ola = TorchOLA(self.frame_shift)
+
+    def _estimate_valid_frame_size(self, frame_size):
+        valid_frame_size = frame_size
+        logger.info(f'valid frame size: {valid_frame_size}')
+        for i in range(self.depth):
+            valid_frame_size = (valid_frame_size + 2 * self.padding_size - self.kernel[1]) // self.stride_size + 1
+            valid_frame_size = max(valid_frame_size, 1)
+        for i in range(self.depth):
+            valid_frame_size = (valid_frame_size + 2 * self.padding_size - self.kernel[1] + 1) * self.stride_size
+        logger.info(f'valid frame size: {valid_frame_size}')
+        return valid_frame_size
 
     def estimate_valid_length(self, length):
         """
@@ -167,7 +184,6 @@ class Caunet(nn.Module):
         logger.info(f'valid length input: {length}')
         length = math.ceil(length * self.scale_factor)
         n_frames = math.ceil((length - self.frame_size) / self.frame_shift + 1)
-        # todo: add pipeline of convolutions + dual transformer + transposed convolutions.
         length = (n_frames - 1) * self.frame_shift + self.frame_size
         logger.info(f'valid length output: {length}')
         return int(length)
