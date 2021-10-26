@@ -4,7 +4,7 @@ import math
 import torch
 import torch.nn.functional as F
 from denoiser.batch_solvers.batch_solver import BatchSolver
-from denoiser.models.demucs_hifi_gen import DemucsHifi, load_features_model
+from denoiser.models.demucs_hifi_generator import DemucsHifi, load_features_model
 from denoiser.models.hifi_gan_models import discriminator_loss, \
     feature_loss, generator_loss
 from denoiser.models.modules import HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator
