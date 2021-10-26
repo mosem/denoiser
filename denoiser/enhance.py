@@ -51,9 +51,9 @@ def write(wav, filename, sr=16_000):
     torchaudio.save(filename, wav.cpu(), sr)
 
 
-def estimate_and_save(model, noisy_sigs, clean_sigs, raw_lengths_pairs, filenames, sample_rate):
+def estimate_and_save(model, noisy_sigs, clean_sigs, raw_lengths_pairs, filenames, source_sr=16_000, target_sr=16_000):
     estimate_sigs = get_estimate(model, noisy_sigs)
-    save_wavs(noisy_sigs, clean_sigs, estimate_sigs, raw_lengths_pairs, filenames, sr=sample_rate)
+    save_wavs(noisy_sigs, clean_sigs, estimate_sigs, raw_lengths_pairs, filenames, source_sr=source_sr, target_sr=target_sr)
 
 
 def get_raw_lengths_dicts(args):
@@ -98,7 +98,9 @@ def enhance(args, model, out_dir, data_loader):
             if args.device == 'cpu' and args.num_workers > 1:
                 pendings.append(
                     pool.submit(estimate_and_save, model,
-                                noisy_sigs, clean_sigs, raw_lengths_pairs, basenames, args.experiment.sample_rate))
+                                noisy_sigs, clean_sigs, raw_lengths_pairs, basenames,
+                                math.ceil(args.experiment.sample_rate / args.experiment.scale_factor),
+                                args.experiment.sample_rate))
             else:
                 # Forward
                 estimate = get_estimate(model, noisy_sigs)
