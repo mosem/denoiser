@@ -37,27 +37,18 @@ class DemucsHifiBS(BatchSolver):
             self.ft_factor = 0
 
     def estimate_valid_length(self, input_length):
-        return self.get_generator_model().estimate_valid_length(input_length)
+        return self._get_generator_model().estimate_valid_length(input_length)
 
     def get_generator_for_evaluation(self, best_states):
-        generator = self.get_generator_model()
-        generator.load_state_dict(self.get_generator_state(best_states))
+        generator = self._get_generator_model()
+        generator.load_state_dict(self._get_generator_state(best_states))
         return generator
 
-    def get_losses_names(self) -> list:
-        return self._losses_names
-
-    def get_generator_model(self):
+    def _get_generator_model(self):
         return self._models[self.GEN]
 
-    def get_generator_state(self, best_states):
+    def _get_generator_state(self, best_states):
         return best_states[self.GEN]
-
-    def get_models(self):
-        return self._models
-
-    def get_optimizers(self):
-        return self._optimizers
 
     def _construct_models(self):
         gen_args = dict(**self.args.experiment.demucs_hifi, **{"output_length": self.args.experiment.sample_rate *
