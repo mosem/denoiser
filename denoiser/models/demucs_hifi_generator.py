@@ -1,6 +1,5 @@
 import math
 import torch
-import torchaudio
 from torch import nn
 from torch.nn import functional as F
 from torch.nn.utils import weight_norm
@@ -145,7 +144,7 @@ class DemucsHifi(nn.Module):
         x, _ = self.lstm(x)
         x = x.permute(1, 2, 0)
 
-        # embedded dim createion
+        # embedded dim creation
         if self.ft_loss:
             ft = self.resampler(x)
 

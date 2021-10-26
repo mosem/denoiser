@@ -6,25 +6,16 @@ source_sample_rate: 16000 # source sample rate, added to support BWE #should be 
 segment: 2
 stride: 2    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
-batch_size: 16
+batch_size: 6
 
 scale_factor: 1
 
-# models related
-model: demucs
-demucs:
-  chin: 1
-  chout: 1
-  hidden: 48
-  max_hidden: 10000
-  causal: true
-  floor: 1e-3
-  glu: true
-  depth: 5
-  kernel_size: 8
-  stride: ${experiment.stride}
-  normalize: true
-  resample: 1
-  growth: 2
-  rescale: 0.1
+model: caunet
+caunet:
+  frame_size: 512
+  hidden: 64
   scale_factor: ${experiment.scale_factor}
+  depth: 4
+  dense_block_depth: 3
+  kernel_size: 3
+  stride_size: ${experiment.stride}
