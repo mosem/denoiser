@@ -69,7 +69,7 @@ class DemucsHifi(nn.Module):
                  resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
                  output_length=6_000):
         super().__init__()
-        self._init_args_kwargs = {
+        self._init_args_kwargs = ({
             "chin" : chin,
             "chout" : chout,
             "hidden" : hidden,
@@ -90,7 +90,7 @@ class DemucsHifi(nn.Module):
             "resblock" : resblock,
             "resblock_kernel_sizes" : resblock_kernel_sizes,
             "resblock_dilation_sizes" : resblock_dilation_sizes,
-            "output_length" : output_length,}
+            "output_length" : output_length,}, None)
 
         # demucs related
         self.floor = floor
