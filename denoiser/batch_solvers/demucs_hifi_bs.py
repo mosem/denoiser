@@ -166,7 +166,7 @@ class DemucsHifiBS(BatchSolver):
         loss_disc_all = self._disc_step(mpd, msd, y, y_g_hat, cross_valid, optim_d)
 
         # take generator step
-        loss_gen_all, loss_audio = self._gen_step(self, cross_valid, optim_g, mpd, msd, y, y_g_hat, x_ft)
+        loss_gen_all, loss_audio = self._gen_step(cross_valid, optim_g, mpd, msd, y, y_g_hat, x_ft)
 
         return {self._losses_names[0]: loss_audio.item(),
                 self._losses_names[1]: loss_gen_all.item() - loss_audio.item(),
