@@ -10,3 +10,7 @@ dist
 build
 *.egg-info
 *.th
+lese/
+.github/workflows/tests_or.yml
+dset_related_scripts/
+run_scripts/

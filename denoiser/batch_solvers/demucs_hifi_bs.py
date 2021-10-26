@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from denoiser.batch_solvers.batch_solver import BatchSolver
 from denoiser.models.demucs_hifi_generator import DemucsHifi, load_features_model
-from denoiser.models.hifi_gan_models import discriminator_loss, \
+from denoiser.models.hifi_gan_loss_functions import discriminator_loss, \
     feature_loss, generator_loss
 from denoiser.models.modules import HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator
 from torchaudio.transforms import MelSpectrogram
@@ -21,8 +21,8 @@ class DemucsHifiBS(BatchSolver):
     def __init__(self, args):
         super().__init__(args)
         self.args = args
-        self._models_dict = self._construct_models()
-        self._opt_dict = self._construct_optimizers()
+        self._models = self._construct_models()
+        self._optimizers = self._construct_optimizers()
         self._losses_names = ['L1', 'Gen_loss', 'Disc_loss']
         self._mel = MelSpectrogram(sample_rate=args.experiment.sample_rate,
                                    n_fft=args.experiment.demucs_hifi_bs.n_fft,
@@ -40,7 +40,6 @@ class DemucsHifiBS(BatchSolver):
             self.ft_factor = 0
 
     def estimate_valid_length(self, input_length):
-        # todo replace to model function
         return self.get_generator_model().estimate_valid_length(input_length)
 
     def get_generator_for_evaluation(self, best_states):
@@ -51,23 +50,17 @@ class DemucsHifiBS(BatchSolver):
     def get_losses_names(self) -> list:
         return self._losses_names
 
-    def set_target_training_length(self, target_length):
-        return None
-
-    def calculate_valid_length(self, length):
-        return int(self.args.experiment.segment * self.args.experiment.sample_rate)
-
     def get_generator_model(self):
-        return self._models_dict[self.GEN]
+        return self._models[self.GEN]
 
     def get_generator_state(self, best_states):
         return best_states[self.GEN]
 
     def get_models(self):
-        return self._models_dict
+        return self._models
 
     def get_optimizers(self):
-        return self._opt_dict
+        return self._optimizers
 
     def _construct_models(self):
         gen_args = dict(**self.args.experiment.demucs_hifi, **{"output_length": self.args.experiment.sample_rate *
@@ -78,9 +71,9 @@ class DemucsHifiBS(BatchSolver):
         return {self.GEN: gen, self.MPD: mpd, self.MSD: msd}
 
     def _construct_optimizers(self):
-        gen_opt = torch.optim.AdamW(self._models_dict[self.GEN].parameters(), lr=self.args.lr, betas=(self.args.beta1, self.args.beta2))
-        disc_opt = torch.optim.AdamW(itertools.chain(self._models_dict[self.MPD].parameters(),
-                                                     self._models_dict[self.MSD].parameters()),
+        gen_opt = torch.optim.AdamW(self._models[self.GEN].parameters(), lr=self.args.lr, betas=(self.args.beta1, self.args.beta2))
+        disc_opt = torch.optim.AdamW(itertools.chain(self._models[self.MPD].parameters(),
+                                                     self._models[self.MSD].parameters()),
                                      lr=self.args.lr, betas=(self.args.beta1, self.args.beta2))
         return {self.G_OPT: gen_opt, self.D_OPT: disc_opt}
 
@@ -152,9 +145,9 @@ class DemucsHifiBS(BatchSolver):
 
     def run(self, data, cross_valid=False):
         x, y = data
-        generator, mpd, msd= self._models_dict[self.GEN], self._models_dict[self.MPD], self._models_dict[self.MSD]
+        generator, mpd, msd= self._models[self.GEN], self._models[self.MPD], self._models[self.MSD]
 
-        optim_g, optim_d = self._opt_dict[self.G_OPT], self._opt_dict[self.D_OPT]
+        optim_g, optim_d = self._optimizers[self.G_OPT], self._optimizers[self.D_OPT]
 
         if self.ft_loss:
             y_g_hat, x_ft = generator(x)

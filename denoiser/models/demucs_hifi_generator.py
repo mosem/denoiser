@@ -6,7 +6,7 @@ from torch.nn import functional as F
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 from torch.nn import Conv1d, ConvTranspose1d, ConstantPad1d
 
-from denoiser.models.modules import BLSTM, ResBlock1, ResBlock2
+from denoiser.models.modules import BLSTM, HifiResBlock1, HifiResBlock2
 from denoiser.resample import upsample2
 from denoiser.utils import capture_init, init_weights
 
@@ -43,6 +43,7 @@ def load_features_model(feature_model, state_dict_path, device):
 
 
 class DemucsHifi(nn.Module):
+    @capture_init
     def __init__(self,
                  # demucs args
                  chin=1,
@@ -69,28 +70,6 @@ class DemucsHifi(nn.Module):
                  resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
                  output_length=6_000):
         super().__init__()
-        self._init_args_kwargs = ({
-            "chin" : chin,
-            "chout" : chout,
-            "hidden" : hidden,
-            "depth" : depth,
-            "kernel_size" : kernel_size,
-            "stride" : stride,
-            "causal" : causal,
-            "resample" : resample,
-            "growth" : growth,
-            "max_hidden" : max_hidden,
-            "normalize" : normalize,
-            "glu" : glu,
-            "rescale" : rescale,
-            "floor" : floor,
-            "scale_factor" : scale_factor,
-            "include_ft" : include_ft,
-            "include_skip_connections" : include_skip_connections,
-            "resblock" : resblock,
-            "resblock_kernel_sizes" : resblock_kernel_sizes,
-            "resblock_dilation_sizes" : resblock_dilation_sizes,
-            "output_length" : output_length,}, None)
 
         # demucs related
         self.floor = floor
@@ -110,10 +89,9 @@ class DemucsHifi(nn.Module):
 
         # hifi generator
         self.num_kernels = len(resblock_kernel_sizes)
-        resblock = ResBlock1 if str(resblock) == '1' else ResBlock2
+        resblock = HifiResBlock1 if str(resblock) == '1' else HifiResBlock2
         channels = []
 
-        # TODO: add support function to override resblocks, encoder and decoder
         self.resblocks = nn.ModuleList()
         self.conv_post = weight_norm(Conv1d(hidden // ch_scale, 1, 7, 1, padding=3))
         self.conv_post.apply(init_weights)
@@ -185,7 +163,7 @@ class DemucsHifi(nn.Module):
 
         # embedded dim createion
         if self.ft_loss:
-            ft = self.resampler(x)  # todo implement this for ft support
+            ft = self.resampler(x)
 
         # decode to original dims
         for i, decode in enumerate(self.decoder):

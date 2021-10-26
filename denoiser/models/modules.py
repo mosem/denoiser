@@ -3,7 +3,7 @@ from torch import nn, nn as nn
 from torch.nn import Conv1d, functional as F, Conv2d, AvgPool1d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
-from denoiser.models.hifi_gan_models import LRELU_SLOPE
+from denoiser.models.hifi_gan_loss_functions import LRELU_SLOPE
 from denoiser.utils import get_padding, init_weights
 
 
@@ -23,9 +23,9 @@ class BLSTM(nn.Module):
         return x, hidden
 
 
-class ResBlock1(torch.nn.Module):
+class HifiResBlock1(torch.nn.Module):
     def __init__(self, channels, kernel_size=3, dilation=(1, 3, 5)):
-        super(ResBlock1, self).__init__()
+        super(HifiResBlock1, self).__init__()
         self.convs1 = nn.ModuleList([
             weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[0],
                                padding=get_padding(kernel_size, dilation[0]))),
@@ -62,9 +62,9 @@ class ResBlock1(torch.nn.Module):
             remove_weight_norm(l)
 
 
-class ResBlock2(torch.nn.Module):
+class HifiResBlock2(torch.nn.Module):
     def __init__(self, channels, kernel_size=3, dilation=(1, 3)):
-        super(ResBlock2, self).__init__()
+        super(HifiResBlock2, self).__init__()
         self.convs = nn.ModuleList([
             weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[0],
                                padding=get_padding(kernel_size, dilation[0]))),
@@ -85,9 +85,9 @@ class ResBlock2(torch.nn.Module):
             remove_weight_norm(l)
 
 
-class DiscriminatorP(torch.nn.Module):
+class HifiDiscriminatorP(torch.nn.Module):
     def __init__(self, period, kernel_size=5, stride=3, use_spectral_norm=False):
-        super(DiscriminatorP, self).__init__()
+        super(HifiDiscriminatorP, self).__init__()
         self.period = period
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
         self.convs = nn.ModuleList([
@@ -125,11 +125,11 @@ class HifiMultiPeriodDiscriminator(torch.nn.Module):
     def __init__(self):
         super(HifiMultiPeriodDiscriminator, self).__init__()
         self.discriminators = nn.ModuleList([
-            DiscriminatorP(2),
-            DiscriminatorP(3),
-            DiscriminatorP(5),
-            DiscriminatorP(7),
-            DiscriminatorP(11),
+            HifiDiscriminatorP(2),
+            HifiDiscriminatorP(3),
+            HifiDiscriminatorP(5),
+            HifiDiscriminatorP(7),
+            HifiDiscriminatorP(11),
         ])
         self._init_args_kwargs = (None, None)
 
@@ -149,9 +149,9 @@ class HifiMultiPeriodDiscriminator(torch.nn.Module):
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
 
-class DiscriminatorS(torch.nn.Module):
+class HifiDiscriminatorS(torch.nn.Module):
     def __init__(self, use_spectral_norm=False):
-        super(DiscriminatorS, self).__init__()
+        super(HifiDiscriminatorS, self).__init__()
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
         self.convs = nn.ModuleList([
             norm_f(Conv1d(1, 32, 15, 1, padding=7)),
@@ -181,9 +181,9 @@ class HifiMultiScaleDiscriminator(torch.nn.Module):
     def __init__(self):
         super(HifiMultiScaleDiscriminator, self).__init__()
         self.discriminators = nn.ModuleList([
-            DiscriminatorS(use_spectral_norm=True),
-            DiscriminatorS(),
-            DiscriminatorS(),
+            HifiDiscriminatorS(use_spectral_norm=True),
+            HifiDiscriminatorS(),
+            HifiDiscriminatorS(),
         ])
         self.meanpools = nn.ModuleList([
             AvgPool1d(4, 2, padding=2),
