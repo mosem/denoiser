@@ -4,7 +4,7 @@ import math
 import torch
 import torch.nn.functional as F
 from denoiser.batch_solvers.batch_solver import BatchSolver
-from denoiser.models.demucs_hifi_generator import DemucsHifi, load_features_model
+from denoiser.models.demucs_hifi_generator import DemucsHifi
 from denoiser.models.hifi_gan_loss_functions import discriminator_loss, \
     feature_loss, generator_loss
 from denoiser.models.modules import HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator
@@ -30,11 +30,9 @@ class DemucsHifiBS(BatchSolver):
                                    hop_length=args.experiment.demucs_hifi_bs.hop_size,
                                    n_mels=args.experiment.demucs_hifi_bs.n_mels).to(args.device)
         self.ft_loss = self.args.experiment.demucs_hifi.include_ft
-        if self.ft_loss:
-            self.ft_model = load_features_model(self.args.experiment.features_model.feature_model,
-                                                self.args.experiment.features_model.state_dict_path,
-                                                device=args.device)
-            self.ft_factor = self.args.experiment.demucs_hifi_bs.ft_reg_factor
+        if self.ft_loss: # room for support - not yet implemented
+            self.ft_model = None
+            self.ft_factor = 0
         else:
             self.ft_model = None
             self.ft_factor = 0

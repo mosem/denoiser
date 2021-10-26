@@ -3,17 +3,12 @@ import torch
 import torchaudio
 from torch import nn
 from torch.nn import functional as F
-from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
-from torch.nn import Conv1d, ConvTranspose1d, ConstantPad1d
+from torch.nn.utils import weight_norm
+from torch.nn import Conv1d
 
 from denoiser.models.modules import BLSTM, HifiResBlock1, HifiResBlock2
 from denoiser.resample import upsample2
 from denoiser.utils import capture_init, init_weights
-
-# asr models
-from lese.models.hubert import huBERT
-from lese.models.cpc import CPC
-from lese.models.asr import AsrFeatExtractor
 
 
 def rescale_conv(conv, reference):
@@ -30,17 +25,6 @@ def rescale_module(module, reference):
             rescale_conv(sub, reference)
 
 LRELU_SLOPE = 0.1
-
-def load_features_model(feature_model, state_dict_path, device):
-    if feature_model == 'hubert':
-        return huBERT(state_dict_path, 6, device=device)
-    elif feature_model == 'cpc':
-        return CPC(device=device)
-    elif feature_model == 'asr':
-        return AsrFeatExtractor(device=device)
-    else:
-        raise ValueError("Unknown model.")
-
 
 class DemucsHifi(nn.Module):
     @capture_init
