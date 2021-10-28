@@ -1,5 +1,4 @@
 import torch.nn as nn
-import numpy as np
 import math
 from denoiser.models.modules import ResnetBlock, WNConv1d, WNConvTranspose1d, weights_init
 from denoiser.resample import downsample2, upsample2
@@ -28,7 +27,6 @@ class Seanet(nn.Module):
         self.decoder = nn.ModuleList()
 
         self.ratios = ratios
-        self.hop_length = np.prod(ratios)
         mult = int(2 ** len(ratios))
 
         decoder_wrapper_conv_layer = [
@@ -93,8 +91,8 @@ class Seanet(nn.Module):
             WNConv1d(ngf, 1, kernel_size=7, padding=0),
             nn.Tanh(),
         ]
-
         self.decoder.append(nn.Sequential(*decoder_wrapper_conv_layer))
+
         self.apply(weights_init)
 
     def estimate_valid_length(self, length):
@@ -148,7 +146,7 @@ class Seanet(nn.Module):
             x = encode(x)
         for j, decode in enumerate(self.decoder):
             x = decode(x)
-            skip = skips.pop(-1)[..., :x.shape[-1]]
+            skip = skips.pop(-1)
             x = x + skip
         if self.resample == 2:
             x = downsample2(x)
