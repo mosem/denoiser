@@ -34,7 +34,7 @@ jobs:
     - name: Demucs HiFi - dummy full pipeline
       run: |
         ./make_debug.sh
-        python train.py num_workers=2 device=cpu epochs=1 experiment=demucs_hifi experiment.scale_factor=2 eval_every=1 experiment.demucs_hifi.hidden=1 experiment.demucs.depth=3
+        python train.py num_workers=2 device=cpu epochs=1 experiment=demucs_hifi experiment.scale_factor=2 eval_every=1 experiment.demucs_hifi.hidden=1 experiment.demucs_hifi.depth=3
 
     - name: Seanet adversarial - dummy full pipeline
       run : |

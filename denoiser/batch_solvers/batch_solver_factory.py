@@ -19,7 +19,7 @@ class BatchSolverFactory:
             return GeneratorBS(args, generator)
         elif args.experiment.model == "demucs_hifi":
             return DemucsHifiBS(args)
-        if args.experiment.model == "seanet":
+        elif args.experiment.model == "seanet":
             generator = Seanet(**args.experiment.seanet)
             if args.experiment.adversarial:
                 if args.experiment.discriminator_model == "laplacian":
