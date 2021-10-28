@@ -12,7 +12,6 @@ class AdversarialBS(GeneratorBS):
             discriminator.cuda()
         self._models.update({'discriminator': discriminator})
 
-        discriminator = self._models['discriminator']
         disc_optimizer = torch.optim.Adam(discriminator.parameters(), lr=self.args.lr, betas=(0.9, self.args.beta2))
         self._optimizers.update(({'discriminator_optimizer': disc_optimizer}))
         self._losses_names += ['discriminator']

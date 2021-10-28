@@ -8,7 +8,7 @@
 
 python train.py \
   dset=valentini \
-  experiment=seanet_adversarial_1 \
+  experiment=seanet_1 \
   experiment.scale_factor=2 \
   stft_loss=True
 
