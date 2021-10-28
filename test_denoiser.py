@@ -18,6 +18,12 @@ TEST_COMMANDS = {
     'demucs_hifi': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_hifi',
                'experiment.segment=2', 'experiment.stride=2','ddp=0', 'experiment.scale_factor=2',
                'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
+    'seanet_adversarial': ['train.py', 'dset=valentini_dummy', 'experiment=seanet_adversarial_1', 'stft_loss=True',
+                           'experiment.segment=2', 'experiment.stride=2', 'ddp=0', 'experiment.scale_factor=2',
+                           'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
+    'seanet': ['train.py', 'dset=valentini_dummy', 'experiment=seanet_1', 'stft_loss=True',
+                           'experiment.segment=2', 'experiment.stride=2', 'ddp=0', 'experiment.scale_factor=2',
+                           'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
 }
 
 REMOVE_OUTPUT_FILE_COMMAND = ['rm', '-r', OUTPUT_DIR]
