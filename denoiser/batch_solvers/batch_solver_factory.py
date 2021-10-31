@@ -1,6 +1,7 @@
 from denoiser.batch_solvers.demucs_hifi_bs import DemucsHifiBS
 from denoiser.batch_solvers.generator_bs import GeneratorBS
 from denoiser.models.demucs import Demucs
+from denoiser.models.demucs_with_transformer import DemucsWithTransformer
 from denoiser.models.caunet import Caunet
 
 
@@ -10,6 +11,9 @@ class BatchSolverFactory:
     def get_bs(args):
         if args.experiment.model == "demucs":
             generator = Demucs(**args.experiment.demucs)
+            return GeneratorBS(args, generator)
+        if args.experiment.model == "demucs_with_transformer":
+            generator = DemucsWithTransformer(**args.experiment.demucs)
             return GeneratorBS(args, generator)
         if args.experiment.model == "caunet":
             generator = Caunet(**args.experiment.caunet)
