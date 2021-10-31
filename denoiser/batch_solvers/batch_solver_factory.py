@@ -11,23 +11,31 @@ class BatchSolverFactory:
 
     @staticmethod
     def get_bs(args):
-        if args.experiment.model == "demucs":
-            generator = Demucs(**args.experiment.demucs)
-            return GeneratorBS(args, generator)
-        elif args.experiment.model == "caunet":
-            generator = Caunet(**args.experiment.caunet)
-            return GeneratorBS(args, generator)
-        elif args.experiment.model == "demucs_hifi":
-            return DemucsHifiBS(args)
-        elif args.experiment.model == "seanet":
-            generator = Seanet(**args.experiment.seanet)
-            if args.experiment.adversarial:
-                if args.experiment.discriminator_model == "laplacian":
-                    discriminator = LaplacianDiscriminator(**args.experiment.discriminator)
-                else:
-                    discriminator = Discriminator(**args.experiment.discriminator)
-                return AdversarialBS(args, generator, discriminator)
+        if args.experiment.adversarial:
+            if args.experiment.model == "demucs":
+                generator = Demucs(**args.experiment.demucs)
+            elif args.experiment.model == "seanet":
+                generator = Seanet(**args.experiment.seanet)
             else:
-                return GeneratorBS(args, generator)
+                raise ValueError("Given model name is not supported")
+
+            if args.experiment.discriminator_model == "laplacian":
+                discriminator = LaplacianDiscriminator(**args.experiment.discriminator)
+            else:
+                discriminator = Discriminator(**args.experiment.discriminator)
+
+            return AdversarialBS(args, generator, discriminator)
         else:
-            raise ValueError("Given model name is not supported")
+            if args.experiment.model == "demucs":
+                generator = Demucs(**args.experiment.demucs)
+                return GeneratorBS(args, generator)
+            elif args.experiment.model == "caunet":
+                generator = Caunet(**args.experiment.caunet)
+                return GeneratorBS(args, generator)
+            elif args.experiment.model == "demucs_hifi":
+                return DemucsHifiBS(args)
+            elif args.experiment.model == "seanet":
+                generator = Seanet(**args.experiment.seanet)
+                return GeneratorBS(args, generator)
+            else:
+                raise ValueError("Given model name is not supported")
