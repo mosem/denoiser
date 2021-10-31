@@ -13,8 +13,6 @@ from denoiser.models.modules import TorchSignalToFrames, TorchOLA, Dual_Transfor
 from denoiser.resample import downsample2, upsample2
 from denoiser.utils import capture_init
 
-import logging
-logger = logging.getLogger(__name__)
 
 def rescale_conv(conv, reference):
     std = conv.weight.std().detach()
@@ -171,13 +169,9 @@ class DemucsWithTransformer(nn.Module):
             x = encode(x)
             skips.append(x)
 
-        logger.info(f"x shape: {x.shape}")
         x = self.signalPreProcessor(x)
-        logger.info(f"x shape: {x.shape}")
         x = self.attention(x)
-        logger.info(f"x shape: {x.shape}")
         x = self.ola(x)
-        logger.info(f"x shape: {x.shape}")
 
         for decode in self.decoder:
             skip = skips.pop(-1)
