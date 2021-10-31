@@ -13,7 +13,7 @@ class BatchSolverFactory:
             generator = Demucs(**args.experiment.demucs)
             return GeneratorBS(args, generator)
         if args.experiment.model == "demucs_with_transformer":
-            generator = DemucsWithTransformer(**args.experiment.demucs)
+            generator = DemucsWithTransformer(**args.experiment.demucs_with_transformer)
             return GeneratorBS(args, generator)
         if args.experiment.model == "caunet":
             generator = Caunet(**args.experiment.caunet)
