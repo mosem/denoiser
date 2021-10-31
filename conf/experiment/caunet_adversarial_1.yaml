@@ -1,4 +1,4 @@
-experiment_name: seanet_adversarial_1
+experiment_name: caunet_adversarial_1
 
 # Dataset related
 sample_rate: 16000 # target sample rate #should be included in training cfg
