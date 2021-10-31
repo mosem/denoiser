@@ -81,3 +81,5 @@ discriminator:
   num_D: 3
   downsampling_factor: 4
   ndf: 16
+
+adversarial: False
