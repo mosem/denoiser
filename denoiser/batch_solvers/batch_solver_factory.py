@@ -16,6 +16,8 @@ class BatchSolverFactory:
                 generator = Demucs(**args.experiment.demucs)
             elif args.experiment.model == "seanet":
                 generator = Seanet(**args.experiment.seanet)
+            elif args.experiment.model == "caunet":
+                generator = Caunet(**args.experiment.caunet)
             else:
                 raise ValueError("Given model name is not supported")
 
@@ -32,10 +34,10 @@ class BatchSolverFactory:
             elif args.experiment.model == "caunet":
                 generator = Caunet(**args.experiment.caunet)
                 return GeneratorBS(args, generator)
-            elif args.experiment.model == "demucs_hifi":
-                return DemucsHifiBS(args)
             elif args.experiment.model == "seanet":
                 generator = Seanet(**args.experiment.seanet)
                 return GeneratorBS(args, generator)
+            elif args.experiment.model == "demucs_hifi":
+                return DemucsHifiBS(args)
             else:
                 raise ValueError("Given model name is not supported")
