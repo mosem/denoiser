@@ -11,6 +11,9 @@ class BatchSolverFactory:
         if args.experiment.model == "demucs":
             generator = Demucs(**args.experiment.demucs)
             return GeneratorBS(args, generator)
+        elif args.experiment.model == "skipless_demucs":
+            generator = Demucs(**args.experiment.skipless_demucs)
+            return GeneratorBS(args, generator)
         if args.experiment.model == "caunet":
             generator = Caunet(**args.experiment.caunet)
             return GeneratorBS(args, generator)
