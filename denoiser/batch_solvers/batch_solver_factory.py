@@ -1,6 +1,7 @@
 from denoiser.batch_solvers.demucs_hifi_bs import DemucsHifiBS
 from denoiser.batch_solvers.generator_bs import GeneratorBS
 from denoiser.models.demucs import Demucs
+from denoiser.models.skipless_demucs import SkiplessDemucs
 from denoiser.models.caunet import Caunet
 
 
@@ -12,7 +13,7 @@ class BatchSolverFactory:
             generator = Demucs(**args.experiment.demucs)
             return GeneratorBS(args, generator)
         elif args.experiment.model == "skipless_demucs":
-            generator = Demucs(**args.experiment.skipless_demucs)
+            generator = SkiplessDemucs(**args.experiment.skipless_demucs)
             return GeneratorBS(args, generator)
         if args.experiment.model == "caunet":
             generator = Caunet(**args.experiment.caunet)

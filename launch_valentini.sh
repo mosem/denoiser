@@ -8,7 +8,7 @@
 
 python train.py \
   dset=valentini \
-  experiment=caunet_1 \
+  experiment=skipless_demucs_1 \
   experiment.scale_factor=2 \
   stft_loss=True
 
