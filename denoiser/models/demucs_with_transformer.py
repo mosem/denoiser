@@ -176,13 +176,9 @@ class DemucsWithTransformer(nn.Module):
             x = encode(x)
             skips.append(x)
 
-        logger.info(f"x shape: {x.shape}")
         x = self.signalPreProcessor(x)
-        logger.info(f"x shape: {x.shape}")
         x = self.attention(x)
-        logger.info(f"x shape: {x.shape}")
         x = self.ola(x)
-        logger.info(f"x shape: {x.shape}")
 
         for decode in self.decoder:
             skip = skips.pop(-1)
