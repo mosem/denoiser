@@ -28,3 +28,5 @@ demucs_with_transformer:
   rescale: 0.1
   scale_factor: ${experiment.scale_factor}
   transformer_frame_size: 8
+  transformer_n_head: 4
+  transformer_n_layers: 6
