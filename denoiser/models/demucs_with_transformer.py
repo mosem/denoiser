@@ -69,7 +69,9 @@ class DemucsWithTransformer(nn.Module):
                  rescale=0.1,
                  floor=1e-3,
                  scale_factor=1,
-                 frame_size=8):
+                 transformer_frame_size=8,
+                 transformer_n_head=4,
+                 transformer_n_layers=6):
 
         super().__init__()
         if resample not in [1, 2, 4]:
@@ -85,8 +87,10 @@ class DemucsWithTransformer(nn.Module):
         self.resample = resample
         self.normalize = normalize
         self.scale_factor = scale_factor
-        self.frame_size = frame_size
-        self.frame_shift = frame_size // 2
+        self.transformer_frame_size = transformer_frame_size
+        self.transformer_frame_shift = transformer_frame_size // 2
+        self.transformer_n_head = transformer_n_head
+        self.transformer_n_layers = transformer_n_layers
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -114,10 +118,11 @@ class DemucsWithTransformer(nn.Module):
             chin = hidden
             hidden = min(int(growth * hidden), max_hidden)
 
-        self.signalPreProcessor = TorchSignalToFrames(frame_size=self.frame_size,
-                                                      frame_shift=self.frame_shift)
-        self.attention = Dual_Transformer(chin, chin, nhead=4, num_layers=6)
-        self.ola = TorchOLA(self.frame_shift)
+        self.signalPreProcessor = TorchSignalToFrames(frame_size=self.transformer_frame_size,
+                                                      frame_shift=self.transformer_frame_shift)
+        self.attention = Dual_Transformer(chin, chin, nhead=self.transformer_n_head,
+                                          num_layers=self.transformer_n_layers)
+        self.ola = TorchOLA(self.transformer_frame_shift)
 
         if rescale:
             rescale_module(self, reference=rescale)
@@ -136,8 +141,8 @@ class DemucsWithTransformer(nn.Module):
         for idx in range(self.depth):
             length = math.ceil((length - self.kernel_size) / self.stride) + 1
             length = max(length, 1)
-        n_frames = math.ceil((length - self.frame_size) / self.frame_shift + 1)
-        length = (n_frames - 1) * self.frame_shift + self.frame_size
+        n_frames = math.ceil((length - self.transformer_frame_size) / self.transformer_frame_shift + 1)
+        length = (n_frames - 1) * self.transformer_frame_shift + self.transformer_frame_size
         for idx in range(self.depth):
             length = (length - 1) * self.stride + self.kernel_size
         length = int(math.ceil(length / self.resample))
@@ -171,13 +176,9 @@ class DemucsWithTransformer(nn.Module):
             x = encode(x)
             skips.append(x)
 
-        logger.info(f"x shape: {x.shape}")
         x = self.signalPreProcessor(x)
-        logger.info(f"x shape: {x.shape}")
         x = self.attention(x)
-        logger.info(f"x shape: {x.shape}")
         x = self.ola(x)
-        logger.info(f"x shape: {x.shape}")
 
         for decode in self.decoder:
             skip = skips.pop(-1)

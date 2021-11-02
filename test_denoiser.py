@@ -9,15 +9,18 @@ device = parser.parse_args().device
 OUTPUT_DIR = './outputs/tmp'
 
 TEST_COMMANDS = {
-    'demucs': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_1', 'stft_loss=True',
-               'experiment.segment=2', 'experiment.stride=2','ddp=0', 'experiment.scale_factor=2',
+    # 'demucs': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_1', 'stft_loss=True',
+    #            'experiment.segment=2', 'experiment.stride=2','ddp=0', 'experiment.scale_factor=2',
+    #            'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
+    'demucs_with_transformer': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_with_transformer_1',
+               'stft_loss=True', 'experiment.segment=2', 'experiment.stride=2', 'ddp=0', 'experiment.scale_factor=2',
                'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
-    'caunet': ['train.py', 'dset=valentini_dummy', 'experiment=caunet_1', 'stft_loss=True',
-               'experiment.segment=2', 'experiment.stride=2', 'ddp=0', 'experiment.scale_factor=2',
-               'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
-    'demucs_hifi': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_hifi',
-               'experiment.segment=2', 'experiment.stride=2','ddp=0', 'experiment.scale_factor=2',
-               'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
+    # 'caunet': ['train.py', 'dset=valentini_dummy', 'experiment=caunet_1', 'stft_loss=True',
+    #            'experiment.segment=2', 'experiment.stride=2', 'ddp=0', 'experiment.scale_factor=2',
+    #            'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
+    # 'demucs_hifi': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_hifi',
+    #            'experiment.segment=2', 'experiment.stride=2','ddp=0', 'experiment.scale_factor=2',
+    #            'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
 }
 
 REMOVE_OUTPUT_FILE_COMMAND = ['rm', '-r', OUTPUT_DIR]
