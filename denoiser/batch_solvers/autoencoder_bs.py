@@ -1,17 +1,44 @@
 import torch
-
+from torch import nn
 import torch.nn.functional as F
 
 from denoiser.batch_solvers.batch_solver import BatchSolver
 
 from denoiser.stft_loss import MultiResolutionSTFTLoss
 
+class Generator(nn.Module):
 
-class GeneratorBS(BatchSolver):
+    def __init__(self, encoder, attention_module, decoder, skips):
+        self.encoder = encoder
+        self.attention_module = attention_module
+        self.decoder = decoder
+        self.skips = skips
 
-    def __init__(self, args, generator):
-        super(GeneratorBS, self).__init__(args)
+    def estimate_valid_length(self, input_length):
+        encoder_output_length = self.encoder.estimate_output_length(input_length)
+        attention_output_length = self.attention_module.estimate_output_length(encoder_output_length)
+        decoder_output_length = self.decoder.estimate_output_length(attention_output_length)
+        return decoder_output_length
+
+    def forward(self, signal):
+        if self.skips:
+            latent, skips_signals = self.encoder(signal)
+            latent = self.attention_module(latent)
+            out = self.decoder(latent, skips_signals)
+        else:
+            latent = self.encoder
+            latent = self.attention_module(latent)
+            out = self.decoder(latent)
+        return out
+
+
+class AutoencoderBS(BatchSolver):
+
+    def __init__(self, args, encoder, attention_module, decoder, skips=False):
+        super(AutoencoderBS, self).__init__(args)
         self.device = args.device
+
+        generator = Generator(encoder, attention_module, decoder, skips)
 
         if torch.cuda.is_available() and args.device == 'cuda':
             generator.cuda()
