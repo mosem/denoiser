@@ -25,6 +25,9 @@ class BLSTM(nn.Module):
         if bi:
             self.linear = nn.Linear(2 * dim, dim)
 
+    def estimate_output_length(self, length):
+        return length
+
     def forward(self, x, hidden=None):
         x, hidden = self.lstm(x, hidden)
         if self.linear:
