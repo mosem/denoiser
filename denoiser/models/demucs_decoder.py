@@ -32,7 +32,6 @@ class DemucsDecoder(nn.Module):
 
     @capture_init
     def __init__(self,
-                 chin=1,
                  chout=1,
                  hidden=48,
                  depth=5,
@@ -51,7 +50,6 @@ class DemucsDecoder(nn.Module):
         if resample not in [1, 2, 4]:
             raise ValueError("Resample should be 1, 2 or 4.")
 
-        self.chin = chin
         self.chout = chout
         self.hidden = hidden
         self.depth = depth

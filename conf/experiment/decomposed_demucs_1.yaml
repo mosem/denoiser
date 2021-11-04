@@ -14,7 +14,6 @@ scale_factor: 1
 model: demucs
 demucs_encoder:
   chin: 1
-  chout: 1
   hidden: 48
   max_hidden: 10000
   floor: 1e-3
@@ -29,7 +28,6 @@ demucs_encoder:
   scale_factor: ${experiment.scale_factor}
 
 demucs_decoder:
-  chin: 1
   chout: 1
   hidden: 48
   max_hidden: 10000
