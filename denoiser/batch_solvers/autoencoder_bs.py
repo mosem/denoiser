@@ -9,6 +9,7 @@ from denoiser.stft_loss import MultiResolutionSTFTLoss
 class Generator(nn.Module):
 
     def __init__(self, encoder, attention_module, decoder, skips):
+        super().__init__()
         self.encoder = encoder
         self.attention_module = attention_module
         self.decoder = decoder
