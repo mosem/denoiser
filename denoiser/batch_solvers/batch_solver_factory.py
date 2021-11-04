@@ -16,7 +16,7 @@ class BatchSolverFactory:
     def get_bs(args):
         if args.experiment.model == "demucs":
             encoder = DemucsEncoder(**args.experiment.demucs_encoder)
-            attention = BLSTM(**args.experiment.blstm)
+            attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
             decoder = DemucsDecoder(**args.experiment.demucs_decoder)
             return AutoencoderBS(args, encoder, attention, decoder, args.experiment.skips)
         elif args.experiment.model == "caunet":

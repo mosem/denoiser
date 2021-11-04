@@ -78,8 +78,13 @@ class DemucsEncoder(nn.Module):
             chin = hidden
             hidden = min(int(growth * hidden), max_hidden)
 
+        self.n_chout = chin
+
         if rescale:
             rescale_module(self, reference=rescale)
+
+    def get_n_chout(self):
+        return self.n_chout
 
     def estimate_output_length(self, input_length):
         """
