@@ -10,6 +10,8 @@ batch_size: 16
 
 scale_factor: 1
 
+skips: true
+
 # models related
 model: demucs
 demucs_encoder:
