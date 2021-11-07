@@ -2,12 +2,13 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+from denoiser.utils import capture_init
 from denoiser.batch_solvers.batch_solver import BatchSolver
-
 from denoiser.stft_loss import MultiResolutionSTFTLoss
 
 class Generator(nn.Module):
 
+    @capture_init
     def __init__(self, encoder, attention_module, decoder, skips):
         super().__init__()
         self.encoder = encoder
