@@ -32,17 +32,17 @@ class BatchSolverFactory:
             if args.experiment.model == "demucs":
                 generator = Demucs(**args.experiment.demucs)
                 return GeneratorBS(args, generator)
-            elif args.experiment.model == "skipless_demucs":
+            elif args.experiment.model == "demucs_skipless":
                 encoder = DemucsEncoder(**args.experiment.demucs_encoder)
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
                 decoder = DemucsDecoder(**args.experiment.demucs_decoder)
                 generator = Autoencoder(encoder, attention, decoder, args.experiment.skips)
                 return GeneratorBS(args, generator)
-            elif args.experiment.model == "caunet":
-                generator = Caunet(**args.experiment.caunet)
-                return GeneratorBS(args, generator)
             elif args.experiment.model == "seanet":
                 generator = Seanet(**args.experiment.seanet)
+                return GeneratorBS(args, generator)
+            elif args.experiment.model == "caunet":
+                generator = Caunet(**args.experiment.caunet)
                 return GeneratorBS(args, generator)
             elif args.experiment.model == "demucs_hifi":
                 return DemucsHifiBS(args)
