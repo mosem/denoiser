@@ -58,6 +58,9 @@ class OneDimDualTransformer(nn.Module):
                                          num_layers=self.n_layers)
         self.ola = TorchOLA(self.frame_shift)
 
+    def estimate_output_length(self, length):
+        return length
+
     def forward(self, x):
         x = self.signalPreProcessor(x)
         x = self.attention(x)
