@@ -53,9 +53,10 @@ class DemucsHifiBS(BatchSolver):
         return losses_dict[self._losses_names[0]]
 
     def _optimize(self, loss):
-        self._optimizers[GEN_OPT].zero_grad()
-        loss.backward()
-        self._optimizers[GEN_OPT].step()
+        with torch.autograd.set_detect_anomaly(True):
+            self._optimizers[GEN_OPT].zero_grad()
+            loss.backward()
+            self._optimizers[GEN_OPT].step()
 
     def _get_loss(self, clean, estimate):
         with torch.autograd.set_detect_anomaly(True):

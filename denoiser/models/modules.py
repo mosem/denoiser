@@ -252,7 +252,9 @@ class MRF(torch.nn.Module):
                 xs = self.resblocks[j](x)
             else:
                 xs += self.resblocks[j](x)
-        return xs / self.num_kernels
+        x = xs + x
+        x = x / (self.num_kernels + 1)
+        return x
 
 
 class HifiResBlock1(torch.nn.Module):
@@ -278,11 +280,10 @@ class HifiResBlock1(torch.nn.Module):
 
     def forward(self, x):
         for c1, c2 in zip(self.convs1, self.convs2):
-            xt = nn.SiLU()(x)
+            xt = nn.ReLU()(x)
             xt = c1(xt)
-            xt = nn.SiLU()(xt)
-            xt = c2(xt)
-            x = xt + x
+            xt = nn.ReLU()(xt)
+            x = c2(xt)
         return x
 
 
@@ -298,9 +299,8 @@ class HifiResBlock2(torch.nn.Module):
 
     def forward(self, x):
         for c in self.convs:
-            xt = nn.SiLU()(x)
-            xt = c(xt)
-            x = xt + x
+            xt = nn.ReLU()(x)
+            x = c(xt)
         return x
 
 

@@ -117,11 +117,11 @@ class DemucsHifi(nn.Module):
             ]
 
             if mrf_counter < num_mrfs:
-                decode += [nn.SiLU(), MRF(resblock_kernel_sizes, resblock_dilation_sizes, chout, resblock)]
+                decode += [nn.ReLU(), MRF(resblock_kernel_sizes, resblock_dilation_sizes, chout, resblock)]
                 mrf_counter += 1
 
             if index > 0:
-                decode.append(nn.SiLU())
+                decode.append(nn.ReLU())
             self.decoder.insert(0, nn.Sequential(*decode))
             chout = hidden
             chin = hidden
