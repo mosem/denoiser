@@ -1,5 +1,6 @@
 import math
 import torch
+import torchaudio
 from torch import nn, nn as nn
 from torch.nn import Conv1d, functional as F, Conv2d, AvgPool1d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm

@@ -98,6 +98,7 @@ class DemucsHifi(nn.Module):
         ch_scale = 2 if glu else 1
 
         # hifi related
+
         self.num_mrfs = num_mrfs
 
         mrf_counter = 0
