@@ -148,7 +148,13 @@ class DemucsHifiBS(BatchSolver):
 
         return audio_loss, loss_gen_s + loss_gen_f + loss_fm_s + loss_fm_f + audio_loss + asr_ft_loss
 
-    def _disc_loss(self, clean, estimate):
+    def _disc_loss(self, clean, predicted):
+
+        if self.include_ft:
+            estimate, _ = predicted
+        else:
+            estimate = predicted
+
         mpd, msd = self._models[MPD], self._models[MSD]
 
         # MPD
