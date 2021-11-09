@@ -61,5 +61,3 @@ features_model:
   feature_model: 'hubert'
   state_dict_path: '/cs/usr/ortal1602/Desktop/MSc/ortal1602/projects/fairseq/pretrained_w/hubert_base_ls960.pt'
   features_factor: 0.01
-
-adversarial: False

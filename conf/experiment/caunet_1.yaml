@@ -19,5 +19,3 @@ caunet:
   dense_block_depth: 3
   kernel_size: 3
   stride_size: ${experiment.stride}
-
-adversarial: False
