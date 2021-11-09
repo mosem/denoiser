@@ -8,6 +8,7 @@ from denoiser.models.modules import Discriminator, LaplacianDiscriminator, BLSTM
 from denoiser.models.demucs import Demucs
 from denoiser.models.caunet import Caunet
 from denoiser.models.seanet import Seanet
+from denoiser.models.generator_composer import Autoencoder
 
 
 class BatchSolverFactory:
@@ -33,9 +34,10 @@ class BatchSolverFactory:
                 encoder = DemucsEncoder(**args.experiment.demucs_encoder)
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
                 decoder = DemucsDecoder(**args.experiment.demucs_decoder)
-                return AutoencoderBS(args, encoder, attention, decoder, args.experiment.skips)
+                generator = Autoencoder(encoder, attention, decoder, args.experiment.skips)
+                # return AutoencoderBS(args, encoder, attention, decoder, args.experiment.skips)
                 # generator = Demucs(**args.experiment.demucs)
-                # return GeneratorBS(args, generator)
+                return GeneratorBS(args, generator)
             elif args.experiment.model == "caunet":
                 generator = Caunet(**args.experiment.caunet)
                 return GeneratorBS(args, generator)
