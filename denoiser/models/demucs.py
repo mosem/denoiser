@@ -161,7 +161,7 @@ class Demucs(nn.Module):
         for encode in self.encoder:
             x = encode(x)
             skips.append(x)
-        x, _ = self.lstm(x)
+        x = self.lstm(x)
         for decode in self.decoder:
             skip = skips.pop(-1)
             x = x + skip[..., :x.shape[-1]]
