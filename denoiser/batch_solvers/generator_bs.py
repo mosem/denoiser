@@ -23,9 +23,9 @@ class GeneratorBS(BatchSolver):
         self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
                                                   factor_mag=args.stft_mag_factor).to(self.device)
 
-        self._models.update({GENERATOR_KEY: generator})
-        self._optimizers.update({GENERATOR_OPTIMIZER_KEY: generator_optimizer})
-        self._losses_names += [GENERATOR_KEY]
+        self._models.update({'generator': generator})
+        self._optimizers.update({'generator_optimizer': generator_optimizer})
+        self._losses_names += ['generator']
 
     def get_generator_for_evaluation(self, best_states):
         generator = self._models[GENERATOR_KEY]
