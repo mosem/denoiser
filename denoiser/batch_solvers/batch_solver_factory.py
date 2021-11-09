@@ -11,7 +11,7 @@ class BatchSolverFactory:
 
     @staticmethod
     def get_bs(args):
-        if args.experiment.adversarial:
+        if 'adversarial' in args.experiment and args.experiment.adversarial:
             if args.experiment.model == "demucs":
                 generator = Demucs(**args.experiment.demucs)
             elif args.experiment.model == "seanet":
@@ -20,12 +20,10 @@ class BatchSolverFactory:
                 generator = Caunet(**args.experiment.caunet)
             else:
                 raise ValueError("Given model name is not supported")
-
             if args.experiment.discriminator_model == "laplacian":
                 discriminator = LaplacianDiscriminator(**args.experiment.discriminator)
             else:
                 discriminator = Discriminator(**args.experiment.discriminator)
-
             return AdversarialBS(args, generator, discriminator)
         else:
             if args.experiment.model == "demucs":
