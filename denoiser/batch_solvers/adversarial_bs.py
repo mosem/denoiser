@@ -5,6 +5,7 @@ from denoiser.batch_solvers.generator_bs import GeneratorBS
 
 GENERATOR_KEY = 'generator'
 DISCRIMINATOR_KEY = 'discriminator'
+GENERATOR_OPTIMIZER_KEY = 'generator_optimizer'
 DISCRIMINATOR_OPTIMIZER_KEY = 'discriminator_optimizer'
 
 class AdversarialBS(GeneratorBS):
@@ -43,8 +44,8 @@ class AdversarialBS(GeneratorBS):
         return losses
 
     def _optimize(self, total_loss_G, loss_D):
-        generator_optimizer = self._optimizers['generator_optimizer']
-        discriminator_optimizer = self._optimizers['discriminator_optimizer']
+        generator_optimizer = self._optimizers[GENERATOR_OPTIMIZER_KEY]
+        discriminator_optimizer = self._optimizers[DISCRIMINATOR_OPTIMIZER_KEY]
 
         generator_optimizer.zero_grad()
         total_loss_G.backward()
