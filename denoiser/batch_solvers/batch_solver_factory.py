@@ -6,11 +6,14 @@ from denoiser.models.demucs import Demucs
 from denoiser.models.caunet import Caunet
 from denoiser.models.seanet import Seanet
 
+import logging
+logger = logging.getLogger(__name__)
 
 class BatchSolverFactory:
 
     @staticmethod
     def get_bs(args):
+        logger.info(f'args.experiment: {args.experiment}')
         if args.experiment.model == "demucs":
             generator = Demucs(**args.experiment.demucs)
             return GeneratorBS(args, generator)
