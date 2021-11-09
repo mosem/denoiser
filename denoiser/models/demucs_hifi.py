@@ -185,6 +185,11 @@ class DemucsHifi(nn.Module):
         x = x.permute(2, 0, 1)
         x, _ = self.lstm(x)
         x = x.permute(1, 2, 0)
+
+        # embedded dim creation
+        if self.ft_loss:
+            ft = x
+
         for decode in self.decoder:
             skip = skips.pop(-1)
             x = x + skip[..., :x.shape[-1]]
@@ -196,7 +201,8 @@ class DemucsHifi(nn.Module):
             x = downsample2(x)
         else:
             pass
-
+        if self.include_ft:
+            return std * x, ft
         return std * x
 
 

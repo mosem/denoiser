@@ -12,6 +12,8 @@ import inspect
 import time
 from torch.nn.utils import weight_norm
 
+from denoiser.models.hubert import huBERT
+
 logger = logging.getLogger(__name__)
 
 
@@ -180,3 +182,12 @@ def apply_weight_norm(m):
 
 def get_padding(kernel_size, dilation=1):
     return int((kernel_size*dilation - dilation)/2)
+
+
+def load_lexical_model(model_name, lexical_path, device="cuda"):
+    if model_name == 'hubert':
+        ret = huBERT(lexical_path, 6)
+        ret.model.to(device)
+        return ret
+    else:
+        logger.error("Unknown model.")

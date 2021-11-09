@@ -4,12 +4,14 @@ import torch
 import logging
 
 import torch.nn.functional as F
+import torchaudio
 
 from denoiser.batch_solvers.batch_solver import BatchSolver
 from denoiser.models.demucs_hifi import DemucsHifi
 from denoiser.models.modules import HifiMultiPeriodDiscriminator, HifiMultiScaleDiscriminator
 
 from denoiser.stft_loss import MultiResolutionSTFTLoss
+from denoiser.utils import load_lexical_model
 
 logger = logging.getLogger(__name__)
 GEN = "generator"
@@ -59,7 +61,7 @@ class DemucsHifiBS(BatchSolver):
         super(DemucsHifiBS, self).__init__(args)
         self.device = args.device
         self.include_disc = args.experiment.demucs_hifi_bs.include_disc
-        print(f"include disc: {self.include_disc}")
+        self.include_ft = args.experiment.demucs_hifi.include_ft
 
         self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
                                                   factor_mag=args.stft_mag_factor).to(self.device)
@@ -70,6 +72,12 @@ class DemucsHifiBS(BatchSolver):
         self.l1_factor = args.experiment.demucs_hifi_bs.l1_factor
         self.gen_factor = args.experiment.demucs_hifi_bs.gen_factor
         self.disc_factor = args.experiment.demucs_hifi_bs.disc_factor
+
+        if self.include_ft:
+            self.ft_model = load_lexical_model(args.experiment.features_model.feature_model,
+                                               args.experiment.features_model.state_dict_path,
+                                               args.device)
+            self.ft_factor = args.experiment.features_model.features_factor
 
     def _generate_optimizers(self):
         gen_opt = torch.optim.Adam(self._models[GEN].parameters(), lr=self.args.lr,
@@ -110,7 +118,13 @@ class DemucsHifiBS(BatchSolver):
     def get_evaluation_loss(self, losses_dict):
         return losses_dict[self._losses_names[0]]
 
-    def _gen_loss(self, clean, estimate):
+    def _gen_loss(self, clean, predicted):
+
+        if self.include_ft:
+            estimate, x_ft = predicted
+        else:
+            estimate = predicted
+            x_ft = 0
 
         audio_loss = F.l1_loss(clean, estimate) * self.l1_factor
 
@@ -120,7 +134,19 @@ class DemucsHifiBS(BatchSolver):
         loss_fm_s = feature_loss(fmap_s_r, fmap_s_g) * self.gen_factor
         loss_gen_f, losses_gen_f = generator_loss(y_df_hat_g)
         loss_gen_s, losses_gen_s = generator_loss(y_ds_hat_g)
-        return audio_loss, loss_gen_s + loss_gen_f + loss_fm_s + loss_fm_f + audio_loss
+
+        if self.include_ft:
+            with torch.no_grad():
+                y_ft = self.ft_model.extract_feats(clean)
+                x_ft = torchaudio.transforms.Resample(x_ft.shape[-1], y_ft.shape[-1]).to(self.args.device)(x_ft)
+                if x_ft.shape[-2] != y_ft.shape[-2]:
+                    x_ft = torchaudio.transforms.Resample(x_ft.shape[-2], y_ft.shape[-2]).to(self.args.device)(
+                        x_ft.permute(0, 2, 1)).permute(0, 2, 1)
+                asr_ft_loss = F.l1_loss(y_ft, x_ft) * self.ft_factor
+        else:
+            asr_ft_loss = 0
+
+        return audio_loss, loss_gen_s + loss_gen_f + loss_fm_s + loss_fm_f + audio_loss + asr_ft_loss
 
     def _disc_loss(self, clean, estimate):
         mpd, msd = self._models[MPD], self._models[MSD]
