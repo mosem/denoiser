@@ -3,6 +3,9 @@ import torch.nn.functional as F
 
 from denoiser.batch_solvers.generator_bs import GeneratorBS
 
+GENERATOR_KEY = 'generator'
+DISCRIMINATOR_KEY = 'discriminator'
+DISCRIMINATOR_OPTIMIZER_KEY = 'discriminator_optimizer'
 
 class AdversarialBS(GeneratorBS):
 
@@ -10,18 +13,18 @@ class AdversarialBS(GeneratorBS):
         super().__init__(args, generator)
         if torch.cuda.is_available():
             discriminator.cuda()
-        self._models.update({'discriminator': discriminator})
+        self._models.update({DISCRIMINATOR_KEY: discriminator})
 
         disc_optimizer = torch.optim.Adam(discriminator.parameters(), lr=self.args.lr, betas=(0.9, self.args.beta2))
-        self._optimizers.update(({'discriminator_optimizer': disc_optimizer}))
-        self._losses_names += ['discriminator']
+        self._optimizers.update(({DISCRIMINATOR_OPTIMIZER_KEY: disc_optimizer}))
+        self._losses_names += [DISCRIMINATOR_KEY]
 
 
     def run(self, data, cross_valid=False):
         noisy, clean = data
 
-        generator = self._models['generator']
-        discriminator = self._models['discriminator']
+        generator = self._models[GENERATOR_KEY]
+        discriminator = self._models[DISCRIMINATOR_KEY]
 
         estimate = generator(noisy)
         discriminator_fake_detached = discriminator(estimate.detach())

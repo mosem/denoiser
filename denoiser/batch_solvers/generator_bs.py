@@ -9,6 +9,8 @@ from denoiser.stft_loss import MultiResolutionSTFTLoss
 
 logger = logging.getLogger(__name__)
 
+GENERATOR_KEY = 'generator'
+GENERATOR_OPTIMIZER_KEY = 'generator_optimizer'
 
 class GeneratorBS(BatchSolver):
 
@@ -23,21 +25,21 @@ class GeneratorBS(BatchSolver):
         self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
                                                   factor_mag=args.stft_mag_factor).to(self.device)
 
-        self._models.update({'generator': generator})
-        self._optimizers.update({'generator_optimizer': generator_optimizer})
-        self._losses_names += ['generator']
+        self._models.update({GENERATOR_KEY: generator})
+        self._optimizers.update({GENERATOR_OPTIMIZER_KEY: generator_optimizer})
+        self._losses_names += [GENERATOR_KEY]
 
     def get_generator_for_evaluation(self, best_states):
-        generator = self._models['generator']
-        generator.load_state_dict(best_states['generator'])
+        generator = self._models[GENERATOR_KEY]
+        generator.load_state_dict(best_states[GENERATOR_KEY])
         return generator
 
     def estimate_valid_length(self, input_length):
-        return self._models['generator'].estimate_valid_length(input_length)
+        return self._models[GENERATOR_KEY].estimate_valid_length(input_length)
 
     def run(self, data, cross_valid=False):
         noisy, clean = data
-        estimate = self._models['generator'](noisy)
+        estimate = self._models[GENERATOR_KEY](noisy)
         loss = self._get_loss(clean, estimate)
         if not cross_valid:
             self._optimize(loss)
@@ -48,9 +50,9 @@ class GeneratorBS(BatchSolver):
         return losses_dict[self._losses_names[0]]
 
     def _optimize(self, loss):
-        self._optimizers['generator_optimizer'].zero_grad()
+        self._optimizers[GENERATOR_OPTIMIZER_KEY].zero_grad()
         loss.backward()
-        self._optimizers['generator_optimizer'].step()
+        self._optimizers[GENERATOR_OPTIMIZER_KEY].step()
 
     def _get_loss(self, clean, estimate):
         with torch.autograd.set_detect_anomaly(True):
