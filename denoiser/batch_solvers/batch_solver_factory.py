@@ -14,7 +14,5 @@ class BatchSolverFactory:
         if args.experiment.model == "caunet":
             generator = Caunet(**args.experiment.caunet)
             return GeneratorBS(args, generator)
-        elif args.experiment.model == "demucs_hifi":
-            return DemucsHifiBS(args)
         else:
             raise ValueError("Given model name is not supported")
