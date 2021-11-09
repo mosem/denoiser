@@ -59,6 +59,8 @@ class OneDimDualTransformer(nn.Module):
         self.ola = TorchOLA(self.frame_shift)
 
     def estimate_output_length(self, length):
+        n_frames = math.ceil((length - self.frame_size) / self.frame_shift + 1)
+        length = (n_frames - 1) * self.frame_shift + self.frame_size
         return length
 
     def forward(self, x):
