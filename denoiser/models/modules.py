@@ -312,12 +312,12 @@ class HifiDiscriminatorP(torch.nn.Module):
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
         self.convs = nn.ModuleList([
             norm_f(Conv2d(1, 32, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(32, 64, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(64, 128, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(128, 128, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
-            norm_f(Conv2d(128, 128, (kernel_size, 1), 1, padding=(2, 0))),
+            norm_f(Conv2d(32, 128, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
+            norm_f(Conv2d(128, 256, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
+            norm_f(Conv2d(256, 256, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
+            norm_f(Conv2d(256, 256, (kernel_size, 1), 1, padding=(2, 0))),
         ])
-        self.conv_post = norm_f(Conv2d(128, 1, (3, 1), 1, padding=(1, 0)))
+        self.conv_post = norm_f(Conv2d(256, 1, (3, 1), 1, padding=(1, 0)))
 
     def forward(self, x):
         fmap = []
@@ -374,15 +374,15 @@ class HifiDiscriminatorS(torch.nn.Module):
         super(HifiDiscriminatorS, self).__init__()
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
         self.convs = nn.ModuleList([
-            norm_f(Conv1d(1, 32, 15, 1, padding=7)),
-            norm_f(Conv1d(32, 32, 41, 2, groups=4, padding=20)),
-            norm_f(Conv1d(32, 64, 41, 2, groups=16, padding=20)),
-            norm_f(Conv1d(64, 128, 41, 4, groups=16, padding=20)),
-            norm_f(Conv1d(128, 128, 41, 4, groups=16, padding=20)),
-            norm_f(Conv1d(128, 128, 41, 1, groups=16, padding=20)),
-            norm_f(Conv1d(128, 128, 5, 1, padding=2)),
+            norm_f(Conv1d(1, 64, 15, 1, padding=7)),
+            norm_f(Conv1d(64, 64, 41, 2, groups=4, padding=20)),
+            norm_f(Conv1d(64, 128, 41, 2, groups=16, padding=20)),
+            norm_f(Conv1d(128, 256, 41, 4, groups=16, padding=20)),
+            norm_f(Conv1d(256, 256, 41, 4, groups=16, padding=20)),
+            norm_f(Conv1d(256, 256, 41, 1, groups=16, padding=20)),
+            norm_f(Conv1d(256, 256, 5, 1, padding=2)),
         ])
-        self.conv_post = norm_f(Conv1d(128, 1, 3, 1, padding=1))
+        self.conv_post = norm_f(Conv1d(256, 1, 3, 1, padding=1))
 
     def forward(self, x):
         fmap = []
