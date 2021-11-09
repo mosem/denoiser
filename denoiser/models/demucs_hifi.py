@@ -73,7 +73,8 @@ class DemucsHifi(nn.Module):
                  num_mrfs=1,
                  resblock=1,
                  resblock_kernel_sizes=(3,7,11),
-                 resblock_dilation_sizes=((1,3,5), (1,3,5), (1,3,5))
+                 resblock_dilation_sizes=((1,3,5), (1,3,5), (1,3,5)),
+                 include_ft=False
                  ):
 
         super().__init__()
@@ -98,7 +99,7 @@ class DemucsHifi(nn.Module):
         ch_scale = 2 if glu else 1
 
         # hifi related
-
+        self.include_ft = include_ft
         self.num_mrfs = num_mrfs
 
         mrf_counter = 0
@@ -187,7 +188,7 @@ class DemucsHifi(nn.Module):
         x = x.permute(1, 2, 0)
 
         # embedded dim creation
-        if self.ft_loss:
+        if self.include_ft:
             ft = x
 
         for decode in self.decoder:
