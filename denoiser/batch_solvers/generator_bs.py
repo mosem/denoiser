@@ -1,5 +1,4 @@
 import torch
-import logging
 
 import torch.nn.functional as F
 
@@ -7,7 +6,6 @@ from denoiser.batch_solvers.batch_solver import BatchSolver
 
 from denoiser.stft_loss import MultiResolutionSTFTLoss
 
-logger = logging.getLogger(__name__)
 
 GENERATOR_KEY = 'generator'
 GENERATOR_OPTIMIZER_KEY = 'generator_optimizer'
