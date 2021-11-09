@@ -1,4 +1,4 @@
-experiment_name: decomposed_demucs_1
+experiment_name: demucs_skipless_1
 
 # Dataset related
 sample_rate: 16000 # target sample rate #should be included in training cfg
