@@ -30,8 +30,8 @@ class BatchSolverFactory:
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
                 decoder = DemucsDecoder(**args.experiment.demucs_decoder)
                 return AutoencoderBS(args, encoder, attention, decoder, args.experiment.skips)
-                generator = Demucs(**args.experiment.demucs)
-                return GeneratorBS(args, generator)
+                # generator = Demucs(**args.experiment.demucs)
+                # return GeneratorBS(args, generator)
             elif args.experiment.model == "caunet":
                 generator = Caunet(**args.experiment.caunet)
                 return GeneratorBS(args, generator)

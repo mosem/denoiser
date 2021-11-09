@@ -140,9 +140,7 @@ class DemucsHifi(nn.Module):
             if self.include_skip:
                 skips.append(x)
 
-        x = x.permute(2, 0, 1)
         x, _ = self.lstm(x)
-        x = x.permute(1, 2, 0)
 
         # embedded dim creation
         if self.ft_loss:
