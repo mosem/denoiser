@@ -7,7 +7,7 @@ from denoiser.models.modules import Discriminator, LaplacianDiscriminator, BLSTM
 from denoiser.models.demucs import Demucs
 from denoiser.models.caunet import Caunet
 from denoiser.models.seanet import Seanet
-from denoiser.models.generator_composer import Autoencoder
+from denoiser.models.autoencoder_composer import Autoencoder
 
 
 class BatchSolverFactory:

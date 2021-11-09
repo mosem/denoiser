@@ -24,7 +24,7 @@ class Autoencoder(nn.Module):
             latent = self.attention_module(latent)
             out = self.decoder(latent, skips_signals)
         else:
-            latent = self.encoder
+            latent = self.encoder(signal)
             latent = self.attention_module(latent)
             out = self.decoder(latent)
         return out
