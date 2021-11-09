@@ -1,7 +1,10 @@
+from denoiser.batch_solvers.autoencoder_bs import AutoencoderBS
 from denoiser.batch_solvers.demucs_hifi_bs import DemucsHifiBS
 from denoiser.batch_solvers.generator_bs import GeneratorBS
 from denoiser.batch_solvers.adversarial_bs import AdversarialBS
-from denoiser.models.modules import Discriminator, LaplacianDiscriminator
+from denoiser.models.demucs_decoder import DemucsDecoder
+from denoiser.models.demucs_encoder import DemucsEncoder
+from denoiser.models.modules import Discriminator, LaplacianDiscriminator, BLSTM
 from denoiser.models.demucs import Demucs
 from denoiser.models.caunet import Caunet
 from denoiser.models.seanet import Seanet
@@ -23,6 +26,10 @@ class BatchSolverFactory:
                 raise ValueError("Given model name is not supported")
         else:
             if args.experiment.model == "demucs":
+                encoder = DemucsEncoder(**args.experiment.demucs_encoder)
+                attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
+                decoder = DemucsDecoder(**args.experiment.demucs_decoder)
+                return AutoencoderBS(args, encoder, attention, decoder, args.experiment.skips)
                 generator = Demucs(**args.experiment.demucs)
                 return GeneratorBS(args, generator)
             elif args.experiment.model == "caunet":
