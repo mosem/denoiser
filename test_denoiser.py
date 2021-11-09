@@ -18,9 +18,12 @@ TEST_COMMANDS = {
     'demucs_adversarial': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_adversarial_1',
                 'experiment.segment=2', 'experiment.stride=2', 'ddp=0',
                 'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
-    'demucs_skipless_adversarial': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_skipless_adversarial_1'
+    'demucs_skipless_adversarial': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_skipless_adversarial_1',
                 'experiment.segment=2', 'experiment.stride=2', 'ddp=0',
                 'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
+    'demucs_with_transformer': ['train.py', 'dset=valentini_dummy', 'experiment=demucs_with_transformer_1',
+                        'experiment.segment=2', 'experiment.stride=2', 'ddp=0',
+                        'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],
     'caunet': ['train.py', 'dset=valentini_dummy', 'experiment=caunet_1',
                 'experiment.segment=2', 'experiment.stride=2', 'ddp=0',
                 'eval_every=1', 'epochs=1', f'hydra.run.dir={OUTPUT_DIR}', f'device={device}'],

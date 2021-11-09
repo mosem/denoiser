@@ -40,6 +40,31 @@ class BLSTM(nn.Module):
         return x
 
 
+class OneDimDualTransformer(nn.Module):
+    def __init__(self, dim,
+                 frame_size=8,
+                 n_head=4,
+                 n_layers=6):
+        super().__init__()
+        self.dim = dim
+        self.frame_size = frame_size
+        self.frame_shift = frame_size // 2
+        self.n_head = n_head
+        self.n_layers = n_layers
+
+        self.signalPreProcessor = TorchSignalToFrames(frame_size=self.frame_size,
+                                                      frame_shift=self.frame_shift)
+        self.attention = DualTransformer(dim, dim, nhead=self.n_head,
+                                         num_layers=self.n_layers)
+        self.ola = TorchOLA(self.frame_shift)
+
+    def forward(self, x):
+        x = self.signalPreProcessor(x)
+        x = self.attention(x)
+        x = self.ola(x)
+        return x
+
+
 # Caunet related
 
 
@@ -184,7 +209,7 @@ class TransformerEncoderLayer(Module):
         return src
 
 
-class Dual_Transformer(nn.Module):
+class DualTransformer(nn.Module):
     """
     Deep duaL-path RNN.
     args:
@@ -199,7 +224,7 @@ class Dual_Transformer(nn.Module):
     """
 
     def __init__(self, input_size, output_size, nhead=4, dropout=0, num_layers=1):
-        super(Dual_Transformer, self).__init__()
+        super(DualTransformer, self).__init__()
 
         self.input_size = input_size
         self.output_size = output_size
