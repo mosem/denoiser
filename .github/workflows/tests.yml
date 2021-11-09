@@ -23,12 +23,12 @@ jobs:
     - name: Demucs - dummy full pipeline
       run: |
         ./make_debug.sh
-        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_1 experiment.scale_factor=2 experiment.demucs.hidden=1 experiment.demucs.depth=3
+        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_1 experiment.demucs.hidden=1 experiment.demucs.depth=3
   
     - name: Demucs Skipless - dummy full pipeline
       run: |
         ./make_debug.sh
-        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_skipless_1 experiment.scale_factor=2 experiment.demucs_encoder.hidden=1 experiment.demucs_encoder.depth=3 experiment.demucs_decoder.hidden=1 experiment.demucs_decoder.depth=3
+        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_skipless_1 experiment.demucs_encoder.hidden=1 experiment.demucs_encoder.depth=3 experiment.demucs_decoder.hidden=1 experiment.demucs_decoder.depth=3
 
     - name: Demucs Adversarial - dummy full pipeline
       run: |
@@ -38,17 +38,17 @@ jobs:
     - name: Demucs Skipless Adversarial - dummy full pipeline
       run: |
         ./make_debug.sh
-        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_skipless_adversarial_1 experiment.scale_factor=2 experiment.demucs_encoder.hidden=1 experiment.demucs_encoder.depth=3 experiment.demucs_decoder.hidden=1 experiment.demucs_decoder.depth=3
+        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_skipless_adversarial_1 experiment.demucs_encoder.hidden=1 experiment.demucs_encoder.depth=3 experiment.demucs_decoder.hidden=1 experiment.demucs_decoder.depth=3
 
     - name: Demucs With Transformer - dummy full pipeline
       run: |
         ./make_debug.sh
-        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_with_transformer_1 experiment.scale_factor=2 experiment.batch_size=4 experiment.demucs_encoder.hidden=4 experiment.demucs_encoder.depth=3 experiment.demucs_decoder.hidden=4 experiment.demucs_decoder.depth=3
+        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_with_transformer_1 experiment.batch_size=4 experiment.demucs_encoder.hidden=4 experiment.demucs_encoder.depth=3 experiment.demucs_decoder.hidden=4 experiment.demucs_decoder.depth=3
 
     - name: Caunet - dummy full pipeline
       run: |
         ./make_debug.sh
-        python train.py num_workers=1 device=cpu epochs=1 experiment=caunet_1 experiment.scale_factor=2 experiment.caunet.hidden=8 experiment.caunet.depth=3 experiment.caunet.dense_block_depth=2
+        python train.py num_workers=1 device=cpu epochs=1 experiment=caunet_1 experiment.caunet.hidden=8 experiment.caunet.depth=3 experiment.caunet.dense_block_depth=2
 
     - name: Caunet Adversarial - dummy full pipeline
       run: |
