@@ -84,10 +84,8 @@ class Solver(object):
         load_from = None
         load_best = False
         keep_history = True
-        logger.info('_reset')
         # Reset
         if self.checkpoint and self.checkpoint_file.exists() and not self.restart:
-            logger.info(f'checkpoint: {self.checkpoint}, restart: {self.restart}, loading from {self.checkpoint_file}')
             load_from = self.checkpoint_file
         elif self.continue_from:
             load_from = self.continue_from
