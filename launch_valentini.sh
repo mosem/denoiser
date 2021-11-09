@@ -10,5 +10,5 @@ python train.py \
   dset=valentini \
   experiment=example_file \
   experiment.scale_factor=2 \
-  stft_loss=True
+
 
