@@ -9,7 +9,7 @@ from torch.nn.modules.dropout import Dropout
 from torch.nn.modules.linear import Linear
 from torch.nn.modules.rnn import GRU
 from torch.nn.modules.normalization import LayerNorm
-from denoiser.utils import get_padding, init_weights
+from denoiser.utils import get_padding
 
 
 class BLSTM(nn.Module):
@@ -236,6 +236,25 @@ class Dual_Transformer(nn.Module):
         return output
 
 
+class MRF(torch.nn.Module):
+    def __init__(self, resblock_kernel_sizes, resblock_dilation_sizes, channels, resblock=1):
+        super().__init__()
+        self.r = HifiResBlock1 if resblock == 1 else HifiResBlock2
+        self.resblocks = nn.ModuleList()
+        self.num_kernels = len(resblock_kernel_sizes)
+        for k, d in zip(resblock_kernel_sizes, resblock_dilation_sizes):
+            self.resblocks.append(self.r(channels, k, d))
+
+    def forward(self, x):
+        xs = None
+        for j in range(self.num_kernels):
+            if xs is None:
+                xs = self.resblocks[j](x)
+            else:
+                xs += self.resblocks[j](x)
+        return xs / self.num_kernels
+
+
 class HifiResBlock1(torch.nn.Module):
     def __init__(self, channels, kernel_size=3, dilation=(1, 3, 5)):
         super(HifiResBlock1, self).__init__()
@@ -312,7 +331,7 @@ class HifiDiscriminatorP(torch.nn.Module):
 
         for l in self.convs:
             x = l(x)
-            x = F.leaky_relu(x, LRELU_SLOPE)
+            x = nn.SiLU()(x)
             fmap.append(x)
         x = self.conv_post(x)
         fmap.append(x)
@@ -368,7 +387,7 @@ class HifiDiscriminatorS(torch.nn.Module):
         fmap = []
         for l in self.convs:
             x = l(x)
-            x = F.leaky_relu(x, LRELU_SLOPE)
+            x = nn.SiLU()(x)
             fmap.append(x)
         x = self.conv_post(x)
         fmap.append(x)

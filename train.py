@@ -83,6 +83,7 @@ def _main(args):
     else:
         run(args)
 
+
 @hydra.main(config_path="conf", config_name="main_config") #  for latest version of hydra=1.0
 def main(args):
     try:
