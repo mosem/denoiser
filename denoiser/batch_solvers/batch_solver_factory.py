@@ -1,4 +1,3 @@
-from denoiser.batch_solvers.autoencoder_bs import AutoencoderBS
 from denoiser.batch_solvers.demucs_hifi_bs import DemucsHifiBS
 from denoiser.batch_solvers.generator_bs import GeneratorBS
 from denoiser.batch_solvers.adversarial_bs import AdversarialBS
@@ -31,12 +30,13 @@ class BatchSolverFactory:
             return AdversarialBS(args, generator, discriminator)
         else:
             if args.experiment.model == "demucs":
+                generator = Demucs(**args.experiment.demucs)
+                return GeneratorBS(args, generator)
+            elif args.experiment.model == "skipless_demucs":
                 encoder = DemucsEncoder(**args.experiment.demucs_encoder)
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
                 decoder = DemucsDecoder(**args.experiment.demucs_decoder)
                 generator = Autoencoder(encoder, attention, decoder, args.experiment.skips)
-                # return AutoencoderBS(args, encoder, attention, decoder, args.experiment.skips)
-                # generator = Demucs(**args.experiment.demucs)
                 return GeneratorBS(args, generator)
             elif args.experiment.model == "caunet":
                 generator = Caunet(**args.experiment.caunet)

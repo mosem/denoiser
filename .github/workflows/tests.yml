@@ -19,11 +19,16 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         sudo apt-get install libsndfile1
-  
+
     - name: Demucs - dummy full pipeline
       run: |
         ./make_debug.sh
-        python train.py num_workers=1 device=cpu epochs=1 experiment=decomposed_demucs_1 experiment.scale_factor=2 experiment.demucs_encoder.hidden=1 experiment.demucs_encoder.depth=3 experiment.demucs_decoder.hidden=1 experiment.demucs_decoder.depth=3
+        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_1 experiment.scale_factor=2 experiment.demucs.hidden=1 experiment.demucs.depth=3
+  
+    - name: Demucs Skipless - dummy full pipeline
+      run: |
+        ./make_debug.sh
+        python train.py num_workers=1 device=cpu epochs=1 experiment=skipless_demucs_1 experiment.scale_factor=2 experiment.demucs_encoder.hidden=1 experiment.demucs_encoder.depth=3 experiment.demucs_decoder.hidden=1 experiment.demucs_decoder.depth=3
 
     - name: Demucs Adversarial - dummy full pipeline
       run: |
