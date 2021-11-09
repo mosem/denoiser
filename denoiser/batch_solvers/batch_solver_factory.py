@@ -33,7 +33,7 @@ class BatchSolverFactory:
                 discriminator = LaplacianDiscriminator(**args.experiment.discriminator)
             else:
                 discriminator = Discriminator(**args.experiment.discriminator)
-                
+
             return AdversarialBS(args, generator, discriminator)
         else:
             if args.experiment.model == "demucs":
