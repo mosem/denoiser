@@ -8,7 +8,8 @@
 
 python train.py \
   dset=valentini \
-  experiment=example_file \
-  experiment.scale_factor=2 \
+  experiment=demucs_1 \
+  epochs=1 \
+
 
 

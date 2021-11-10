@@ -43,6 +43,11 @@ pesq: True # compute pesq?
 eval_every: 10  # compute test metrics every so epochs
 streaming: False  # use streaming evaluation for Demucs
 
+#wand_b
+wandb:
+  log: all # gradients/parameters/all/None
+  log_freq: 5
+
 # Optimization related
 optim: adam
 lr: 3e-4

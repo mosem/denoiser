@@ -12,6 +12,7 @@ import os
 import time
 
 import torch
+import wandb
 
 from . import distrib
 from .augment import Augment
@@ -169,6 +170,7 @@ class Solver(object):
                 logger.info('Enhance and save samples...')
                 enhance(self.args, generator, self.samples_dir, self.tt_loader)
 
+            wandb.log(metrics)
             self.history.append(metrics)
             info = " | ".join(f"{k.capitalize()} {v:.5f}" for k, v in metrics.items())
             logger.info('-' * 70)

@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import torchaudio
 from torch.nn import functional as F
+import wandb
 
 from .resample import upsample2
 from .evaluate import run_metrics
@@ -35,6 +36,7 @@ def create_results_df(args):
     clean_paths = [str(data[0]) for data in files if '_clean' in str(data[0])]
     noisy_paths = [str(data[0]) for data in files if '_noisy' in str(data[0])]
     enhanced_paths = [str(data[0]) for data in files if '_enhanced' in str(data[0])]
+    # audio_signals = {'clean':[], 'noisy': [], 'enhanced': []}
     for i, (clean_path, noisy_path, enhanced_path) in enumerate(zip(clean_paths, noisy_paths, enhanced_paths)):
         clean, clean_sr = torchaudio.load(clean_path)
         noisy, noisy_sr = torchaudio.load(noisy_path)
@@ -45,6 +47,9 @@ def create_results_df(args):
         enhanced = enhanced.unsqueeze(0)
 
         clean, noisy, enhanced = _process_signals_lengths(args, clean, noisy, enhanced)
+        # audio_signals['clean'].append(clean)
+        # audio_signals['noisy'].append(noisy)
+        # audio_signals['enhanced'].append(enhanced)
 
         noisy_snr = _snr(noisy, noisy - clean).item()
         enhanced_snr = _snr(enhanced, enhanced - clean).item()
@@ -52,7 +57,7 @@ def create_results_df(args):
 
         filename = os.path.basename(clean_path).rstrip('_clean.wav')
         df.loc[i] = [filename, noisy_snr, enhanced_snr, pesq, stoi]
-    return df
+    return df #, audio_signals
 
 
 def create_results_histogram_df(results_df, n_bins):
@@ -67,6 +72,11 @@ def create_results_histogram_df(results_df, n_bins):
     return results_histogram_df
 
 
+def log_results_to_wandb(results_df, audio_signals=None):
+    logger.info(f'saving to wandb: {results_df["filename"]}')
+    wandb_table = wandb.Table(columns='filename', data=[results_df['filename']])
+    wandb.log({"Results": wandb_table})
+
 def log_results(args):
     logger.info('logging results...')
     results_out_path = 'results.csv'
@@ -75,6 +85,7 @@ def log_results(args):
     else:
         results_df = create_results_df(args)
         results_df.to_csv(results_out_path)
+    log_results_to_wandb(results_df)
 
     n_bins = args.n_bins
     histogram_out_path = 'results_histogram_' + str(n_bins) + '.csv'
