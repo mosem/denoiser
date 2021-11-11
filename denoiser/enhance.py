@@ -106,7 +106,7 @@ def enhance(args, model, out_dir, data_loader):
             else:
                 # Forward
                 estimate = get_estimate(model, noisy_sigs)
-
+                estimate = estimate[0] if len(estimate) > 1 else estimate
                 save_wavs(noisy_sigs, clean_sigs, estimate, raw_lengths_pairs, basenames,
                           source_sr=noisy_sr, target_sr=args.experiment.sample_rate)
 
