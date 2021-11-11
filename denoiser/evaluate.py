@@ -42,6 +42,7 @@ def evaluate(args, model, data_loader):
                         pool.submit(estimate_and_run_metrics, clean, model, noisy, args))
                 else:
                     estimate = get_estimate(model, noisy)
+                    estimate = estimate[0] if len(estimate) > 1 else estimate
                     estimate = estimate.cpu()
                     clean = clean.cpu()
                     pendings.append(
