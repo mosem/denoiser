@@ -242,67 +242,72 @@ class Dual_Transformer(nn.Module):
 
 
 # HiFi related
+class MRF(torch.nn.Module):
+    def __init__(self, resblock_kernel_sizes, resblock_dilation_sizes, channels, resblock=1):
+        super().__init__()
+        self.r = HifiResBlock1 if resblock == 1 else HifiResBlock2
+        self.resblocks = nn.ModuleList()
+        self.num_kernels = len(resblock_kernel_sizes)
+        for k, d in zip(resblock_kernel_sizes, resblock_dilation_sizes):
+            self.resblocks.append(self.r(channels, k, d))
+
+    def forward(self, x):
+        xs = None
+        for j in range(self.num_kernels):
+            if xs is None:
+                xs = self.resblocks[j](x)
+            else:
+                xs += self.resblocks[j](x)
+        x = xs + x
+        x = x / (self.num_kernels + 1)
+        return x
+
 
 class HifiResBlock1(torch.nn.Module):
     def __init__(self, channels, kernel_size=3, dilation=(1, 3, 5)):
         super(HifiResBlock1, self).__init__()
         self.convs1 = nn.ModuleList([
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[0],
-                               padding=get_padding(kernel_size, dilation[0]))),
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[1],
-                               padding=get_padding(kernel_size, dilation[1]))),
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[2],
-                               padding=get_padding(kernel_size, dilation[2])))
+            Conv1d(channels, channels, kernel_size, 1, dilation=dilation[0],
+                               padding=get_padding(kernel_size, dilation[0])),
+            Conv1d(channels, channels, kernel_size, 1, dilation=dilation[1],
+                               padding=get_padding(kernel_size, dilation[1])),
+            Conv1d(channels, channels, kernel_size, 1, dilation=dilation[2],
+                               padding=get_padding(kernel_size, dilation[2]))
         ])
-        self.convs1.apply(init_weights)
 
         self.convs2 = nn.ModuleList([
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=1,
-                               padding=get_padding(kernel_size, 1))),
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=1,
-                               padding=get_padding(kernel_size, 1))),
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=1,
-                               padding=get_padding(kernel_size, 1)))
+            Conv1d(channels, channels, kernel_size, 1, dilation=1,
+                               padding=get_padding(kernel_size, 1)),
+            Conv1d(channels, channels, kernel_size, 1, dilation=1,
+                               padding=get_padding(kernel_size, 1)),
+            Conv1d(channels, channels, kernel_size, 1, dilation=1,
+                               padding=get_padding(kernel_size, 1))
         ])
-        self.convs2.apply(init_weights)
 
     def forward(self, x):
         for c1, c2 in zip(self.convs1, self.convs2):
-            xt = F.leaky_relu(x, LRELU_SLOPE)
+            xt = nn.ReLU()(x)
             xt = c1(xt)
-            xt = F.leaky_relu(xt, LRELU_SLOPE)
-            xt = c2(xt)
-            x = xt + x
+            xt = nn.ReLU()(xt)
+            x = c2(xt)
         return x
-
-    def remove_weight_norm(self):
-        for l in self.convs1:
-            remove_weight_norm(l)
-        for l in self.convs2:
-            remove_weight_norm(l)
 
 
 class HifiResBlock2(torch.nn.Module):
     def __init__(self, channels, kernel_size=3, dilation=(1, 3)):
         super(HifiResBlock2, self).__init__()
         self.convs = nn.ModuleList([
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[0],
-                               padding=get_padding(kernel_size, dilation[0]))),
-            weight_norm(Conv1d(channels, channels, kernel_size, 1, dilation=dilation[1],
-                               padding=get_padding(kernel_size, dilation[1])))
+            Conv1d(channels, channels, kernel_size, 1, dilation=dilation[0],
+                               padding=get_padding(kernel_size, dilation[0])),
+            Conv1d(channels, channels, kernel_size, 1, dilation=dilation[1],
+                               padding=get_padding(kernel_size, dilation[1]))
         ])
-        self.convs.apply(init_weights)
 
     def forward(self, x):
         for c in self.convs:
-            xt = F.leaky_relu(x, LRELU_SLOPE)
-            xt = c(xt)
-            x = xt + x
+            xt = nn.ReLU()(x)
+            x = c(xt)
         return x
-
-    def remove_weight_norm(self):
-        for l in self.convs:
-            remove_weight_norm(l)
 
 
 class HifiDiscriminatorP(torch.nn.Module):
@@ -332,7 +337,7 @@ class HifiDiscriminatorP(torch.nn.Module):
 
         for l in self.convs:
             x = l(x)
-            x = F.leaky_relu(x, LRELU_SLOPE)
+            x = nn.SiLU()(x)
             fmap.append(x)
         x = self.conv_post(x)
         fmap.append(x)
@@ -377,8 +382,8 @@ class HifiDiscriminatorS(torch.nn.Module):
             norm_f(Conv1d(1, 32, 15, 1, padding=7)),
             norm_f(Conv1d(32, 32, 41, 2, groups=4, padding=20)),
             norm_f(Conv1d(32, 64, 41, 2, groups=16, padding=20)),
+            norm_f(Conv1d(64, 64, 41, 4, groups=16, padding=20)),
             norm_f(Conv1d(64, 128, 41, 4, groups=16, padding=20)),
-            norm_f(Conv1d(128, 128, 41, 4, groups=16, padding=20)),
             norm_f(Conv1d(128, 128, 41, 1, groups=16, padding=20)),
             norm_f(Conv1d(128, 128, 5, 1, padding=2)),
         ])
@@ -388,7 +393,7 @@ class HifiDiscriminatorS(torch.nn.Module):
         fmap = []
         for l in self.convs:
             x = l(x)
-            x = F.leaky_relu(x, LRELU_SLOPE)
+            x = nn.SiLU()(x)
             fmap.append(x)
         x = self.conv_post(x)
         fmap.append(x)
@@ -428,6 +433,7 @@ class HifiMultiScaleDiscriminator(torch.nn.Module):
             fmap_gs.append(fmap_g)
 
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
+
 
 # Seanet related
 
