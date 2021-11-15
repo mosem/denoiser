@@ -113,7 +113,7 @@ class DemucsHifiBS(BatchSolver):
         estimate = self._models[GEN](noisy)
         losses = self._get_loss(clean, estimate, epoch)
         if not cross_valid:
-            self._optimize(losses)
+            self._optimize(losses, epoch)
         return {k: v.item() for k, v in losses.items()}
 
     def get_evaluation_loss(self, losses_dict):
@@ -167,9 +167,9 @@ class DemucsHifiBS(BatchSolver):
         loss_disc_s, _, _ = discriminator_loss(y_ds_hat_r, y_ds_hat_g)
         return loss_disc_s + loss_disc_f
 
-    def _optimize(self, losses):
+    def _optimize(self, losses, epoch):
         with torch.autograd.set_detect_anomaly(True):
-            if self.include_disc:
+            if self.include_disc and epoch >= self.first_disc_epoch:
                 self._optimizers[G_OPT].zero_grad()
                 losses[self._losses_names[1]].backward()
                 self._optimizers[G_OPT].step()
