@@ -72,7 +72,7 @@ class DemucsHifiBS(BatchSolver):
         self.l1_factor = args.experiment.demucs_hifi_bs.l1_factor
         self.gen_factor = args.experiment.demucs_hifi_bs.gen_factor
         self.disc_factor = args.experiment.demucs_hifi_bs.disc_factor
-        self.first_disc_epoch = args.experiment.demucs_hifi_bs.disc_first_epoch if args.experiment.pass_epoch else 0
+        self.first_disc_epoch = args.experiment.demucs_hifi_bs.disc_first_epoch if args.experiment.pass_epochs else 0
         self.epoch = 0
 
         if self.include_ft:
