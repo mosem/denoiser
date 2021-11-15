@@ -7,9 +7,11 @@
 # authors: adiyoss and adefossez
 
 python train.py \
-  dset=valentini \
+  dset=valentini_dummy \
   experiment=demucs_1 \
-  epochs=1 \
+  epochs=5 \
+  eval_every=2 \
+
 
 
 

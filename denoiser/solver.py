@@ -129,6 +129,7 @@ class Solver(object):
             logger_msg = f'Train Summary | End of Epoch {epoch + 1} | Time {time.time() - start:.2f}s | ' \
                          + ' | '.join([f'{k} Loss {v:.5f}' for k,v in losses.items()])
             logger.info(bold(logger_msg))
+            losses = {k + '_loss': v for k, v in losses.items()}
             logger.info('-' * 70)
             if self.cv_loader:
                 # Cross validation
@@ -141,13 +142,13 @@ class Solver(object):
                 logger_msg = f'Validation Summary | End of Epoch {epoch + 1} | Time {time.time() - start:.2f}s | ' \
                              + ' | '.join([f'{k} Valid Loss {v:.5f}' for k, v in valid_losses.items()])
                 logger.info(bold(logger_msg))
-                valid_losses = {'valid_'  + k: v for k,v in valid_losses.items()}
+                valid_losses = {'valid_'  + k + '_loss': v for k,v in valid_losses.items()}
             else:
                 valid_losses = {}
                 evaluation_loss = 0
 
-            best_loss = min(pull_metric(self.history, 'evaluation') + [evaluation_loss])
-            metrics = {**losses, **valid_losses, 'evaluation': evaluation_loss, 'best': best_loss}
+            best_loss = min(pull_metric(self.history, 'evaluation_loss') + [evaluation_loss])
+            metrics = {**losses, **valid_losses, 'evaluation_loss': evaluation_loss, 'best_loss': best_loss}
             # Save the best model
             if evaluation_loss == best_loss:
                 logger.info(bold('New best evaluation loss %.4f'), evaluation_loss)
@@ -162,15 +163,15 @@ class Solver(object):
 
                 generator = self.batch_solver.get_generator_for_evaluation(self.best_states)
                 with torch.no_grad():
-                    pesq, stoi = evaluate(self.args, generator, self.tt_loader)
+                    pesq, stoi = evaluate(self.args, generator, self.tt_loader, epoch)
 
-                    metrics.update({'pesq': pesq, 'stoi': stoi})
+                    metrics.update({'total pesq': pesq, 'total stoi': stoi})
 
                 # enhance some samples
                 logger.info('Enhance and save samples...')
                 enhance(self.args, generator, self.samples_dir, self.tt_loader)
 
-            wandb.log(metrics)
+            wandb.log(metrics, step=epoch)
             self.history.append(metrics)
             info = " | ".join(f"{k.capitalize()} {v:.5f}" for k, v in metrics.items())
             logger.info('-' * 70)

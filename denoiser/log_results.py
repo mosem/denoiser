@@ -1,42 +1,22 @@
 import os
 import pandas as pd
 import torchaudio
-from torch.nn import functional as F
 import wandb
 
-from .resample import upsample2
-from .evaluate import run_metrics
+from .evaluate import get_metrics, _snr, _process_signals_lengths, init_wandb_table, add_data_to_wandb_table
 from .audio import find_audio_files
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-def _snr(signal, noise):
-    return (signal**2).mean()/(noise**2).mean()
-
-
-def _process_signals_lengths(args, clean, noisy, enhanced):
-    if args.experiment.scale_factor == 2:
-        noisy = upsample2(noisy)
-    elif args.experiment.scale_factor == 4:
-        noisy = upsample2(noisy)
-        noisy = upsample2(noisy)
-
-    if clean.shape[-1] < noisy.shape[-1]:
-        clean = F.pad(clean, (0, noisy.shape[-1] - clean.shape[-1]))
-    if enhanced.shape[-1] < noisy.shape[-1]:
-        enhanced = F.pad(enhanced, (0, noisy.shape[-1] - enhanced.shape[-1]))
-
-    return clean, noisy, enhanced
-
 def create_results_df(args):
+    wandb_table = init_wandb_table()
     df = pd.DataFrame(columns=['filename', 'snr', 'enhanced snr', 'pesq', 'stoi'])
     files = find_audio_files(args.samples_dir, progress=False)
     clean_paths = [str(data[0]) for data in files if '_clean' in str(data[0])]
     noisy_paths = [str(data[0]) for data in files if '_noisy' in str(data[0])]
     enhanced_paths = [str(data[0]) for data in files if '_enhanced' in str(data[0])]
-    # audio_signals = {'clean':[], 'noisy': [], 'enhanced': []}
     for i, (clean_path, noisy_path, enhanced_path) in enumerate(zip(clean_paths, noisy_paths, enhanced_paths)):
         clean, clean_sr = torchaudio.load(clean_path)
         noisy, noisy_sr = torchaudio.load(noisy_path)
@@ -46,18 +26,18 @@ def create_results_df(args):
         noisy = noisy.unsqueeze(0)
         enhanced = enhanced.unsqueeze(0)
 
-        clean, noisy, enhanced = _process_signals_lengths(args, clean, noisy, enhanced)
-        # audio_signals['clean'].append(clean)
-        # audio_signals['noisy'].append(noisy)
-        # audio_signals['enhanced'].append(enhanced)
+        clean, noisy_upsampled, enhanced = _process_signals_lengths(args, clean, noisy, enhanced)
 
-        noisy_snr = _snr(noisy, noisy - clean).item()
+        noisy_snr = _snr(noisy_upsampled, noisy_upsampled - clean).item()
         enhanced_snr = _snr(enhanced, enhanced - clean).item()
-        pesq, stoi = run_metrics(clean, enhanced, args)
+        pesq, stoi = get_metrics(clean, enhanced, args)
 
         filename = os.path.basename(clean_path).rstrip('_clean.wav')
         df.loc[i] = [filename, noisy_snr, enhanced_snr, pesq, stoi]
-    return df #, audio_signals
+        add_data_to_wandb_table((clean, noisy_upsampled, enhanced), (pesq, stoi), filename, args, wandb_table)
+
+    wandb.log({"Results": wandb_table})
+    return df
 
 
 def create_results_histogram_df(results_df, n_bins):
@@ -72,11 +52,6 @@ def create_results_histogram_df(results_df, n_bins):
     return results_histogram_df
 
 
-def log_results_to_wandb(results_df, audio_signals=None):
-    logger.info(f'saving to wandb: {results_df["filename"]}')
-    wandb_table = wandb.Table(columns='filename', data=[results_df['filename']])
-    wandb.log({"Results": wandb_table})
-
 def log_results(args):
     logger.info('logging results...')
     results_out_path = 'results.csv'
@@ -85,7 +60,6 @@ def log_results(args):
     else:
         results_df = create_results_df(args)
         results_df.to_csv(results_out_path)
-    log_results_to_wandb(results_df)
 
     n_bins = args.n_bins
     histogram_out_path = 'results_histogram_' + str(n_bins) + '.csv'
