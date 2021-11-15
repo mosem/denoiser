@@ -1,3 +1,4 @@
+# @package experiment
 defaults:
   - experiment: example_file
   - dset: debug

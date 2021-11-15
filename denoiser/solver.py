@@ -22,6 +22,7 @@ from .utils import bold, pull_metric, LogProgress
 from .log_results import log_results
 
 logger = logging.getLogger(__name__)
+PASS_EP = "pass_epochs"
 
 
 class Solver(object):
@@ -201,7 +202,10 @@ class Solver(object):
             if not cross_valid:
                 noisy, clean = self.augment.augment_data(noisy, clean)
 
-            losses = self.batch_solver.run((noisy, clean), cross_valid)
+            if hasattr(self.args.experiment, PASS_EP) and self.args.experiment.pass_epochs:
+                losses = self.batch_solver.run((noisy, clean), cross_valid, epoch)
+            else:
+                losses = self.batch_solver.run((noisy, clean), cross_valid)
             for k in self.batch_solver.get_losses_names():
                 total_losses[k] += losses[k]
             losses_info = {k: format(v/(i+1), ".5f") for k,v in total_losses.items()}

@@ -1,4 +1,5 @@
-experiment_name: demucs_hifi_1
+# @package experiment
+experiment_name: demucs_1
 
 # Dataset related
 sample_rate: 16000 # target sample rate #should be included in training cfg
@@ -7,16 +8,15 @@ segment: 2
 stride: 2    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
 batch_size: 16
+pass_epochs: True
 
 scale_factor: 2
-upsampled: false # if upsampling from input dataset to target dataset
 
 # models related
-model: demucs_hifi # demucs/demucs_adversarial/demucs_hifi
-
+model: demucs_hifi
 demucs_hifi:
   chin: 1
-  chout: 24
+  chout: 1
   hidden: 48
   max_hidden: 10000
   causal: true
@@ -24,40 +24,27 @@ demucs_hifi:
   glu: true
   depth: 5
   kernel_size: 8
-  stride: 2
+  stride: ${experiment.stride}
   normalize: true
   resample: 1
   growth: 2
   rescale: 0.1
-  scale_factor: 2
-  # embedded dim
-  include_ft: false
-  include_skip_connections: true
-  # hifi
-  resblock: 2
-  resblock_kernel_sizes: [3, 7, 11]
-  resblock_dilation_sizes: [[1, 3, 5], [1, 3, 5], [1, 3, 5]]
+  scale_factor: ${experiment.scale_factor}
+  # hifi related
+  num_mrfs: 0
+  resblock: 1
+  resblock_kernel_sizes: [3,7,11]
+  resblock_dilation_sizes: [[1,3,5], [1,3,5], [1,3,5]]
+  include_ft: False
 
 demucs_hifi_bs:
-  # embedded dim
-  sample_rate: 16000
-  slice_rate: 20e-3
-  ch_in: 128
-  len_in: 256
-  emb_dim: 768
-  ft_reg_factor: 1e-2
-  dialation: 1
-  # hifi
-  n_fft: 1024
-  hop_size: 256
-  win_size: 1024
-  n_mels: 80
-  with_spec: True
+  include_disc: True
   l1_factor: 45
   gen_factor: 2
-
+  disc_factor: 1
+  disc_first_epoch: 0
 
 features_model:
   feature_model: 'hubert'
-  state_dict_path: '/cs/usr/ortal1602/Desktop/MSc/ortal1602/projects/fairseq/pretrained_w/hubert_base_ls960.pt'
+  state_dict_path: '/cs/labs/adiyoss/shared/pretrained_weights/hubert/hubert_base_ls960.pt'
   features_factor: 0.01
