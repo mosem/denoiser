@@ -68,11 +68,13 @@ class DemucsHifiBS(BatchSolver):
 
         self._models = self._generate_models(args)
         self._optimizers = self._generate_optimizers()
-        self._losses_names = ['L1', 'Gen_loss', 'Disc_loss'] if self.include_disc else ['L1']
+        self._losses = ['L1', 'Gen_loss', 'Disc_loss'] if self.include_disc else ['L1']
+        self._losses_names = self._losses
         self.l1_factor = args.experiment.demucs_hifi_bs.l1_factor
         self.gen_factor = args.experiment.demucs_hifi_bs.gen_factor
         self.disc_factor = args.experiment.demucs_hifi_bs.disc_factor
         self.first_disc_epoch = args.experiment.demucs_hifi_bs.disc_first_epoch if args.experiment.pass_epoch else 0
+        self.epoch = 0
 
         if self.include_ft:
             self.ft_model = load_lexical_model(args.experiment.features_model.feature_model,
@@ -109,6 +111,7 @@ class DemucsHifiBS(BatchSolver):
         return self._models[GEN].estimate_valid_length(input_length)
 
     def run(self, data, cross_valid=False, epoch=0):
+        self._losses_names = self._losses if epoch >= self.first_disc_epoch else [self._losses[0]]
         noisy, clean = data
         estimate = self._models[GEN](noisy)
         losses = self._get_loss(clean, estimate, epoch)
