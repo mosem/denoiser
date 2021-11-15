@@ -8,7 +8,7 @@ segment: 2
 stride: 2    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
 batch_size: 16
-pass_epoch: True
+pass_epochs: True
 
 scale_factor: 2
 
