@@ -72,6 +72,7 @@ class DemucsHifiBS(BatchSolver):
         self.l1_factor = args.experiment.demucs_hifi_bs.l1_factor
         self.gen_factor = args.experiment.demucs_hifi_bs.gen_factor
         self.disc_factor = args.experiment.demucs_hifi_bs.disc_factor
+        self.first_disc_epoch = args.experiment.demucs_hifi_bs.disc_first_epoch if args.experiment.pass_epoch else 0
 
         if self.include_ft:
             self.ft_model = load_lexical_model(args.experiment.features_model.feature_model,
@@ -107,10 +108,10 @@ class DemucsHifiBS(BatchSolver):
     def estimate_valid_length(self, input_length):
         return self._models[GEN].estimate_valid_length(input_length)
 
-    def run(self, data, cross_valid=False):
+    def run(self, data, cross_valid=False, epoch=0):
         noisy, clean = data
         estimate = self._models[GEN](noisy)
-        losses = self._get_loss(clean, estimate)
+        losses = self._get_loss(clean, estimate, epoch)
         if not cross_valid:
             self._optimize(losses)
         return {k: v.item() for k, v in losses.items()}
@@ -181,10 +182,10 @@ class DemucsHifiBS(BatchSolver):
                 losses[self._losses_names[0]].backward()
                 self._optimizers[G_OPT].step()
 
-    def _get_loss(self, clean, estimate):
+    def _get_loss(self, clean, estimate, epoch):
         with torch.autograd.set_detect_anomaly(True):
 
-            if self.include_disc:
+            if self.include_disc and epoch >= self.first_disc_epoch:
                 disc_loss = self._disc_loss(clean, estimate)
                 audio_loss, gen_loss = self._gen_loss(clean, estimate)
                 return {self._losses_names[0]: audio_loss, self._losses_names[1]: gen_loss, self._losses_names[2]: disc_loss}

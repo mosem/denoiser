@@ -201,7 +201,10 @@ class Solver(object):
             if not cross_valid:
                 noisy, clean = self.augment.augment_data(noisy, clean)
 
-            losses = self.batch_solver.run((noisy, clean), cross_valid)
+            if hasattr(self.args.experiment, "pass_epochs") and self.args.experiment.pass_epochs:
+                losses = self.batch_solver.run((noisy, clean), cross_valid, epoch)
+            else:
+                losses = self.batch_solver.run((noisy, clean), cross_valid)
             for k in self.batch_solver.get_losses_names():
                 total_losses[k] += losses[k]
             losses_info = {k: format(v/(i+1), ".5f") for k,v in total_losses.items()}
