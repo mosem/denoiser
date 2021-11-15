@@ -13,7 +13,6 @@ from denoiser.models.modules import HifiMultiPeriodDiscriminator, HifiMultiScale
 from denoiser.stft_loss import MultiResolutionSTFTLoss
 from denoiser.utils import load_lexical_model
 
-logger = logging.getLogger(__name__)
 GEN = "generator"
 G_OPT = "generator_optimizer"
 MPD = "mpd"
@@ -34,9 +33,9 @@ def discriminator_loss(disc_real_outputs, disc_generated_outputs):
     loss = 0
     r_losses = []
     g_losses = []
-    for dr, dg in zip(disc_real_outputs, disc_generated_outputs):
-        r_loss = torch.mean((1-dr)**2)
-        g_loss = torch.mean(dg**2)
+    for disc_real, disc_generated in zip(disc_real_outputs, disc_generated_outputs):
+        r_loss = torch.mean((1-disc_real)**2)
+        g_loss = torch.mean(disc_generated**2)
         loss += (r_loss + g_loss)
         r_losses.append(r_loss.item())
         g_losses.append(g_loss.item())
