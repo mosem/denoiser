@@ -9,8 +9,6 @@ from torch.nn.modules.dropout import Dropout
 from torch.nn.modules.linear import Linear
 from torch.nn.modules.rnn import GRU
 from torch.nn.modules.normalization import LayerNorm
-
-from denoiser.models.hifi_gan_loss_functions import LRELU_SLOPE
 from denoiser.utils import get_padding, init_weights, capture_init
 from denoiser.resample import downsample2, upsample2
 
