@@ -184,9 +184,8 @@ class Solver(object):
         if self.args.log_results:
             log_results(self.args)
 
-
     def _run_one_epoch(self, epoch, cross_valid=False):
-        total_losses = {k:0 for k in self.batch_solver.get_losses_names()}
+        total_losses = dict()
         data_loader = self.tr_loader if not cross_valid else self.cv_loader
 
         # get a different order for distributed training, otherwise this will get ignored
@@ -206,8 +205,11 @@ class Solver(object):
                 losses = self.batch_solver.run((noisy, clean), cross_valid, epoch)
             else:
                 losses = self.batch_solver.run((noisy, clean), cross_valid)
-            for k in self.batch_solver.get_losses_names():
-                total_losses[k] += losses[k]
+            for k, v in losses.items():
+                if i == 0:
+                    total_losses[k] = losses[k]
+                else:
+                    total_losses[k] += losses[k]
             losses_info = {k: format(v/(i+1), ".5f") for k,v in total_losses.items()}
             logprog.update(**losses_info)
             del losses

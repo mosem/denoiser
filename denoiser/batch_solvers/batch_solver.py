@@ -49,9 +49,6 @@ class BatchSolver(ABC):
     def get_optimizers(self) -> dict:
         return self._optimizers
 
-    def get_losses_names(self) -> list:
-        return self._losses_names
-
     @abstractmethod
     def estimate_valid_length(self, input_length):
         """
