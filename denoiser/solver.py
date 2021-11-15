@@ -23,6 +23,7 @@ from .log_results import log_results
 
 logger = logging.getLogger(__name__)
 
+PASS_EP = "pass_epochs"
 
 class Solver(object):
     def __init__(self, data, batch_solver, args):
@@ -183,7 +184,6 @@ class Solver(object):
         if self.args.log_results:
             log_results(self.args)
 
-
     def _run_one_epoch(self, epoch, cross_valid=False):
         total_losses = {k:0 for k in self.batch_solver.get_losses_names()}
         data_loader = self.tr_loader if not cross_valid else self.cv_loader
@@ -201,7 +201,7 @@ class Solver(object):
             if not cross_valid:
                 noisy, clean = self.augment.augment_data(noisy, clean)
 
-            if hasattr(self.args.experiment, "pass_epochs") and self.args.experiment.pass_epochs:
+            if hasattr(self.args.experiment, PASS_EP) and self.args.experiment.pass_epochs:
                 losses = self.batch_solver.run((noisy, clean), cross_valid, epoch)
             else:
                 losses = self.batch_solver.run((noisy, clean), cross_valid)
