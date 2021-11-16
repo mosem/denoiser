@@ -15,6 +15,7 @@ from torch.nn import functional as F
 from torchaudio.transforms import Spectrogram
 from scipy.signal import spectrogram
 import wandb
+import cv2
 
 from pesq import pesq
 from pystoi import stoi
@@ -36,6 +37,8 @@ def evaluate(args, model, data_loader, epoch):
 
     model.eval()
 
+    files_to_log = []
+
     pendings = []
     with ProcessPoolExecutor(args.num_workers) as pool:
         with torch.no_grad():
@@ -46,107 +49,65 @@ def evaluate(args, model, data_loader, epoch):
                 filename = os.path.basename(clean_path[0]).rstrip('_clean.wav')
                 noisy = noisy.to(args.device)
                 clean = clean.to(args.device)
+                if args.wandb.n_files_to_log == -1 or len(files_to_log) < args.wandb.n_files_to_log:
+                    files_to_log.append(filename)
                 # If device is CPU, we do parallel evaluation in each CPU worker.
                 if args.device == 'cpu':
                     pendings.append(
-                        pool.submit(estimate_and_run_metrics, clean, model, noisy, filename, args))
+                        pool.submit(estimate_and_run_metrics, clean, model, noisy, args, filename))
                 else:
                     estimate = get_estimate(model, noisy)
-                    clean, noisy_upsampled, estimate = _process_signals_lengths(args, clean, noisy, estimate)
-                    clean = clean.cpu()
-                    noisy_upsampled = noisy_upsampled.cpu()
+                    noisy = upsample_noisy(args, noisy)
                     estimate = estimate.cpu()
-                    estimate_pesq, estimate_stoi = get_metrics(clean, estimate, args)
-                    estimate_snr = _snr(estimate, estimate - clean).item()
-                    log_file_to_wandb(estimate, (estimate_pesq, estimate_stoi, estimate_snr), filename, args, epoch)
+                    clean = clean.cpu()
                     pendings.append(
-                        pool.submit(run_metrics, (clean, noisy_upsampled, estimate), filename, args))
+                        pool.submit(run_metrics, clean, estimate, noisy.shape[-1], args, filename))
                 total_cnt += clean.shape[0]
 
         for pending in LogProgress(logger, pendings, updates, name="Eval metrics"):
-            pesq_i, stoi_i = pending.result()
+            pesq_i, stoi_i, snr_i, estimate_i, filename_i = pending.result()
+            if filename_i in files_to_log:
+                log_to_wandb(estimate_i, pesq_i, stoi_i, snr_i, filename_i, epoch, args.experiment.sample_rate)
             total_pesq += pesq_i
             total_stoi += stoi_i
 
     metrics = [total_pesq, total_stoi]
-    pesq, stoi = distrib.average([m/total_cnt for m in metrics], total_cnt)
-    logger.info(bold(f'Test set performance:PESQ={pesq}, STOI={stoi}.'))
-    return pesq, stoi
+    avg_pesq, avg_stoi = distrib.average([m/total_cnt for m in metrics], total_cnt)
+    logger.info(bold(f'Test set performance:PESQ={avg_pesq}, STOI={avg_stoi}.'))
+    return avg_pesq, avg_stoi
 
 
-def init_wandb_table():
-    columns = ['filename', 'clean audio', 'clean spectogram', 'noisy audio', 'noisy spectogram', 'enhanced audio',
-               'enhanced spectogram', 'noisy snr', 'enhanced snr', 'pesq', 'stoi']
-    table = wandb.Table(columns=columns)
-    return table
-
-
-def log_file_to_wandb(enhanced, enhanced_metrics, filename, args, epoch):
-    logger.info(f'logging {filename} to wandb.')
+def log_to_wandb(signal, pesq, stoi, snr, filename, epoch, sr):
     spectrogram_transform = Spectrogram()
-
-    enhanced_pesq, enhanced_stoi, enhanced_snr = enhanced_metrics
-
-    enhaced_spectrogram = wandb.Image(spectrogram_transform(enhanced).log2()[0, :, :].numpy(), caption=filename)
-    ehnahced_wandb_audio = wandb.Audio(enhanced.squeeze().numpy(), sample_rate=args.experiment.sample_rate,
-                                    caption=filename)
-    wandb.log({f'test samples/{filename}/pesq': enhanced_pesq,
-               f'test samples/{filename}/stoi': enhanced_stoi,
-               f'test samples/{filename}/snr': enhanced_snr,
-               f'test samples/{filename}/spectrogram': enhaced_spectrogram,
-               f'test samples/{filename}/audio': ehnahced_wandb_audio},
+    enhanced_spectrogram = wandb.Image(spectrogram_transform(signal).log2()[0, :, :].numpy(), caption=filename)
+    enhanced_wandb_audio = wandb.Audio(signal.squeeze().numpy(), sample_rate=sr, caption=filename)
+    wandb.log({f'test samples/{filename}/pesq': pesq,
+               f'test samples/{filename}/stoi': stoi,
+               f'test samples/{filename}/snr': snr,
+               f'test samples/{filename}/spectrogram': enhanced_spectrogram,
+               f'test samples/{filename}/audio': enhanced_wandb_audio},
               step=epoch)
 
 
-def add_data_to_wandb_table(signals, metrics, filename, args, wandb_table):
-    logger.info(f'adding {filename} to wandb table.')
-    clean, noisy, enhanced = signals
-
-    spectogram_transform = Spectrogram()
-
-    epsilon = 1e-13
-    clean_spec = wandb.Image(spectogram_transform(clean).log2()[0, :, :].numpy())
-    noisy_spec = wandb.Image((epsilon + spectogram_transform(noisy)).log2()[0, :, :].numpy())
-    enhaced_spec = wandb.Image(spectogram_transform(enhanced).log2()[0, :, :].numpy())
-    pesq, stoi = metrics
-    noisy_snr = _snr(noisy, noisy - clean).item()
-    enhanced_snr = _snr(enhanced, enhanced - clean).item()
-
-    clean_sr = args.experiment.sample_rate
-
-    clean_wandb_audio = wandb.Audio(clean.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_clean')
-    noisy_wandb_audio = wandb.Audio(noisy.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_noisy')
-    enhanced_wandb_audio = wandb.Audio(enhanced.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_enhanced')
-
-    wandb_table.add_data(filename, clean_wandb_audio, clean_spec, noisy_wandb_audio, noisy_spec, enhanced_wandb_audio,
-                         enhaced_spec, noisy_snr, enhanced_snr, pesq, stoi)
-
-def estimate_and_run_metrics(clean, model, noisy, filename, args, wandb_table=None):
+def estimate_and_run_metrics(clean, model, noisy, args, filename):
     estimate = get_estimate(model, noisy)
-    signals = (clean, noisy, estimate)
-    return run_metrics(signals, filename, args, wandb_table)
+    noisy = upsample_noisy(args, noisy)
+    return run_metrics(clean, estimate, noisy.shape[-1], args, filename)
 
 
-def run_metrics(signals, filename, args, wandb_table=None):
-    clean, noisy, estimate = signals
+def run_metrics(clean, estimate, noisy_len, args, filename):
+    clean, estimate = pad_signals_to_noisy_length(clean, noisy_len, estimate)
+    pesq, stoi, snr = get_metrics(clean, estimate, args.experiment.sample_rate)
+    return pesq, stoi, snr, estimate, filename
+
+
+def get_metrics(clean, estimate, sr):
     estimate_numpy = estimate.numpy()[:, 0]
     clean_numpy = clean.numpy()[:, 0]
-
-    if args.pesq:
-        pesq_i = get_pesq(clean_numpy, estimate_numpy, sr=args.experiment.sample_rate)
-    else:
-        pesq_i = 0
-    stoi_i = get_stoi(clean_numpy, estimate_numpy, sr=args.experiment.sample_rate)
-    # log_to_wandb_table(signals, (pesq_i, stoi_i), filename, args, wandb_table)
-    return pesq_i, stoi_i
-
-
-def get_metrics(clean, estimate, args):
-    estimate_numpy = estimate.numpy()[:, 0]
-    clean_numpy = clean.numpy()[:, 0]
-    pesq_i = get_pesq(clean_numpy, estimate_numpy, sr=args.experiment.sample_rate)
-    stoi_i = get_stoi(clean_numpy, estimate_numpy, sr=args.experiment.sample_rate)
-    return pesq_i, stoi_i
+    pesq = get_pesq(clean_numpy, estimate_numpy, sr=sr)
+    stoi = get_stoi(clean_numpy, estimate_numpy, sr=sr)
+    snr = get_snr(estimate, estimate - clean).item()
+    return pesq, stoi, snr
 
 
 def get_pesq(ref_sig, out_sig, sr):
@@ -178,22 +139,23 @@ def get_stoi(ref_sig, out_sig, sr):
     return stoi_val
 
 
-def _snr(signal, noise):
+def get_snr(signal, noise):
     return (signal**2).mean()/(noise**2).mean()
 
 
-def _process_signals_lengths(args, clean, noisy, enhanced):
+def upsample_noisy(args, noisy):
     if args.experiment.scale_factor == 2:
         noisy = upsample2(noisy)
     elif args.experiment.scale_factor == 4:
         noisy = upsample2(noisy)
         noisy = upsample2(noisy)
+    return noisy
 
-    if clean.shape[-1] < noisy.shape[-1]:
-        logger.info(f'padding clean with {noisy.shape[-1] - clean.shape[-1]} samples.')
-        clean = F.pad(clean, (0, noisy.shape[-1] - clean.shape[-1]))
-    if enhanced.shape[-1] < noisy.shape[-1]:
-        logger.info(f'padding enhanced with {noisy.shape[-1] - enhanced.shape[-1]} samples.')
-        enhanced = F.pad(enhanced, (0, noisy.shape[-1] - enhanced.shape[-1]))
 
-    return clean, noisy, enhanced
+def pad_signals_to_noisy_length(clean, noisy_len, enhanced):
+    if clean.shape[-1] < noisy_len:
+        clean = F.pad(clean, (0, noisy_len - clean.shape[-1]))
+    if enhanced.shape[-1] < noisy_len:
+        enhanced = F.pad(enhanced, (0, noisy_len - enhanced.shape[-1]))
+
+    return clean, enhanced

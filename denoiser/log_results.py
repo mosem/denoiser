@@ -2,8 +2,9 @@ import os
 import pandas as pd
 import torchaudio
 import wandb
+from torchaudio.transforms import Spectrogram
 
-from .evaluate import get_metrics, _snr, _process_signals_lengths, init_wandb_table, add_data_to_wandb_table
+from .evaluate import get_metrics, get_snr, upsample_noisy, pad_signals_to_noisy_length, logger
 from .audio import find_audio_files
 
 import logging
@@ -22,19 +23,20 @@ def create_results_df(args):
         noisy, noisy_sr = torchaudio.load(noisy_path)
         enhanced, enhanced_sr = torchaudio.load(enhanced_path)
 
+        noisy = upsample_noisy(args, noisy)
+
         clean = clean.unsqueeze(0)
         noisy = noisy.unsqueeze(0)
         enhanced = enhanced.unsqueeze(0)
 
-        clean, noisy_upsampled, enhanced = _process_signals_lengths(args, clean, noisy, enhanced)
+        clean, enhanced = pad_signals_to_noisy_length(clean, noisy.shape[-1], enhanced)
 
-        noisy_snr = _snr(noisy_upsampled, noisy_upsampled - clean).item()
-        enhanced_snr = _snr(enhanced, enhanced - clean).item()
-        pesq, stoi = get_metrics(clean, enhanced, args)
+        noisy_snr = get_snr(noisy, noisy - clean).item()
+        pesq, stoi, enhanced_snr = get_metrics(clean, enhanced, args.experiment.sample_rate)
 
         filename = os.path.basename(clean_path).rstrip('_clean.wav')
         df.loc[i] = [filename, noisy_snr, enhanced_snr, pesq, stoi]
-        add_data_to_wandb_table((clean, noisy_upsampled, enhanced), (pesq, stoi), filename, args, wandb_table)
+        add_data_to_wandb_table((clean, noisy, enhanced), (pesq, stoi), filename, args, wandb_table)
 
     wandb.log({"Results": wandb_table})
     return df
@@ -66,3 +68,34 @@ def log_results(args):
     if not os.path.isfile(histogram_out_path):
         results_histogram_df = create_results_histogram_df(results_df, n_bins)
         results_histogram_df.to_csv(histogram_out_path)
+
+
+def init_wandb_table():
+    columns = ['filename', 'clean audio', 'clean spectogram', 'noisy audio', 'noisy spectogram', 'enhanced audio',
+               'enhanced spectogram', 'noisy snr', 'enhanced snr', 'pesq', 'stoi']
+    table = wandb.Table(columns=columns)
+    return table
+
+
+def add_data_to_wandb_table(signals, metrics, filename, args, wandb_table):
+    logger.info(f'adding {filename} to wandb table.')
+    clean, noisy, enhanced = signals
+
+    spectrogram_transform = Spectrogram()
+
+    epsilon = 1e-13
+    clean_spec = wandb.Image(spectrogram_transform(clean).log2()[0, :, :].numpy())
+    noisy_spec = wandb.Image((epsilon + spectrogram_transform(noisy)).log2()[0, :, :].numpy())
+    enhaced_spec = wandb.Image(spectrogram_transform(enhanced).log2()[0, :, :].numpy())
+    pesq, stoi = metrics
+    noisy_snr = get_snr(noisy, noisy - clean).item()
+    enhanced_snr = get_snr(enhanced, enhanced - clean).item()
+
+    clean_sr = args.experiment.sample_rate
+
+    clean_wandb_audio = wandb.Audio(clean.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_clean')
+    noisy_wandb_audio = wandb.Audio(noisy.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_noisy')
+    enhanced_wandb_audio = wandb.Audio(enhanced.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_enhanced')
+
+    wandb_table.add_data(filename, clean_wandb_audio, clean_spec, noisy_wandb_audio, noisy_spec, enhanced_wandb_audio,
+                         enhaced_spec, noisy_snr, enhanced_snr, pesq, stoi)
