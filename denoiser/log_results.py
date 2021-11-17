@@ -84,7 +84,6 @@ def init_wandb_table():
 
 
 def add_data_to_wandb_table(signals, metrics, filename, args, wandb_table):
-    logger.info(f'adding {filename} to wandb table.')
     clean, noisy, enhanced = signals
 
     spectrogram_transform = Spectrogram()
