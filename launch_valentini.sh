@@ -9,8 +9,8 @@
 python train.py \
   dset=valentini_dummy \
   experiment=demucs_1 \
-  epochs=5 \
-  eval_every=2 \
+  epochs=1 \
+
 
 
 

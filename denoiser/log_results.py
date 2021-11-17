@@ -8,7 +8,13 @@ from .evaluate import get_metrics, get_snr, upsample_noisy, pad_signals_to_noisy
 from .audio import find_audio_files
 
 import logging
+
+from .utils import convert_spectrogram_to_heatmap
+
 logger = logging.getLogger(__name__)
+
+import cv2
+import numpy as np
 
 
 def create_results_df(args):
@@ -84,9 +90,12 @@ def add_data_to_wandb_table(signals, metrics, filename, args, wandb_table):
     spectrogram_transform = Spectrogram()
 
     epsilon = 1e-13
-    clean_spec = wandb.Image(spectrogram_transform(clean).log2()[0, :, :].numpy())
-    noisy_spec = wandb.Image((epsilon + spectrogram_transform(noisy)).log2()[0, :, :].numpy())
-    enhaced_spec = wandb.Image(spectrogram_transform(enhanced).log2()[0, :, :].numpy())
+    clean_spectrogram = spectrogram_transform(clean).log2()[0, :, :].numpy()
+    noisy_spectrogram = (epsilon + spectrogram_transform(noisy)).log2()[0, :, :].numpy()
+    enhanced_spectrogram = spectrogram_transform(enhanced).log2()[0, :, :].numpy()
+    clean_wandb_spec = wandb.Image(convert_spectrogram_to_heatmap(clean_spectrogram))
+    noisy_wandb_spec = wandb.Image(convert_spectrogram_to_heatmap(noisy_spectrogram))
+    enhaced_wandb_spec = wandb.Image(convert_spectrogram_to_heatmap(enhanced_spectrogram))
     pesq, stoi = metrics
     noisy_snr = get_snr(noisy, noisy - clean).item()
     enhanced_snr = get_snr(enhanced, enhanced - clean).item()
@@ -97,5 +106,5 @@ def add_data_to_wandb_table(signals, metrics, filename, args, wandb_table):
     noisy_wandb_audio = wandb.Audio(noisy.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_noisy')
     enhanced_wandb_audio = wandb.Audio(enhanced.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_enhanced')
 
-    wandb_table.add_data(filename, clean_wandb_audio, clean_spec, noisy_wandb_audio, noisy_spec, enhanced_wandb_audio,
-                         enhaced_spec, noisy_snr, enhanced_snr, pesq, stoi)
+    wandb_table.add_data(filename, clean_wandb_audio, clean_wandb_spec, noisy_wandb_audio, noisy_wandb_spec, enhanced_wandb_audio,
+                         enhaced_wandb_spec, noisy_snr, enhanced_snr, pesq, stoi)

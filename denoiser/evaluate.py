@@ -19,7 +19,7 @@ import torch
 from .enhance import get_estimate
 from . import distrib
 from .resample import upsample2
-from .utils import bold, LogProgress
+from .utils import bold, LogProgress, convert_spectrogram_to_heatmap
 
 logger = logging.getLogger(__name__)
 
@@ -74,12 +74,13 @@ def evaluate(args, model, data_loader, epoch):
 
 def log_to_wandb(signal, pesq, stoi, snr, filename, epoch, sr):
     spectrogram_transform = Spectrogram()
-    enhanced_spectrogram = wandb.Image(spectrogram_transform(signal).log2()[0, :, :].numpy(), caption=filename)
+    enhanced_spectrogram = spectrogram_transform(signal).log2()[0, :, :].numpy()
+    enhanced_spectrogram_wandb_image = wandb.Image(convert_spectrogram_to_heatmap(enhanced_spectrogram), caption=filename)
     enhanced_wandb_audio = wandb.Audio(signal.squeeze().numpy(), sample_rate=sr, caption=filename)
     wandb.log({f'test samples/{filename}/pesq': pesq,
                f'test samples/{filename}/stoi': stoi,
                f'test samples/{filename}/snr': snr,
-               f'test samples/{filename}/spectrogram': enhanced_spectrogram,
+               f'test samples/{filename}/spectrogram': enhanced_spectrogram_wandb_image,
                f'test samples/{filename}/audio': enhanced_wandb_audio},
               step=epoch)
 
