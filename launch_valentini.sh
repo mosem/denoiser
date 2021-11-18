@@ -7,11 +7,8 @@
 # authors: adiyoss and adefossez
 
 python train.py \
-  dset=valentini_dummy \
-  experiment=demucs_1 \
-  epochs=1 \
-
-
-
+  dset=valentini \
+  experiment=example_file \
+  experiment.scale_factor=2 \
 
 
