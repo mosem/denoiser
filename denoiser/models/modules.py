@@ -24,14 +24,15 @@ class BLSTM(nn.Module):
             self.linear = nn.Linear(2 * dim, dim)
 
     def forward(self, x, hidden=None):
+        x = x.permute(2, 0, 1)
         x, hidden = self.lstm(x, hidden)
         if self.linear:
             x = self.linear(x)
-        return x, hidden
+        x = x.permute(1, 2, 0)
+        return x
 
 
 # Caunet related
-
 
 class TorchSignalToFrames(object):
     r"""Chunks a tensor into frames
