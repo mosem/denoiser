@@ -7,7 +7,6 @@
 
 import math
 
-import torch
 from torch import nn
 
 from denoiser.models.modules import BLSTM, MRF
