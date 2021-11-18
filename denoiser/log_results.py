@@ -13,9 +13,6 @@ from .utils import convert_spectrogram_to_heatmap
 
 logger = logging.getLogger(__name__)
 
-import cv2
-import numpy as np
-
 
 def create_results_df(args):
     wandb_table = init_wandb_table()
