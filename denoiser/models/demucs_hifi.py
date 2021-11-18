@@ -7,6 +7,7 @@
 
 import math
 
+import torch
 from torch import nn
 
 from denoiser.models.modules import BLSTM, MRF
@@ -182,8 +183,9 @@ class DemucsHifi(nn.Module):
         for encode in self.encoder:
             x = encode(x)
             skips.append(x)
-
-        x = self.lstm(x)
+        x = x.permute(2, 0, 1)
+        x, _ = self.lstm(x)
+        x = x.permute(1, 2, 0)
 
         # embedded dim creation
         if self.include_ft:
