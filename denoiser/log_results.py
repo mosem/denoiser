@@ -13,10 +13,22 @@ from .utils import convert_spectrogram_to_heatmap
 
 logger = logging.getLogger(__name__)
 
+RESULTS_DF_FILENAME = 'filename'
+RESULTS_DF_NOISY_SNR = 'noisy snr'
+RESULTS_DF_ENHANCED_SNR = 'enhanced snr'
+RESULTS_DF_PESQ = 'pesq'
+RESULTS_DF_STOI = 'stoi'
+
+HISTOGRAM_DF_RANGE = 'range'
+HISTOGRAM_DF_N_SAMPLES = 'n_samples'
+HISTOGRAM_DF_AVG_PESQ = 'avg pesq'
+HISTOGRAM_DF_AVG_STOI = 'avg stoi'
+
 
 def create_results_df(args):
     wandb_table = init_wandb_table()
-    df = pd.DataFrame(columns=['filename', 'snr', 'enhanced snr', 'pesq', 'stoi'])
+    df = pd.DataFrame(columns=[RESULTS_DF_FILENAME, RESULTS_DF_NOISY_SNR, RESULTS_DF_ENHANCED_SNR, RESULTS_DF_PESQ,
+                               RESULTS_DF_STOI])
     files = find_audio_files(args.samples_dir, progress=False)
     clean_paths = [str(data[0]) for data in files if '_clean' in str(data[0])]
     noisy_paths = [str(data[0]) for data in files if '_noisy' in str(data[0])]
@@ -46,8 +58,9 @@ def create_results_df(args):
 
 
 def create_results_histogram_df(results_df, n_bins):
-    results_histogram_df = pd.DataFrame(columns=['range', 'n_samples','avg pesq', 'avg stoi'])
-    bin_indices, bins = pd.cut(results_df['snr'], n_bins, labels=False, retbins=True, right=False)
+    results_histogram_df = pd.DataFrame(columns=[HISTOGRAM_DF_RANGE, HISTOGRAM_DF_N_SAMPLES, HISTOGRAM_DF_AVG_PESQ,
+                                                 HISTOGRAM_DF_AVG_STOI])
+    bin_indices, bins = pd.cut(results_df[RESULTS_DF_NOISY_SNR], n_bins, labels=False, retbins=True, right=False)
     for i in range(n_bins):
         bin_range = (float("{:.2f}".format(bins[i])), float("{:.2f}".format(bins[i + 1])))
         n_samples_per_bin = len(bin_indices[bin_indices == i])
@@ -61,7 +74,8 @@ def log_results(args):
     logger.info('logging results...')
     results_out_path = 'results.csv'
     if os.path.isfile(results_out_path):
-        results_df = pd.read_csv(results_out_path)
+        logger.info('results.csv file already exists.')
+        results_df = pd.read_csv(results_out_path, index_col=False)
     else:
         results_df = create_results_df(args)
         results_df.to_csv(results_out_path)
@@ -71,6 +85,8 @@ def log_results(args):
     if not os.path.isfile(histogram_out_path):
         results_histogram_df = create_results_histogram_df(results_df, n_bins)
         results_histogram_df.to_csv(histogram_out_path)
+    else:
+        logger.info('histogram file already exists.')
 
 
 def init_wandb_table():
@@ -102,5 +118,5 @@ def add_data_to_wandb_table(signals, metrics, filename, args, wandb_table):
     noisy_wandb_audio = wandb.Audio(noisy.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_noisy')
     enhanced_wandb_audio = wandb.Audio(enhanced.squeeze().numpy(), sample_rate=clean_sr, caption=filename + '_enhanced')
 
-    wandb_table.add_data(filename, clean_wandb_audio, clean_wandb_spec, noisy_wandb_audio, noisy_wandb_spec, enhanced_wandb_audio,
-                         enhaced_wandb_spec, noisy_snr, enhanced_snr, pesq, stoi)
+    wandb_table.add_data(filename, clean_wandb_audio, clean_wandb_spec, noisy_wandb_audio, noisy_wandb_spec,
+                         enhanced_wandb_audio, enhaced_wandb_spec, noisy_snr, enhanced_snr, pesq, stoi)

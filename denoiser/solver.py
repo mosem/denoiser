@@ -24,6 +24,18 @@ from .log_results import log_results
 
 logger = logging.getLogger(__name__)
 
+SERIALIZE_KEY_MODELS = 'models'
+SERIALIZE_KEY_OPTIMIZERS = 'optimizers'
+SERIALIZE_KEY_HISTORY = 'history'
+SERIALIZE_KEY_STATE = 'state'
+SERIALIZE_KEY_BEST_STATES = 'best_states'
+SERIALIZE_KEY_ARGS = 'args'
+
+METRICS_KEY_EVALUATION_LOSS = 'evaluation_loss'
+METRICS_KEY_BEST_LOSS = 'best_loss'
+METRICS_KEY_PESQ = 'total pesq'
+METRICS_KEY_STOI = 'total stoi'
+
 
 class Solver(object):
     def __init__(self, data, batch_solver, args):
@@ -60,10 +72,10 @@ class Solver(object):
 
     def _serialize(self):
         package = {}
-        package['models'], package['optimizers'] = self.batch_solver.serialize()
-        package['history'] = self.history
-        package['best_states'] = self.best_states
-        package['args'] = self.args
+        package[SERIALIZE_KEY_MODELS], package[SERIALIZE_KEY_OPTIMIZERS] = self.batch_solver.serialize()
+        package[SERIALIZE_KEY_HISTORY] = self.history
+        package[SERIALIZE_KEY_BEST_STATES] = self.best_states
+        package[SERIALIZE_KEY_ARGS] = self.args
         tmp_path = str(self.checkpoint_file) + ".tmp"
         torch.save(package, tmp_path)
         # renaming is sort of atomic on UNIX (not really true on NFS)
@@ -71,9 +83,9 @@ class Solver(object):
         os.rename(tmp_path, self.checkpoint_file)
 
         # Saving only the latest best model.
-        models = package['models']
-        for model_name, best_state in package['best_states'].items():
-            models[model_name]['state'] = best_state
+        models = package[SERIALIZE_KEY_MODELS]
+        for model_name, best_state in package[SERIALIZE_KEY_BEST_STATES].items():
+            models[model_name][SERIALIZE_KEY_STATE] = best_state
             model_filename = model_name + '_' + self.best_file.name
             tmp_path = os.path.join(self.best_file.parent, model_filename) + ".tmp"
             torch.save(models[model_name], tmp_path)
@@ -98,8 +110,8 @@ class Solver(object):
             package = torch.load(load_from, 'cpu')
             self.batch_solver.load(package, load_best)
             if keep_history:
-                self.history = package['history']
-            self.best_states = package['best_states']
+                self.history = package[SERIALIZE_KEY_HISTORY]
+            self.best_states = package[SERIALIZE_KEY_BEST_STATES]
 
     def train(self):
         # Optimizing the model
@@ -147,8 +159,8 @@ class Solver(object):
                 valid_losses = {}
                 evaluation_loss = 0
 
-            best_loss = min(pull_metric(self.history, 'evaluation_loss') + [evaluation_loss])
-            metrics = {**losses, **valid_losses, 'evaluation_loss': evaluation_loss, 'best_loss': best_loss}
+            best_loss = min(pull_metric(self.history, METRICS_KEY_EVALUATION_LOSS) + [evaluation_loss])
+            metrics = {**losses, **valid_losses, METRICS_KEY_EVALUATION_LOSS: evaluation_loss, METRICS_KEY_BEST_LOSS: best_loss}
             # Save the best model
             if evaluation_loss == best_loss:
                 logger.info(bold('New best evaluation loss %.4f'), evaluation_loss)
@@ -165,7 +177,7 @@ class Solver(object):
                 with torch.no_grad():
                     pesq, stoi = evaluate(self.args, generator, self.tt_loader, epoch)
 
-                    metrics.update({'total pesq': pesq, 'total stoi': stoi})
+                    metrics.update({METRICS_KEY_PESQ: pesq, METRICS_KEY_STOI: stoi})
 
                 # enhance some samples
                 logger.info('Enhance and save samples...')
