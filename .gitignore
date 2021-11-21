@@ -16,3 +16,6 @@ dset_related_scripts/
 run_scripts/
 /launch_valentini.sh
 /wandb_keys.json
+/test_data/
+.idea/
+/test_data/
