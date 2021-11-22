@@ -29,9 +29,66 @@ def rescale_module(module, reference):
             rescale_conv(sub, reference)
 
 
+class DemucsDecoderWithMRF(nn.Module):
+
+    def __init__(self,
+                 chout=1,
+                 hidden=48,
+                 depth=5,
+                 kernel_size=8,
+                 stride=4,
+                 growth=2,
+                 max_hidden=10_000,
+                 glu=True,
+                 num_mrfs=1,
+                 resblock=1,
+                 resblock_kernel_sizes=(3, 7, 11),
+                 resblock_dilation_sizes=((1, 3, 5), (1, 3, 5), (1, 3, 5))):
+
+        super().__init__()
+        self.decoder = nn.ModuleList()
+        activation = nn.GLU(1) if glu else nn.ReLU()
+        ch_scale = 2 if glu else 1
+
+        # hifi related
+        self.num_mrfs = num_mrfs
+
+        mrf_counter = 0
+        for index in range(depth):
+
+            decode = []
+            decode += [
+                nn.Conv1d(hidden, ch_scale * hidden, 1), activation,
+                nn.ConvTranspose1d(hidden, chout, kernel_size, stride)
+            ]
+
+            if mrf_counter < num_mrfs:
+                decode += [nn.ReLU(), MRF(resblock_kernel_sizes, resblock_dilation_sizes, chout, resblock)]
+                mrf_counter += 1
+
+            if index > 0:
+                decode.append(nn.ReLU())
+            self.decoder.insert(0, nn.Sequential(*decode))
+            chout = hidden
+            hidden = min(int(growth * hidden), max_hidden)
+
+    def forward(self, x, skips=None):
+        for decode in self.decoder:
+            if skips is not None:
+                skip = skips.pop(-1)
+                x = x + skip[..., :x.shape[-1]]
+            x = decode(x)
+        if self.resample == 2:
+            x = downsample2(x)
+        elif self.resample == 4:
+            x = downsample2(x)
+            x = downsample2(x)
+        return x
+
+
+
 class DemucsHifi(nn.Module):
     """
-    Demucs speech enhancement model.
     Args:
         - chin (int): number of input channels.
         - chout (int): number of output channels.
@@ -200,8 +257,6 @@ class DemucsHifi(nn.Module):
         elif self.resample == 4:
             x = downsample2(x)
             x = downsample2(x)
-        else:
-            pass
         if self.include_ft:
             return std * x, ft
         return std * x
