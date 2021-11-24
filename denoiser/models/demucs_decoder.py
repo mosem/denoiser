@@ -42,7 +42,6 @@ class DemucsDecoder(nn.Module):
                  max_hidden=10_000,
                  glu=True,
                  rescale=0.1,
-                 floor=1e-3,
                  scale_factor=1):
 
         super().__init__()
@@ -54,7 +53,6 @@ class DemucsDecoder(nn.Module):
         self.depth = depth
         self.kernel_size = kernel_size
         self.stride = stride
-        self.floor = floor
         self.resample = resample
         self.scale_factor = scale_factor
 

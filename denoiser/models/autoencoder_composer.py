@@ -5,12 +5,13 @@ from denoiser.utils import capture_init
 class Autoencoder(nn.Module):
 
     @capture_init
-    def __init__(self, encoder, attention_module, decoder, skips, normalize):
+    def __init__(self, encoder, attention_module, decoder, skips, normalize, floor=1e-3):
         super().__init__()
         self.encoder = encoder
         self.attention_module = attention_module
         self.decoder = decoder
         self.skips = skips
+        self.floor = floor
         self.normalize = normalize
 
     def estimate_valid_length(self, input_length):

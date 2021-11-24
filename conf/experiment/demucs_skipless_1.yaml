@@ -11,8 +11,10 @@ batch_size: 16
 
 scale_factor: 2
 
-skips: false
-normalize: true
+autoencoder:
+  skips: false
+  normalize: true
+  floor: 1e-3
 
 # models related
 model: demucs_skipless
@@ -20,7 +22,6 @@ demucs_encoder:
   chin: 1
   hidden: 48
   max_hidden: 10000
-  floor: 1e-3
   glu: true
   depth: 5
   kernel_size: 8
@@ -35,7 +36,6 @@ demucs_decoder:
   chout: 1
   hidden: 48
   max_hidden: 10000
-  floor: 1e-3
   glu: true
   depth: 5
   kernel_size: 8
