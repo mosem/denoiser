@@ -40,7 +40,6 @@ class DemucsDecoder(nn.Module):
                  resample=4,
                  growth=2,
                  max_hidden=10_000,
-                 normalize=True,
                  glu=True,
                  rescale=0.1,
                  floor=1e-3,
@@ -57,7 +56,6 @@ class DemucsDecoder(nn.Module):
         self.stride = stride
         self.floor = floor
         self.resample = resample
-        self.normalize = normalize
         self.scale_factor = scale_factor
 
         self.decoder = nn.ModuleList()
@@ -98,12 +96,6 @@ class DemucsDecoder(nn.Module):
         if signal.dim() == 2:
             signal = signal.unsqueeze(1)
 
-        if self.normalize:
-            mono = signal.mean(dim=1, keepdim=True)
-            std = mono.std(dim=-1, keepdim=True)
-            signal = signal / (self.floor + std)
-        else:
-            std = 1
         x = signal
 
         for decode in self.decoder:
@@ -120,4 +112,4 @@ class DemucsDecoder(nn.Module):
         else:
             pass
 
-        return std * x
+        return x
