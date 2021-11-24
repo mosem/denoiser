@@ -1,3 +1,4 @@
+# @package experiment
 experiment_name: demucs_skipless_1
 
 # Dataset related
@@ -11,6 +12,7 @@ batch_size: 16
 scale_factor: 2
 
 skips: false
+normalize: true
 
 # models related
 model: demucs_skipless
@@ -23,7 +25,6 @@ demucs_encoder:
   depth: 5
   kernel_size: 8
   stride: ${experiment.stride}
-  normalize: true
   resample: 1
   growth: 2
   rescale: 0.1
@@ -39,7 +40,6 @@ demucs_decoder:
   depth: 5
   kernel_size: 8
   stride: ${experiment.stride}
-  normalize: true
   resample: 1
   growth: 2
   rescale: 0.1

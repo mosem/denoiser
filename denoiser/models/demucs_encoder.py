@@ -40,7 +40,6 @@ class DemucsEncoder(nn.Module):
                  resample=4,
                  growth=2,
                  max_hidden=10_000,
-                 normalize=True,
                  glu=True,
                  rescale=0.1,
                  floor=1e-3,
@@ -58,7 +57,6 @@ class DemucsEncoder(nn.Module):
         self.stride = stride
         self.floor = floor
         self.resample = resample
-        self.normalize = normalize
         self.scale_factor = scale_factor
         self.skips = skips
 
@@ -106,12 +104,6 @@ class DemucsEncoder(nn.Module):
         if signal.dim() == 2:
             signal = signal.unsqueeze(1)
 
-        if self.normalize:
-            mono = signal.mean(dim=1, keepdim=True)
-            std = mono.std(dim=-1, keepdim=True)
-            signal = signal / (self.floor + std)
-        else:
-            std = 1
         x = signal
 
         if self.scale_factor == 2:
@@ -131,9 +123,9 @@ class DemucsEncoder(nn.Module):
                 x = encode(x)
                 skips_signals.append(x)
 
-            return std * x, skips_signals
+            return x, skips_signals
 
         else:
             for encode in self.encoder:
                 x = encode(x)
-            return std * x
+            return x
