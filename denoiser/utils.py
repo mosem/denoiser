@@ -10,7 +10,10 @@ import logging
 from contextlib import contextmanager
 import inspect
 import time
+
+import cv2
 from torch.nn.utils import weight_norm
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -180,3 +183,10 @@ def apply_weight_norm(m):
 
 def get_padding(kernel_size, dilation=1):
     return int((kernel_size*dilation - dilation)/2)
+
+
+def convert_spectrogram_to_heatmap(spectrogram):
+    spectrogram = (255 * (spectrogram - np.min(spectrogram)) / np.ptp(spectrogram)).astype(np.uint8).squeeze()
+    heatmap = cv2.applyColorMap(spectrogram, cv2.COLORMAP_INFERNO)
+    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
+    return heatmap

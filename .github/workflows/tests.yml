@@ -8,6 +8,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      WANDB_MODE: disabled
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-python@v2

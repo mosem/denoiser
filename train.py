@@ -6,14 +6,17 @@
 # LICENSE file in the root directory of this source tree.
 # authors: adiyoss and adefossez
 import logging
-import math
 import os
 import hydra
+import wandb
 
 from denoiser.executor import start_ddp_workers
 from denoiser.batch_solvers.batch_solver_factory import BatchSolverFactory
 
 logger = logging.getLogger(__name__)
+
+WANDB_PROJECT_NAME = 'Coupling Speech Denoising and Bandwidth Extension'
+WANDB_ENTITY = 'huji-dl-audio-lab'
 
 def run(args):
     import torch
@@ -27,6 +30,7 @@ def run(args):
     torch.manual_seed(args.seed)
 
     batch_solver = BatchSolverFactory.get_bs(args)
+    wandb.watch(tuple(batch_solver.get_models().values()), log=args.wandb.log, log_freq=args.wandb.log_freq)
 
     if args.show:
             logger.info(batch_solver)
@@ -65,6 +69,14 @@ def run(args):
     solver.train()
 
 
+def _get_wandb_config(args):
+    included_keys = ['eval_every', 'optim', 'lr', 'loss', 'epochs', 'num_workers']
+    wandb_config = {k: args[k] for k in included_keys}
+    wandb_config.update(**args.experiment)
+    wandb_config.update({'train': args.dset.train, 'test': args.dset.test, 'valid': args.dset.valid})
+    wandb_config.update({'remix': args.remix, 'bandmask': args.bandmask, 'shift': args.shift, 'revecho': args.revecho})
+    return wandb_config
+
 def _main(args):
     global __file__
     # Updating paths in config
@@ -78,6 +90,7 @@ def _main(args):
 
     logger.info("For logs, checkpoints and samples check %s", os.getcwd())
     logger.debug(args)
+    wandb.init(project=WANDB_PROJECT_NAME, entity=WANDB_ENTITY, config=_get_wandb_config(args), group=args.experiment.experiment_name)
     if args.ddp and args.rank is None:
         start_ddp_workers()
     else:
