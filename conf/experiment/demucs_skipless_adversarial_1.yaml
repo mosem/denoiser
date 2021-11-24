@@ -11,9 +11,10 @@ batch_size: 16
 
 scale_factor: 2
 
-skips: false
-normalize: true
-floor: 1e-3
+autoencoder:
+  skips: false
+  normalize: true
+  floor: 1e-3
 
 # models related
 model: demucs_skipless
