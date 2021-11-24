@@ -21,7 +21,7 @@ class BatchSolverFactory:
                 encoder = DemucsEncoder(**args.experiment.demucs_encoder)
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
                 decoder = DemucsDecoder(**args.experiment.demucs_decoder)
-                generator = Autoencoder(encoder, attention, decoder, args.experiment.skips, args.experiment.normalize)
+                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder)
             elif args.experiment.model == "demucs_with_transformer":
                 encoder = DemucsEncoder(**args.experiment.demucs_encoder)
                 attention = OneDimDualTransformer(dim=encoder.get_n_chout(), **args.experiment.transformer)
@@ -48,7 +48,7 @@ class BatchSolverFactory:
                 encoder = DemucsEncoder(**args.experiment.demucs_encoder)
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
                 decoder = DemucsDecoder(**args.experiment.demucs_decoder)
-                generator = Autoencoder(encoder, attention, decoder, args.experiment.skips, args.experiment.normalize)
+                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder)
                 return GeneratorBS(args, generator)
             elif args.experiment.model == "demucs_with_transformer":
                 encoder = DemucsEncoder(**args.experiment.demucs_encoder)
