@@ -50,6 +50,12 @@ class BatchSolverFactory:
                 decoder = DemucsDecoder(**args.experiment.demucs_decoder)
                 generator = Autoencoder(encoder, attention, decoder, args.experiment.skips, args.experiment.normalize)
                 return GeneratorBS(args, generator)
+            elif args.experiment.model == "demucs_with_transformer":
+                encoder = DemucsEncoder(**args.experiment.demucs_encoder)
+                attention = OneDimDualTransformer(dim=encoder.get_n_chout(), **args.experiment.transformer)
+                decoder = DemucsDecoder(**args.experiment.demucs_decoder)
+                generator = Autoencoder(encoder, attention, decoder, args.experiment.skips, args.experiment.normalize)
+                return GeneratorBS(args, generator)
             elif args.experiment.model == "seanet":
                 generator = Seanet(**args.experiment.seanet)
                 return GeneratorBS(args, generator)
