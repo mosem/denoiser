@@ -42,8 +42,7 @@ class DemucsEncoder(nn.Module):
                  max_hidden=10_000,
                  glu=True,
                  rescale=0.1,
-                 scale_factor=1,
-                 skips=False):
+                 scale_factor=1):
 
         super().__init__()
         if resample not in [1, 2, 4]:
