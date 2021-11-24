@@ -25,8 +25,8 @@ n_bins: 10
 # Checkpointing, by default automatically load last checkpoint
 checkpoint: true
 continue_from: '' # Path the a checkpoint.th file to start from.
-                  # this is not used in the name of the experiment!
-                  # so use a dummy=something not to mixup experiment.
+# this is not used in the name of the experiment!
+# so use a dummy=something not to mixup experiment.
 continue_best: false  # continue from best, not last state if continue_from is set.
 restart: false # Ignore existing checkpoints
 checkpoint_file: checkpoint.th
@@ -66,9 +66,8 @@ world_size:
 # Hydra config
 hydra:
   run:
-    dir: ./outputs/${hydra.job.name}/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ./outputs/${experiment.experiment_name}_${now:%Y-%m-%d_%H-%M-%S}
   job:
-    name: ${experiment.experiment_name}
     config:
       # configuration for the ${hydra.job.override_dirname} runtime variable
       override_dirname:
