@@ -70,7 +70,7 @@ def run(args):
 
 
 def _get_wandb_config(args):
-    included_keys = ['dset', 'eval_every', 'optim', 'lr', 'loss', 'epochs', 'num_workers']
+    included_keys = ['eval_every', 'optim', 'lr', 'loss', 'epochs', 'num_workers']
     wandb_config = {k: args[k] for k in included_keys}
     wandb_config.update(**args.experiment)
     wandb_config.update({'train': args.dset.train, 'test': args.dset.test, 'valid': args.dset.valid})
