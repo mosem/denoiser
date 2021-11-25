@@ -14,6 +14,11 @@ scale_factor: 2
 
 # models related
 model: demucs_hifi
+autoencoder:
+  skips: True
+  normalize: True
+  floor: 1e-3
+
 demucs:
   chin: 1
   chout: 1
@@ -30,7 +35,7 @@ demucs:
   growth: 2
   rescale: 0.1
   scale_factor: ${experiment.scale_factor}
-  skips: True
+  skips: ${experiment.autoencoder.skips}
 
 mrf:
   num_mrfs: 0
