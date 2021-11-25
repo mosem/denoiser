@@ -7,7 +7,7 @@ from torch.nn import Conv1d, functional as F, Conv2d, AvgPool1d
 from torch.nn.utils import weight_norm, spectral_norm
 
 from denoiser.models.dataclasses import FeaturesConfig
-from denoiser.utils import get_padding
+from denoiser.utils import get_padding, capture_init
 
 
 class HifiDiscriminatorP(torch.nn.Module):
@@ -136,6 +136,7 @@ class HifiMultiScaleDiscriminator(torch.nn.Module):
 
 
 class HifiJointDiscriminator(nn.Module):
+    @capture_init
     def __init__(self, device='cuda', l1_factor=45, gen_factor=2, ft_conf: FeaturesConfig=None):
         super().__init__()
         self.mpd = HifiMultiPeriodDiscriminator().to(device)
