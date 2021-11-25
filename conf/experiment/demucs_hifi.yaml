@@ -14,7 +14,7 @@ scale_factor: 2
 
 # models related
 model: demucs_hifi
-demucs_hifi:
+demucs:
   chin: 1
   chout: 1
   hidden: 48
@@ -30,11 +30,13 @@ demucs_hifi:
   growth: 2
   rescale: 0.1
   scale_factor: ${experiment.scale_factor}
-  # hifi related
+  skips: True
+
+mrf:
   num_mrfs: 0
   resblock: 1
-  resblock_kernel_sizes: [3,7,11]
-  resblock_dilation_sizes: [[1,3,5], [1,3,5], [1,3,5]]
+  resblock_kernel_sizes: [ 3,7,11 ]
+  resblock_dilation_sizes: [ [ 1,3,5 ], [ 1,3,5 ], [ 1,3,5 ] ]
   include_ft: False
 
 demucs_hifi_bs:
@@ -45,6 +47,7 @@ demucs_hifi_bs:
   disc_first_epoch: 0
 
 features_model:
+  include_ft: False
   feature_model: 'hubert'
   state_dict_path: '/cs/labs/adiyoss/shared/pretrained_weights/hubert/hubert_base_ls960.pt'
   features_factor: 0.01

@@ -1,10 +1,11 @@
 import math
-
 from torch import nn
 
+from denoiser.models.dataclasses import DemucsConfig
 from denoiser.models.demucs import  rescale_module
 from denoiser.resample import upsample2
 from denoiser.utils import capture_init
+
 
 class DemucsEncoder(nn.Module):
     """
@@ -31,53 +32,41 @@ class DemucsEncoder(nn.Module):
     """
 
     @capture_init
-    def __init__(self,
-                 chin=1,
-                 hidden=48,
-                 depth=5,
-                 kernel_size=8,
-                 stride=4,
-                 resample=4,
-                 growth=2,
-                 max_hidden=10_000,
-                 glu=True,
-                 rescale=0.1,
-                 scale_factor=1,
-                 skips=False):
+    def __init__(self,demucs_conf: DemucsConfig):
 
         super().__init__()
-        if resample not in [1, 2, 4]:
+        if demucs_conf.resample not in [1, 2, 4]:
             raise ValueError("Resample should be 1, 2 or 4.")
 
-        self.chin = chin
-        self.hidden = hidden
-        self.depth = depth
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.resample = resample
-        self.scale_factor = scale_factor
-        self.skips = skips
+        self.chin = demucs_conf.chin
+        self.hidden = demucs_conf.hidden
+        self.depth = demucs_conf.depth
+        self.kernel_size = demucs_conf.kernel_size
+        self.stride = demucs_conf.stride
+        self.resample = demucs_conf.resample
+        self.scale_factor = demucs_conf.scale_factor
+        self.skips = demucs_conf.skips
 
         self.encoder = nn.ModuleList()
-        activation = nn.GLU(1) if glu else nn.ReLU()
-        ch_scale = 2 if glu else 1
+        activation = nn.GLU(1) if demucs_conf.glu else nn.ReLU()
+        ch_scale = 2 if demucs_conf.glu else 1
 
-        for index in range(depth):
+        for index in range(demucs_conf.depth):
             encode = []
             encode += [
-                nn.Conv1d(chin, hidden, kernel_size, stride),
+                nn.Conv1d(chin, hidden, demucs_conf.kernel_size, demucs_conf.stride),
                 nn.ReLU(),
                 nn.Conv1d(hidden, hidden * ch_scale, 1), activation,
             ]
             self.encoder.append(nn.Sequential(*encode))
 
             chin = hidden
-            hidden = min(int(growth * hidden), max_hidden)
+            hidden = min(int(demucs_conf.growth * hidden), demucs_conf.max_hidden)
 
         self.n_chout = chin
 
-        if rescale:
-            rescale_module(self, reference=rescale)
+        if demucs_conf.rescale:
+            rescale_module(self, reference=demucs_conf.rescale)
 
     def get_n_chout(self):
         return self.n_chout

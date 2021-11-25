@@ -1,10 +1,11 @@
 import math
-
 from torch import nn
-
 from denoiser.models.demucs import rescale_module
+from denoiser.models.dataclasses import DemucsConfig, MRFConfig
+from denoiser.models.modules import MRF
 from denoiser.resample import downsample2
 from denoiser.utils import capture_init
+
 
 class DemucsDecoder(nn.Module):
     """
@@ -31,49 +32,38 @@ class DemucsDecoder(nn.Module):
     """
 
     @capture_init
-    def __init__(self,
-                 chout=1,
-                 hidden=48,
-                 depth=5,
-                 kernel_size=8,
-                 stride=4,
-                 resample=4,
-                 growth=2,
-                 max_hidden=10_000,
-                 glu=True,
-                 rescale=0.1,
-                 scale_factor=1):
+    def __init__(self,demucs_conf: DemucsConfig):
 
         super().__init__()
-        if resample not in [1, 2, 4]:
+        if demucs_conf.resample not in [1, 2, 4]:
             raise ValueError("Resample should be 1, 2 or 4.")
 
-        self.chout = chout
-        self.hidden = hidden
-        self.depth = depth
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.resample = resample
-        self.scale_factor = scale_factor
+        self.chout = demucs_conf.chout
+        self.hidden = demucs_conf.hidden
+        self.depth = demucs_conf.depth
+        self.kernel_size = demucs_conf.kernel_size
+        self.stride = demucs_conf.stride
+        self.resample = demucs_conf.resample
+        self.scale_factor = demucs_conf.scale_factor
 
         self.decoder = nn.ModuleList()
-        activation = nn.GLU(1) if glu else nn.ReLU()
-        ch_scale = 2 if glu else 1
+        activation = nn.GLU(1) if demucs_conf.glu else nn.ReLU()
+        ch_scale = 2 if demucs_conf.glu else 1
 
-        for index in range(depth):
+        for index in range(demucs_conf.depth):
             decode = []
             decode += [
                 nn.Conv1d(hidden, ch_scale * hidden, 1), activation,
-                nn.ConvTranspose1d(hidden, chout, kernel_size, stride),
+                nn.ConvTranspose1d(hidden, chout, demucs_conf.kernel_size, demucs_conf.stride),
             ]
             if index > 0:
                 decode.append(nn.ReLU())
             self.decoder.insert(0, nn.Sequential(*decode))
             chout = hidden
-            hidden = min(int(growth * hidden), max_hidden)
+            hidden = min(int(demucs_conf.growth * hidden), demucs_conf.max_hidden)
 
-        if rescale:
-            rescale_module(self, reference=rescale)
+        if demucs_conf.rescale:
+            rescale_module(self, reference=demucs_conf.rescale)
 
     def estimate_output_length(self, input_length):
         """
@@ -107,7 +97,35 @@ class DemucsDecoder(nn.Module):
         elif self.resample == 4:
             x = downsample2(x)
             x = downsample2(x)
-        else:
-            pass
 
         return x
+
+
+class DemucsDecoderWithMRF(DemucsDecoder):
+
+    def __init__(self, demucs_conf: DemucsConfig, mrf_conf: MRFConfig):
+
+        super().__init__(demucs_conf)
+        self.decoder = nn.ModuleList()
+        activation = nn.GLU(1) if demucs_conf.glu else nn.ReLU()
+        ch_scale = 2 if demucs_conf.glu else 1
+
+        # hifi related
+        self.num_mrfs = mrf_conf.num_mrfs
+
+        mrf_counter = 0
+        for index in range(demucs_conf.depth):
+            decode = []
+            decode += [
+                nn.Conv1d(hidden, ch_scale * hidden, 1), activation,
+                nn.ConvTranspose1d(hidden, chout, demucs_conf.kernel_size, demucs_conf.stride)
+            ]
+            if mrf_counter < mrf_conf.num_mrfs:
+                decode += [nn.ReLU(), MRF(mrf_conf.resblock_kernel_sizes, mrf_conf.resblock_dilation_sizes, chout, mrf_conf.resblock)]
+                mrf_counter += 1
+
+            if index > 0:
+                decode.append(nn.ReLU())
+            self.decoder.insert(0, nn.Sequential(*decode))
+            chout = hidden
+            hidden = min(int(demucs_conf.growth * hidden), demucs_conf.max_hidden)
