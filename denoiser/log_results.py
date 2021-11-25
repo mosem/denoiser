@@ -1,8 +1,10 @@
+import math
 import os
 import pandas as pd
 import torchaudio
 import wandb
 from torchaudio.transforms import Spectrogram
+import numpy as np
 
 from .evaluate import get_metrics, get_snr, upsample_noisy, pad_signals_to_noisy_length, logger
 from .audio import find_audio_files
@@ -12,6 +14,8 @@ import logging
 from .utils import convert_spectrogram_to_heatmap
 
 logger = logging.getLogger(__name__)
+
+SPECTOGRAM_EPSILON = 1e-13
 
 RESULTS_DF_FILENAME = 'filename'
 RESULTS_DF_NOISY_SNR = 'noisy snr'
@@ -23,6 +27,10 @@ HISTOGRAM_DF_RANGE = 'range'
 HISTOGRAM_DF_N_SAMPLES = 'n_samples'
 HISTOGRAM_DF_AVG_PESQ = 'avg pesq'
 HISTOGRAM_DF_AVG_STOI = 'avg stoi'
+
+DEFAULT_HISTOGRAM_MAX_SNR = 40.0
+
+WANDB_CUSTOM_CHART_NAME = "huji-dl-audio-lab/non-sorted-bar-chart"
 
 
 def create_results_df(args):
@@ -57,18 +65,53 @@ def create_results_df(args):
     return df
 
 
+def get_histogram_intervals(max_snr_value, n_bins):
+    step_size = DEFAULT_HISTOGRAM_MAX_SNR / n_bins
+    max_snr_value = max(max_snr_value, DEFAULT_HISTOGRAM_MAX_SNR)
+    intervals = np.arange(max_snr_value + 1e-3, step=step_size)
+    while intervals[-1] < max_snr_value:
+        intervals = np.append(intervals, intervals[-1]+step_size)
+    return intervals
+
+
 def create_results_histogram_df(results_df, n_bins):
     results_histogram_df = pd.DataFrame(columns=[HISTOGRAM_DF_RANGE, HISTOGRAM_DF_N_SAMPLES, HISTOGRAM_DF_AVG_PESQ,
                                                  HISTOGRAM_DF_AVG_STOI])
-    bin_indices, bins = pd.cut(results_df[RESULTS_DF_NOISY_SNR], n_bins, labels=False, retbins=True, right=False)
-    for i in range(n_bins):
+    noisy_snr_values = results_df[RESULTS_DF_NOISY_SNR]
+    bin_indices, bins = pd.cut(noisy_snr_values, get_histogram_intervals(noisy_snr_values.max(), n_bins),
+                               labels=False, retbins=True, right=False)
+    wandb_ranges = []
+    n_samples_per_bin = []
+    wandb_pesq = []
+    wandb_stoi = []
+    total_n_samples = 0
+    for i in range(len(bins)-1):
         bin_range = (float("{:.2f}".format(bins[i])), float("{:.2f}".format(bins[i + 1])))
-        n_samples_per_bin = len(bin_indices[bin_indices == i])
+        wandb_ranges.append(', '.join(str(x) for x in bin_range))
+        n_samples_per_bin_i = len(bin_indices[bin_indices == i])
+        n_samples_per_bin.append(n_samples_per_bin_i)
+        total_n_samples += n_samples_per_bin_i
         bin_avg_pesq = results_df.pesq[bin_indices == i].mean()
         bin_avg_stoi = results_df.stoi[bin_indices == i].mean()
-        results_histogram_df.loc[i] = [bin_range, n_samples_per_bin, bin_avg_pesq, bin_avg_stoi]
+        bin_avg_pesq = 0 if math.isnan(bin_avg_pesq) else bin_avg_pesq
+        bin_avg_stoi = 0 if math.isnan(bin_avg_stoi) else bin_avg_stoi
+        wandb_pesq.append(bin_avg_pesq)
+        wandb_stoi.append(bin_avg_stoi)
+        results_histogram_df.loc[i] = [bin_range, n_samples_per_bin_i, bin_avg_pesq, bin_avg_stoi]
+    log_wandb_bar_chart([[wandb_range, pesq, n_samples_per_bin_i] for (wandb_range, pesq, n_samples_per_bin_i)
+                                                                in zip(wandb_ranges, wandb_pesq, n_samples_per_bin)],
+                        ['ranges', 'pesq', 'n_samples_per_bin_i'], 'pesq_table', 'Average PESQ per SNR range')
+    log_wandb_bar_chart([[wandb_range, stoi, n_samples_per_bin_i] for (wandb_range, stoi, n_samples_per_bin_i)
+                                                                in zip(wandb_ranges, wandb_stoi, n_samples_per_bin)],
+                        ['ranges', 'stoi', 'n_samples_per_bin_i'], 'stoi_table', 'Average STOI per SNR range')
     return results_histogram_df
 
+
+def log_wandb_bar_chart(data, column_names, table_name, title):
+    table = wandb.Table(data=data, columns=column_names)
+    fields = {"label": column_names[0], "value": column_names[1]}
+    custom_chart = wandb.plot_table(WANDB_CUSTOM_CHART_NAME, table, fields, {"title": title})
+    wandb.log({table_name: custom_chart})
 
 def log_results(args):
     logger.info('logging results...')
@@ -101,9 +144,8 @@ def add_data_to_wandb_table(signals, metrics, filename, args, wandb_table):
 
     spectrogram_transform = Spectrogram()
 
-    epsilon = 1e-13
     clean_spectrogram = spectrogram_transform(clean).log2()[0, :, :].numpy()
-    noisy_spectrogram = (epsilon + spectrogram_transform(noisy)).log2()[0, :, :].numpy()
+    noisy_spectrogram = (SPECTOGRAM_EPSILON + spectrogram_transform(noisy)).log2()[0, :, :].numpy()
     enhanced_spectrogram = spectrogram_transform(enhanced).log2()[0, :, :].numpy()
     clean_wandb_spec = wandb.Image(convert_spectrogram_to_heatmap(clean_spectrogram))
     noisy_wandb_spec = wandb.Image(convert_spectrogram_to_heatmap(noisy_spectrogram))
