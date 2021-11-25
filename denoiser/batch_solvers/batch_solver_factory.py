@@ -3,7 +3,7 @@ from denoiser.batch_solvers.generator_bs import GeneratorBS
 from denoiser.batch_solvers.adversarial_bs import AdversarialBS
 from denoiser.models.demucs_decoder import DemucsDecoder
 from denoiser.models.demucs_encoder import DemucsEncoder
-from denoiser.models.modules import Discriminator, LaplacianDiscriminator, BLSTM
+from denoiser.models.modules import Discriminator, LaplacianDiscriminator, BLSTM, OneDimDualTransformer
 from denoiser.models.demucs import Demucs
 from denoiser.models.caunet import Caunet
 from denoiser.models.seanet import Seanet
@@ -20,6 +20,11 @@ class BatchSolverFactory:
             elif args.experiment.model == "demucs_skipless":
                 encoder = DemucsEncoder(**args.experiment.demucs_encoder)
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
+                decoder = DemucsDecoder(**args.experiment.demucs_decoder)
+                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder)
+            elif args.experiment.model == "demucs_with_transformer":
+                encoder = DemucsEncoder(**args.experiment.demucs_encoder)
+                attention = OneDimDualTransformer(dim=encoder.get_n_chout(), **args.experiment.transformer)
                 decoder = DemucsDecoder(**args.experiment.demucs_decoder)
                 generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder)
             elif args.experiment.model == "seanet":
@@ -42,6 +47,12 @@ class BatchSolverFactory:
             elif args.experiment.model == "demucs_skipless":
                 encoder = DemucsEncoder(**args.experiment.demucs_encoder)
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
+                decoder = DemucsDecoder(**args.experiment.demucs_decoder)
+                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder)
+                return GeneratorBS(args, generator)
+            elif args.experiment.model == "demucs_with_transformer":
+                encoder = DemucsEncoder(**args.experiment.demucs_encoder)
+                attention = OneDimDualTransformer(dim=encoder.get_n_chout(), **args.experiment.transformer)
                 decoder = DemucsDecoder(**args.experiment.demucs_decoder)
                 generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder)
                 return GeneratorBS(args, generator)

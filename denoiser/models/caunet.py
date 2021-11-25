@@ -1,7 +1,7 @@
 import math
 import torch
 import torch.nn as nn
-from denoiser.models.modules import TorchSignalToFrames, TorchOLA, Dual_Transformer
+from denoiser.models.modules import TorchSignalToFrames, TorchOLA, DualTransformer
 from denoiser.resample import upsample2
 from denoiser.utils import capture_init
 
@@ -143,7 +143,7 @@ class Caunet(nn.Module):
             encoder_input_size = encoder_output_size
 
 
-        self.dual_transformer = Dual_Transformer(self.hidden, self.hidden, nhead=4, num_layers=6)
+        self.dual_transformer = DualTransformer(self.hidden, self.hidden, nhead=4, num_layers=6)
 
         self.out_conv = nn.Conv2d(in_channels=self.hidden, out_channels=self.out_channels, kernel_size=(1, 1))
         self.ola = TorchOLA(self.frame_shift)
