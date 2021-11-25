@@ -103,7 +103,6 @@ class TorchSignalToFrames(object):
         return a
 
 
-
 class TorchOLA(nn.Module):
     r"""Performs overlap-and-add on gpu using torch tensor
         required input is tensor
