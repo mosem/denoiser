@@ -11,4 +11,3 @@ python train.py \
   experiment=example_file \
   experiment.scale_factor=2 \
 
-

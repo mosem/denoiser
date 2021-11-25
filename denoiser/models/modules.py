@@ -14,6 +14,9 @@ from denoiser.models.hifi_gan_loss_functions import LRELU_SLOPE
 from denoiser.utils import get_padding, init_weights, capture_init
 from denoiser.resample import downsample2, upsample2
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Demucs related
 
 class BLSTM(nn.Module):
@@ -25,11 +28,16 @@ class BLSTM(nn.Module):
         if bi:
             self.linear = nn.Linear(2 * dim, dim)
 
+    def estimate_output_length(self, length):
+        return length
+
     def forward(self, x, hidden=None):
+        x = x.permute(2, 0, 1)
         x, hidden = self.lstm(x, hidden)
         if self.linear:
             x = self.linear(x)
-        return x, hidden
+        x = x.permute(1, 2, 0)
+        return x
 
 
 # Caunet related
