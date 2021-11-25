@@ -65,7 +65,7 @@ class BatchSolverFactory:
                 generator = Caunet(**args.experiment.caunet)
                 return GeneratorBS(args, generator)
             elif args.experiment.model == "demucs_hifi":
-                encoder = DemucsEncoder(DemucsConfig(**args.experiment.demucs_encoder))
+                encoder = DemucsEncoder(DemucsConfig(**args.experiment.demucs))
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
                 decoder = DemucsDecoderWithMRF(DemucsConfig(**args.experiment.demucs), MRFConfig(**args.experiment.mrf))
                 generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder)
