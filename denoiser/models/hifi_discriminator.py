@@ -136,7 +136,7 @@ class HifiMultiScaleDiscriminator(torch.nn.Module):
 
 
 class HifiJointDiscriminator(nn.Module):
-    def __init__(self, device='cuda', l1_factor=45, gen_factor=2, ft_conf:FeaturesConfig=None):
+    def __init__(self, device='cuda', l1_factor=45, gen_factor=2, ft_conf: FeaturesConfig=None):
         super().__init__()
         self.mpd = HifiMultiPeriodDiscriminator().to(device)
         self.msd = HifiMultiScaleDiscriminator().to(device)
