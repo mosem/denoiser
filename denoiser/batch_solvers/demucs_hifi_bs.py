@@ -8,6 +8,7 @@ import torchaudio
 
 from denoiser.batch_solvers.batch_solver import BatchSolver
 from denoiser.models.autoencoder_composer import Autoencoder
+from denoiser.models.dataclasses import FeaturesConfig
 
 from denoiser.stft_loss import MultiResolutionSTFTLoss
 from denoiser.utils import load_lexical_model
@@ -20,11 +21,11 @@ D_OPT = "discriminator optimizer"
 
 class DemucsHifiBS(BatchSolver):
 
-    def __init__(self, args, generator, discriminator, features_config=None):
+    def __init__(self, args, generator, discriminator, features_config: FeaturesConfig=None):
         super(DemucsHifiBS, self).__init__(args)
         self.device = args.device
         self.include_disc = args.experiment.demucs_hifi_bs.include_disc
-        self.include_ft = args.experiment.demucs_hifi.include_ft
+        self.include_ft = features_config.include_ft if features_config is not None else False
 
         self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
                                                   factor_mag=args.stft_mag_factor).to(self.device)
