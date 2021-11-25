@@ -143,7 +143,7 @@ class HifiJointDiscriminator(nn.Module):
         self.include_ft = ft_conf.include_ft if ft_conf is not None else False
         self.ft_conf = ft_conf
         self.l1_factor = l1_factor
-        self.ft_factor = gen_factor
+        self.gen_factor = gen_factor
 
     def forward(self, clean, predicted):
         if self.include_ft:
