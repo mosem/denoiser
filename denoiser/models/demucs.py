@@ -9,6 +9,7 @@ import math
 
 from torch import nn
 
+from denoiser.models.dataclasses import DemucsConfig
 from denoiser.models.modules import BLSTM
 from denoiser.resample import downsample2, upsample2
 from denoiser.utils import capture_init
@@ -52,48 +53,35 @@ class Demucs(nn.Module):
 
     """
     @capture_init
-    def __init__(self,
-                 chin=1,
-                 chout=1,
-                 hidden=48,
-                 depth=5,
-                 kernel_size=8,
-                 stride=4,
-                 causal=True,
-                 resample=4,
-                 growth=2,
-                 max_hidden=10_000,
-                 normalize=True,
-                 glu=True,
-                 rescale=0.1,
-                 floor=1e-3,
-                 scale_factor=1):
+    def __init__(self,demucs_conf: DemucsConfig):
 
         super().__init__()
-        if resample not in [1, 2, 4]:
+        if demucs_conf.resample not in [1, 2, 4]:
             raise ValueError("Resample should be 1, 2 or 4.")
 
-        self.chin = chin
-        self.chout = chout
-        self.hidden = hidden
-        self.depth = depth
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.causal = causal
-        self.floor = floor
-        self.resample = resample
-        self.normalize = normalize
-        self.scale_factor = scale_factor
+        self.chin = demucs_conf.chin
+        self.chout = demucs_conf.chout
+        self.hidden = demucs_conf.hidden
+        self.depth = demucs_conf.depth
+        self.kernel_size = demucs_conf.kernel_size
+        self.stride = demucs_conf.stride
+        self.causal = demucs_conf.causal
+        self.floor = demucs_conf.floor
+        self.resample = demucs_conf.resample
+        self.normalize = demucs_conf.normalize
+        self.scale_factor = demucs_conf.scale_factor
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
-        activation = nn.GLU(1) if glu else nn.ReLU()
-        ch_scale = 2 if glu else 1
+        activation = nn.GLU(1) if demucs_conf.glu else nn.ReLU()
+        ch_scale = 2 if demucs_conf.glu else 1
 
-        for index in range(depth):
+        chin, hidden, chout = self.chin, self.hidden, self.chout
+
+        for index in range(demucs_conf.depth):
             encode = []
             encode += [
-                nn.Conv1d(chin, hidden, kernel_size, stride),
+                nn.Conv1d(chin, hidden, demucs_conf.kernel_size, demucs_conf.stride),
                 nn.ReLU(),
                 nn.Conv1d(hidden, hidden * ch_scale, 1), activation,
             ]
@@ -102,18 +90,18 @@ class Demucs(nn.Module):
             decode = []
             decode += [
                 nn.Conv1d(hidden, ch_scale * hidden, 1), activation,
-                nn.ConvTranspose1d(hidden, chout, kernel_size, stride),
+                nn.ConvTranspose1d(hidden, chout, demucs_conf.kernel_size, demucs_conf.stride),
             ]
             if index > 0:
                 decode.append(nn.ReLU())
             self.decoder.insert(0, nn.Sequential(*decode))
             chout = hidden
             chin = hidden
-            hidden = min(int(growth * hidden), max_hidden)
+            hidden = min(int(demucs_conf.growth * hidden), demucs_conf.max_hidden)
 
-        self.lstm = BLSTM(chin, bi=not causal)
-        if rescale:
-            rescale_module(self, reference=rescale)
+        self.lstm = BLSTM(chin, bi=not demucs_conf.causal)
+        if demucs_conf.rescale:
+            rescale_module(self, reference=demucs_conf.rescale)
 
     def estimate_valid_length(self, length):
         """
