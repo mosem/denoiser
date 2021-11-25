@@ -50,6 +50,7 @@ class DemucsEncoder(nn.Module):
         self.encoder = nn.ModuleList()
         activation = nn.GLU(1) if demucs_conf.glu else nn.ReLU()
         ch_scale = 2 if demucs_conf.glu else 1
+        chin, hidden, chout = self.chin, self.hidden, self.chout
 
         for index in range(demucs_conf.depth):
             encode = []
