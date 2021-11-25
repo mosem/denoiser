@@ -280,23 +280,28 @@ class DualTransformer(nn.Module):
 
 # HiFi related
 class MRF(torch.nn.Module):
-    def __init__(self, resblock_kernel_sizes, resblock_dilation_sizes, channels, resblock=1):
+    def __init__(self, resblock_kernel_sizes, resblock_dilation_sizes, channels, resblock=1, sequential=True):
         super().__init__()
         self.r = HifiResBlock1 if resblock == 1 else HifiResBlock2
         self.resblocks = nn.ModuleList()
         self.num_kernels = len(resblock_kernel_sizes)
         for k, d in zip(resblock_kernel_sizes, resblock_dilation_sizes):
             self.resblocks.append(self.r(channels, k, d))
+        self.sequential = sequential
 
     def forward(self, x):
-        xs = None
-        for j in range(self.num_kernels):
-            if xs is None:
-                xs = self.resblocks[j](x)
-            else:
-                xs += self.resblocks[j](x)
-        x = xs + x
-        x = x / (self.num_kernels + 1)
+        if self.sequential:
+            for r in self.resblocks:
+                x = r(x)
+        else:
+            xs = None
+            for j in range(self.num_kernels):
+                if xs is None:
+                    xs = self.resblocks[j](x)
+                else:
+                    xs += self.resblocks[j](x)
+            x = xs + x
+            x = x / (self.num_kernels + 1)
         return x
 
 
@@ -312,6 +317,7 @@ class HifiResBlock1(torch.nn.Module):
                                padding=get_padding(kernel_size, dilation[2]))
         ])
 
+        kernel_size = 1
         self.convs2 = nn.ModuleList([
             Conv1d(channels, channels, kernel_size, 1, dilation=1,
                                padding=get_padding(kernel_size, 1)),
@@ -326,7 +332,7 @@ class HifiResBlock1(torch.nn.Module):
             xt = nn.ReLU()(x)
             xt = c1(xt)
             xt = nn.ReLU()(xt)
-            x = c2(xt)
+            x = c2(xt) + x
         return x
 
 
@@ -343,7 +349,7 @@ class HifiResBlock2(torch.nn.Module):
     def forward(self, x):
         for c in self.convs:
             xt = nn.ReLU()(x)
-            x = c(xt)
+            x = c(xt) + x
         return x
 
 
