@@ -12,6 +12,9 @@ from torch.nn.modules.normalization import LayerNorm
 from denoiser.utils import get_padding, init_weights, capture_init
 from denoiser.resample import downsample2, upsample2
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Demucs related
 
 class BLSTM(nn.Module):
@@ -23,11 +26,46 @@ class BLSTM(nn.Module):
         if bi:
             self.linear = nn.Linear(2 * dim, dim)
 
+    def estimate_output_length(self, length):
+        return length
+
     def forward(self, x, hidden=None):
+        x = x.permute(2, 0, 1)
         x, hidden = self.lstm(x, hidden)
         if self.linear:
             x = self.linear(x)
-        return x, hidden
+        x = x.permute(1, 2, 0)
+        return x
+
+
+class OneDimDualTransformer(nn.Module):
+    def __init__(self, dim,
+                 frame_size=8,
+                 n_head=4,
+                 n_layers=6):
+        super().__init__()
+        self.dim = dim
+        self.frame_size = frame_size
+        self.frame_shift = frame_size // 2
+        self.n_head = n_head
+        self.n_layers = n_layers
+
+        self.signalPreProcessor = TorchSignalToFrames(frame_size=self.frame_size,
+                                                      frame_shift=self.frame_shift)
+        self.attention = DualTransformer(dim, dim, nhead=self.n_head,
+                                         num_layers=self.n_layers)
+        self.ola = TorchOLA(self.frame_shift)
+
+    def estimate_output_length(self, length):
+        n_frames = math.ceil((length - self.frame_size) / self.frame_shift + 1)
+        length = (n_frames - 1) * self.frame_shift + self.frame_size
+        return length
+
+    def forward(self, x):
+        x = self.signalPreProcessor(x)
+        x = self.attention(x)
+        x = self.ola(x)
+        return x
 
 
 # Caunet related
@@ -174,7 +212,7 @@ class TransformerEncoderLayer(Module):
         return src
 
 
-class Dual_Transformer(nn.Module):
+class DualTransformer(nn.Module):
     """
     Deep duaL-path RNN.
     args:
@@ -189,7 +227,7 @@ class Dual_Transformer(nn.Module):
     """
 
     def __init__(self, input_size, output_size, nhead=4, dropout=0, num_layers=1):
-        super(Dual_Transformer, self).__init__()
+        super(DualTransformer, self).__init__()
 
         self.input_size = input_size
         self.output_size = output_size

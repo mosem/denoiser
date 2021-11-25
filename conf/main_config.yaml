@@ -25,8 +25,8 @@ n_bins: 10
 # Checkpointing, by default automatically load last checkpoint
 checkpoint: true
 continue_from: '' # Path the a checkpoint.th file to start from.
-                  # this is not used in the name of the experiment!
-                  # so use a dummy=something not to mixup experiment.
+# this is not used in the name of the experiment!
+# so use a dummy=something not to mixup experiment.
 continue_best: false  # continue from best, not last state if continue_from is set.
 restart: false # Ignore existing checkpoints
 checkpoint_file: checkpoint.th
@@ -42,6 +42,12 @@ dummy:  # use this if you want twice the same exp, with a different name
 pesq: True # compute pesq?
 eval_every: 10  # compute test metrics every so epochs
 streaming: False  # use streaming evaluation for Demucs
+
+#wand_b
+wandb:
+  log: all # gradients/parameters/all/None
+  log_freq: 5
+  n_files_to_log: 10 # number or -1 for all files
 
 # Optimization related
 optim: adam
@@ -66,7 +72,7 @@ world_size:
 # Hydra config
 hydra:
   run:
-    dir: ./outputs/${experiment.experiment_name}_${hydra.job.override_dirname}
+    dir: ./outputs/${experiment.experiment_name}_${now:%Y-%m-%d_%H-%M-%S}
   job:
     config:
       # configuration for the ${hydra.job.override_dirname} runtime variable

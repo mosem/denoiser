@@ -10,7 +10,10 @@ import logging
 from contextlib import contextmanager
 import inspect
 import time
+
+import cv2
 from torch.nn.utils import weight_norm
+import numpy as np
 
 from denoiser.models.hubert import huBERT
 
@@ -184,10 +187,8 @@ def get_padding(kernel_size, dilation=1):
     return int((kernel_size*dilation - dilation)/2)
 
 
-def load_lexical_model(model_name, lexical_path, device="cuda"):
-    if model_name == 'hubert':
-        ret = huBERT(lexical_path, 6)
-        ret.model.to(device)
-        return ret
-    else:
-        logger.error("Unknown model.")
+def convert_spectrogram_to_heatmap(spectrogram):
+    spectrogram = (255 * (spectrogram - np.min(spectrogram)) / np.ptp(spectrogram)).astype(np.uint8).squeeze()
+    heatmap = cv2.applyColorMap(spectrogram, cv2.COLORMAP_INFERNO)
+    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
+    return heatmap
