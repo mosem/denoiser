@@ -7,7 +7,7 @@
 # authors: adiyoss and adefossez
 
 python train.py \
-  dset=valentini \
-  experiment=example_file \
+  dset=valentini_dummy \
+  experiment=demucs_seanet_skipless_adversarial_1 \
   experiment.scale_factor=2 \
 

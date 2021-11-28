@@ -8,6 +8,7 @@ from denoiser.models.demucs import Demucs
 from denoiser.models.caunet import Caunet
 from denoiser.models.seanet import Seanet
 from denoiser.models.autoencoder_composer import Autoencoder
+from denoiser.models.seanet_decoder import SeanetDecoder
 
 
 class BatchSolverFactory:
@@ -31,6 +32,11 @@ class BatchSolverFactory:
                 generator = Seanet(**args.experiment.seanet)
             elif args.experiment.model == "caunet":
                 generator = Caunet(**args.experiment.caunet)
+            elif args.experiment.model == "demucs_seanet_hybrid":
+                encoder = DemucsEncoder(**args.experiment.demucs_encoder)
+                attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
+                decoder = SeanetDecoder(**args.experiment.seanet_decoder)
+                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder)
             else:
                 raise ValueError("Given model name is not supported")
 
