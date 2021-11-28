@@ -14,7 +14,7 @@ class Autoencoder(nn.Module):
         self.floor = floor
         self.normalize = normalize
 
-    def estimate_valid_length(self, input_length):
+    def estimate_output_length(self, input_length):
         encoder_output_length = self.encoder.estimate_output_length(input_length)
         attention_output_length = self.attention_module.estimate_output_length(encoder_output_length)
         decoder_output_length = self.decoder.estimate_output_length(attention_output_length)

@@ -36,7 +36,7 @@ class DemucsHifiBS(BatchSolver):
             self.ft_model = None
             self.ft_factor = 0
 
-    def estimate_valid_length(self, input_length):
+    def estimate_output_length(self, input_length):
         return self._get_generator_model().estimate_valid_length(input_length)
 
     def get_generator_for_evaluation(self, best_states):
