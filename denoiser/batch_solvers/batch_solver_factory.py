@@ -1,4 +1,3 @@
-from denoiser.batch_solvers.demucs_hifi_bs import DemucsHifiBS
 from denoiser.batch_solvers.generator_bs import GeneratorBS
 from denoiser.batch_solvers.adversarial_bs import AdversarialBS
 from denoiser.models.dataclasses import FeaturesConfig
@@ -65,7 +64,5 @@ class BatchSolverFactory:
             elif args.experiment.model == "caunet":
                 generator = Caunet(**args.experiment.caunet)
                 return GeneratorBS(args, generator)
-            elif args.experiment.model == "demucs_hifi":
-                return DemucsHifiBS(args)
             else:
                 raise ValueError("Given model name is not supported")
