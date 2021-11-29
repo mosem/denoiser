@@ -9,7 +9,7 @@ class SeanetDecoder(nn.Module):
 
     @capture_init
     def __init__(self,
-                 latent_space_size=128,
+                 latent_space_size,
                  ngf=32, n_residual_layers=3,
                  resample=1,
                  ratios=[8, 8, 2, 2],

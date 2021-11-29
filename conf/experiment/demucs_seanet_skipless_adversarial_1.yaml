@@ -33,7 +33,7 @@ demucs_encoder:
   skips: ${experiment.autoencoder.skips}
 
 seanet_decoder:
-  latent_space_size: 128
+  latent_space_size: 768
   ngf: 32
   n_residual_layers: 3
   resample: 1
