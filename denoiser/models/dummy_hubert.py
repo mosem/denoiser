@@ -1,7 +1,7 @@
 import torch
 
 HUBERT_CH = 768
-HUBERT_TIME = 100
+HUBERT_TIME = 3995
 
 
 class DummyHubert(torch.nn.Module):
