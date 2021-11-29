@@ -71,7 +71,7 @@ class BatchSolver(ABC):
         pass
 
     @abstractmethod
-    def run(self, data, cross_valid=False):
+    def run(self, data, cross_valid=False, epoch=0):
         """
         run on single batch
         """
@@ -96,3 +96,4 @@ class BatchSolver(ABC):
             estimated_embedded_dim = F.interpolate(estimated_embedded_dim, y_ft.shape[-1]).permute(0, 2, 1)
             estimated_embedded_dim = F.interpolate(estimated_embedded_dim, y_ft.shape[-2]).permute(0, 2, 1)
             return F.l1_loss(y_ft, estimated_embedded_dim) * self.ft_factor
+

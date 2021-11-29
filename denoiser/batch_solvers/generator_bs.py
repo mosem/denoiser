@@ -36,7 +36,7 @@ class GeneratorBS(BatchSolver):
     def estimate_valid_length(self, input_length):
         return self._models[GENERATOR_KEY].estimate_valid_length(input_length)
 
-    def run(self, data, cross_valid=False):
+    def run(self, data, cross_valid=False, epoch=0):
         noisy, clean = data
         estimate = self._models[GENERATOR_KEY](noisy)
         loss = self._get_loss(clean, estimate)
