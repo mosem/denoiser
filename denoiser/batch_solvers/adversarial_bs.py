@@ -28,12 +28,23 @@ class AdversarialBS(GeneratorBS):
         generator = self._models[GENERATOR_KEY]
         discriminator = self._models[DISCRIMINATOR_KEY]
 
-        estimate = generator(noisy)
+        prediction = generator(noisy)
+
+        # get features regularization loss if specified
+        if self.include_ft:
+            estimate, features = prediction
+            features_loss = self.get_features_loss(features, prediction)
+        else:
+            estimate = prediction
+            features_loss = 0
+
         discriminator_fake_detached = discriminator(estimate.detach())
         discriminator_real = discriminator(clean)
         discriminator_fake = discriminator(estimate)
 
-        loss_discriminator = self._get_discriminator_loss(discriminator_fake_detached, discriminator_real)
+        loss_discriminator = features_loss + self._get_discriminator_loss(discriminator_fake_detached, discriminator_real)
+
+
 
         total_loss_generator = self._get_total_generator_loss(discriminator_fake, discriminator_real)
 

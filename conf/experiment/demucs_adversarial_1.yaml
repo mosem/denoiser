@@ -37,3 +37,9 @@ discriminator:
   num_D: 3
   downsampling_factor: 4
   ndf: 16
+
+features_model:
+  include_ft: False
+  feature_model: 'hubert'
+  state_dict_path: '/cs/labs/adiyoss/shared/pretrained_weights/hubert/hubert_base_ls960.pt'
+  features_factor: 0.01
