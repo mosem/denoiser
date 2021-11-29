@@ -1,4 +1,4 @@
-from denoiser.models.dataclasses import FeaturesConfig
+from dataclasses import dataclass
 
 @dataclass
 class FeaturesConfig:
