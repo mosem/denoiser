@@ -15,6 +15,8 @@ import cv2
 from torch.nn.utils import weight_norm
 import numpy as np
 
+from denoiser.models.hubert import huBERT
+
 logger = logging.getLogger(__name__)
 
 
@@ -190,3 +192,12 @@ def convert_spectrogram_to_heatmap(spectrogram):
     heatmap = cv2.applyColorMap(spectrogram, cv2.COLORMAP_INFERNO)
     heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
     return heatmap
+
+
+def load_lexical_model(model_name, lexical_path, device="cuda"):
+    if model_name.lower() == 'hubert':
+        ret = huBERT(lexical_path, 6)
+        ret.model.to(device)
+        return ret
+    else:
+        logger.error("Unknown model.")

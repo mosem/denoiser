@@ -1,14 +1,24 @@
 from abc import ABC, abstractmethod
 
-from denoiser.utils import serialize_model, copy_state
+import torch
+import torchaudio
+import torch.nn.functional as F
+from denoiser.utils import serialize_model, copy_state, load_lexical_model
+from denoiser.models.dataclasses import FeaturesConfig
+
 
 class BatchSolver(ABC):
-    @abstractmethod
-    def __init__(self, args):
+    def __init__(self, args, features_config: FeaturesConfig=None):
         self.args = args
         self._models = {}
         self._optimizers = {}
         self._losses_names = []
+        self.include_ft = features_config.include_ft if features_config is not None else False
+        if self.include_ft:
+            self.ft_model = load_lexical_model(features_config.feature_model,
+                                               features_config.state_dict_path,
+                                               args.device)
+            self.ft_factor = features_config.features_factor
 
     def train(self):
         for model in self.get_models().values():
@@ -76,3 +86,14 @@ class BatchSolver(ABC):
         loads the best state dict seen so far and returns a generator model ready for evaluation
         """
         pass
+
+    def get_features_loss(self, estimated_embedded_dim, signal_to_extract_features_from):
+        if not self.include_ft:
+            return 0
+        with torch.no_grad():
+            y_ft = self.ft_model.extract_feats(signal_to_extract_features_from)
+            x_ft = torchaudio.transforms.Resample(estimated_embedded_dim.shape[-1], y_ft.shape[-1]).to(self.args.device)(x_ft)
+            if x_ft.shape[-2] != y_ft.shape[-2]:
+                x_ft = torchaudio.transforms.Resample(x_ft.shape[-2], y_ft.shape[-2]).to(self.args.device)(
+                    x_ft.permute(0, 2, 1)).permute(0, 2, 1)
+            return F.l1_loss(y_ft, x_ft) * self.ft_factor
