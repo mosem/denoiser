@@ -90,10 +90,7 @@ def _main(args):
 
     logger.info("For logs, checkpoints and samples check %s", os.getcwd())
     logger.debug(args)
-    if 'WANDB_MODE' in os.environ.keys():
-        wandb_mode = os.environ['WANDB_MODE']
-    else:
-        wandb_mode = args.wandb.mode
+    wandb_mode = os.environ['WANDB_MODE'] if 'WANDB_MODE' in os.environ.keys() else args.wandb.mode
     wandb.init(mode=wandb_mode, project=WANDB_PROJECT_NAME, entity=WANDB_ENTITY, config=_get_wandb_config(args),
                group=args.experiment.experiment_name)
     if args.ddp and args.rank is None:
