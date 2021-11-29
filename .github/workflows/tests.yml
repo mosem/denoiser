@@ -25,12 +25,12 @@ jobs:
     - name: Demucs Adversarial with features regularization - dummy full pipeline
       run: |
         ./make_debug.sh
-        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_adversarial_1 experiment.demucs.hidden=1 experiment.demucs.depth=3 experiment.features_model.include_ft=True  experiment.features_model.state_dict_path=https://dl.fbaipublicfiles.com/hubert/hubert_base_ls960.pt
+        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_adversarial_1 experiment.demucs.hidden=1 experiment.demucs.depth=3 experiment.features_model.include_ft=True experiment.features_model.feature_model=dummy
 
     - name: Demucs with features regularization - dummy full pipeline
       run: |
         ./make_debug.sh
-        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_1 experiment.demucs.hidden=1 experiment.demucs.depth=3 experiment.features_model.include_ft=True
+        python train.py num_workers=1 device=cpu epochs=1 experiment=demucs_1 experiment.demucs.hidden=1 experiment.demucs.depth=3 experiment.features_model.include_ft=True experiment.features_model.feature_model=dummy
 
     - name: Demucs - dummy full pipeline
       run: |

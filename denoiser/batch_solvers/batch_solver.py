@@ -13,6 +13,7 @@ class BatchSolver(ABC):
         self._models = {}
         self._optimizers = {}
         self._losses_names = []
+        self.features_config = features_config
         self.include_ft = features_config.include_ft if features_config is not None else False
         if self.include_ft:
             self.ft_model = load_lexical_model(features_config.feature_model,
@@ -91,9 +92,9 @@ class BatchSolver(ABC):
         if not self.include_ft:
             return 0
         with torch.no_grad():
+            estimated_embedded_dim.permute(0, 2, 1)
             y_ft = self.ft_model.extract_feats(signal_to_extract_features_from)
-            x_ft = torchaudio.transforms.Resample(estimated_embedded_dim.shape[-1], y_ft.shape[-1]).to(self.args.device)(x_ft)
-            if x_ft.shape[-2] != y_ft.shape[-2]:
-                x_ft = torchaudio.transforms.Resample(x_ft.shape[-2], y_ft.shape[-2]).to(self.args.device)(
-                    x_ft.permute(0, 2, 1)).permute(0, 2, 1)
-            return F.l1_loss(y_ft, x_ft) * self.ft_factor
+            estimated_embedded_dim = (torchaudio.transforms.Resample(estimated_embedded_dim.shape[-1], y_ft.shape[-1]).to(self.args.device)(estimated_embedded_dim)).permute(0, 2, 1)
+            if estimated_embedded_dim.shape[-2] != y_ft.shape[-2]:
+                estimated_embedded_dim = torchaudio.transforms.Resample(estimated_embedded_dim.shape[-2], y_ft.shape[-2]).to(self.args.device)(estimated_embedded_dim.permute(0, 2, 1)).permute(0, 2, 1)
+            return F.l1_loss(y_ft, estimated_embedded_dim) * self.ft_factor
