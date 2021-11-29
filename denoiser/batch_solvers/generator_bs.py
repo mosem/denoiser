@@ -56,7 +56,7 @@ class GeneratorBS(BatchSolver):
     def _get_loss(self, clean, prediction):
         if self.include_ft:
             estimate, features = prediction
-            loss = self.get_features_loss(features, prediction)
+            loss = self.get_features_loss(features, clean)
         else:
             estimate = prediction
             loss = 0

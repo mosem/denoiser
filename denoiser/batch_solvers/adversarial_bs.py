@@ -33,7 +33,7 @@ class AdversarialBS(GeneratorBS):
         # get features regularization loss if specified
         if self.include_ft:
             estimate, features = prediction
-            features_loss = self.get_features_loss(features, prediction)
+            features_loss = self.get_features_loss(features, clean)
         else:
             estimate = prediction
             features_loss = 0
