@@ -16,13 +16,13 @@ class AdversarialBS(GeneratorBS):
         if torch.cuda.is_available():
             discriminator.cuda()
         self._models.update({DISCRIMINATOR_KEY: discriminator})
-
         disc_optimizer = torch.optim.Adam(discriminator.parameters(), lr=self.args.lr, betas=(0.9, self.args.beta2))
         self._optimizers.update(({DISCRIMINATOR_OPTIMIZER_KEY: disc_optimizer}))
         self._losses_names += [DISCRIMINATOR_KEY]
+        self.disc_first_epoch = args.experiment.discriminator_first_epoch if hasattr(args.experiment, "discriminator_first_epoch") else 0
 
 
-    def run(self, data, cross_valid=False):
+    def run(self, data, cross_valid=False, epoch=0):
         noisy, clean = data
 
         generator = self._models[GENERATOR_KEY]
@@ -38,24 +38,45 @@ class AdversarialBS(GeneratorBS):
             estimate = prediction
             features_loss = 0
 
-        discriminator_fake_detached = discriminator(estimate.detach())
-        discriminator_real = discriminator(clean)
-        discriminator_fake = discriminator(estimate)
+        if epoch >= self.disc_first_epoch:
+            discriminator_fake_detached = discriminator(estimate.detach())
+            discriminator_real = discriminator(clean)
+            discriminator_fake = discriminator(estimate)
 
-        loss_discriminator = features_loss + self._get_discriminator_loss(discriminator_fake_detached, discriminator_real)
+            loss_discriminator = features_loss + self._get_discriminator_loss(discriminator_fake_detached, discriminator_real)
 
+            total_loss_generator = self._get_total_generator_loss(discriminator_fake, discriminator_real)
 
+            losses_dict = {self._losses_names[0]: total_loss_generator.item(), self._losses_names[1]: loss_discriminator.item()}
 
-        total_loss_generator = self._get_total_generator_loss(discriminator_fake, discriminator_real)
+            losses = (total_loss_generator, loss_discriminator)
 
-        losses = {self._losses_names[0]: total_loss_generator.item(), self._losses_names[1]: loss_discriminator.item()}
+        # train all of the first epochs simply with an l1 loss
+        else:
+            loss = features_loss
+            if self.args.loss == 'l1':
+                loss += F.l1_loss(clean, estimate)
+            elif self.args.loss == 'l2':
+                loss += F.mse_loss(clean, estimate)
+            elif self.args.loss == 'huber':
+                loss += F.smooth_l1_loss(clean, estimate)
+            else:
+                raise ValueError(f"Invalid loss {self.args.loss}")
+            # MultiResolution STFT loss
+            if self.args.stft_loss:
+                sc_loss, mag_loss = self.mrstftloss(estimate.squeeze(1), clean.squeeze(1))
+                loss += sc_loss + mag_loss
+
+            losses_dict = {self._losses_names[0]: loss.item(), self._losses_names[1]: 0}
+            losses = (loss, 0)
 
         if not cross_valid:
-            self._optimize(total_loss_generator, loss_discriminator)
+            self._optimize(losses, epoch)
 
-        return losses
+        return losses_dict
 
-    def _optimize(self, total_loss_G, loss_D):
+    def _optimize(self, losses, epoch=0):
+        total_loss_G, loss_D = losses
         generator_optimizer = self._optimizers[GENERATOR_OPTIMIZER_KEY]
         discriminator_optimizer = self._optimizers[DISCRIMINATOR_OPTIMIZER_KEY]
 
@@ -63,9 +84,10 @@ class AdversarialBS(GeneratorBS):
         total_loss_G.backward()
         generator_optimizer.step()
 
-        discriminator_optimizer.zero_grad()
-        loss_D.backward()
-        discriminator_optimizer.step()
+        if epoch >= self.disc_first_epoch:
+            discriminator_optimizer.zero_grad()
+            loss_D.backward()
+            discriminator_optimizer.step()
 
     def _get_discriminator_loss(self, discriminator_fake, discriminator_real):
         discriminator_loss = 0

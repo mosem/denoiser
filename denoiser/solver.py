@@ -198,7 +198,6 @@ class Solver(object):
         if self.args.log_results:
             log_results(self.args)
 
-
     def _run_one_epoch(self, epoch, cross_valid=False):
         total_losses = {k:0 for k in self.batch_solver.get_losses_names()}
         data_loader = self.tr_loader if not cross_valid else self.cv_loader
@@ -216,7 +215,7 @@ class Solver(object):
             if not cross_valid:
                 noisy, clean = self.augment.augment_data(noisy, clean)
 
-            losses = self.batch_solver.run((noisy, clean), cross_valid)
+            losses = self.batch_solver.run((noisy, clean), cross_valid, epoch)
             for k in self.batch_solver.get_losses_names():
                 total_losses[k] += losses[k]
             losses_info = {k: format(v/(i+1), ".5f") for k,v in total_losses.items()}
