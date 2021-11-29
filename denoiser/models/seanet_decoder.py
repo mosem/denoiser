@@ -9,7 +9,7 @@ class SeanetDecoder(nn.Module):
 
     @capture_init
     def __init__(self,
-                 latent_space_size,
+                 n_in_channels,
                  ngf=32, n_residual_layers=3,
                  resample=1,
                  ratios=[8, 8, 2, 2],
@@ -27,7 +27,7 @@ class SeanetDecoder(nn.Module):
         decoder_wrapper_conv_layer = [
             nn.LeakyReLU(0.2),
             nn.ReflectionPad1d(3),
-            WNConv1d(latent_space_size, mult * ngf, kernel_size=7, padding=0),
+            WNConv1d(n_in_channels, mult * ngf, kernel_size=7, padding=0),
         ]
 
         self.decoder.append(nn.Sequential(*decoder_wrapper_conv_layer))

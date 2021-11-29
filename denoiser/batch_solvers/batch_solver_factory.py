@@ -68,6 +68,12 @@ class BatchSolverFactory:
             elif args.experiment.model == "caunet":
                 generator = Caunet(**args.experiment.caunet)
                 return GeneratorBS(args, generator)
+            elif args.experiment.model == "demucs_seanet_hybrid":
+                encoder = DemucsEncoder(**args.experiment.demucs_encoder)
+                attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
+                decoder = SeanetDecoder(**args.experiment.seanet_decoder)
+                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder)
+                return GeneratorBS(args, generator)
             elif args.experiment.model == "demucs_hifi":
                 return DemucsHifiBS(args)
             else:
