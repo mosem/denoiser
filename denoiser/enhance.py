@@ -51,9 +51,10 @@ def write(wav, filename, sr=16_000):
     torchaudio.save(filename, wav.cpu(), sr)
 
 
-def estimate_and_save(model, noisy_sigs, clean_sigs, raw_lengths_pairs, filenames, source_sr=16_000, target_sr=16_000):
+def estimate_and_save(model, noisy_sigs, clean_sigs, raw_lengths_pairs, filenames, source_sr=16_000, target_sr=16_000, include_ft=False):
     estimate_sigs = get_estimate(model, noisy_sigs)
-    save_wavs(noisy_sigs, clean_sigs, estimate_sigs, raw_lengths_pairs, filenames, source_sr=source_sr, target_sr=target_sr)
+    save_wavs(noisy_sigs, clean_sigs, estimate_sigs[0] if include_ft else estimate_sigs,
+              raw_lengths_pairs, filenames, source_sr=source_sr, target_sr=target_sr)
 
 
 def get_raw_lengths_dicts(args):
@@ -80,7 +81,7 @@ def enhance(args, model, out_dir, data_loader):
     if distrib.rank == 0:
         os.makedirs(out_dir, exist_ok=True)
     distrib.barrier()
-
+    include_ft = args.experiment.features_model.include_ft if hasattr(args.experiment, "features_model") else False
     noisy_json_dict, clean_json_dict = get_raw_lengths_dicts(args)
 
     with ProcessPoolExecutor(args.num_workers) as pool:
@@ -102,10 +103,11 @@ def enhance(args, model, out_dir, data_loader):
                                 noisy_sigs, clean_sigs,
                                 raw_lengths_pairs,
                                 basenames, noisy_sr,
-                                args.experiment.sample_rate))
+                                args.experiment.sample_rate,
+                                include_ft))
             else:
                 # Forward
-                estimate = get_estimate(model, noisy_sigs)
+                estimate = get_estimate(model, noisy_sigs)[0] if include_ft else get_estimate(model, noisy_sigs)
 
                 save_wavs(noisy_sigs, clean_sigs, estimate, raw_lengths_pairs, basenames,
                           source_sr=noisy_sr, target_sr=args.experiment.sample_rate)
