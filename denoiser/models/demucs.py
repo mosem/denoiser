@@ -9,6 +9,7 @@ import math
 
 from torch import nn
 
+from denoiser.models.dataclasses import FeaturesConfig
 from denoiser.models.modules import BLSTM
 from denoiser.resample import downsample2, upsample2
 from denoiser.utils import capture_init
@@ -67,7 +68,8 @@ class Demucs(nn.Module):
                  glu=True,
                  rescale=0.1,
                  floor=1e-3,
-                 scale_factor=1):
+                 scale_factor=1,
+                 include_ft_in_output=False):
 
         super().__init__()
         if resample not in [1, 2, 4]:
@@ -84,6 +86,7 @@ class Demucs(nn.Module):
         self.resample = resample
         self.normalize = normalize
         self.scale_factor = scale_factor
+        self.include_features_in_output = include_ft_in_output
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -161,7 +164,8 @@ class Demucs(nn.Module):
         for encode in self.encoder:
             x = encode(x)
             skips.append(x)
-        x = self.lstm(x)
+        latent = self.lstm(x)
+        x = latent
         for decode in self.decoder:
             skip = skips.pop(-1)
             x = x + skip[..., :x.shape[-1]]
@@ -174,4 +178,6 @@ class Demucs(nn.Module):
         else:
             pass
 
+        if self.include_features_in_output:
+            return std * x, latent
         return std * x
