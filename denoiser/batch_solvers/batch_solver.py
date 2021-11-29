@@ -94,6 +94,6 @@ class BatchSolver(ABC):
         with torch.no_grad():
             y_ft = self.ft_model.extract_feats(signal_to_extract_features_from)
             if estimated_embedded_dim.shape[-2] != y_ft.shape[-2]:
-                estimated_embedded_dim = (torchaudio.transforms.Resample(estimated_embedded_dim.shape[-2], y_ft.shape[-2]).to(self.args.device)(estimated_embedded_dim.permute(0, 2, 1))).permute(0, 2, 1)
+                estimated_embedded_dim = (torchaudio.transforms.Resample(estimated_embedded_dim.shape[-2], y_ft.shape[-2]).to(self.args.device)(estimated_embedded_dim.transpose(1, 2))).transpose(1, 2)
             length = min(y_ft.shape[-1], estimated_embedded_dim.shape[-1])
             return F.l1_loss(y_ft[...,:length], estimated_embedded_dim[...,:length]) * self.ft_factor
