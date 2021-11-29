@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class FeaturesConfig:
     include_ft: bool = False
     feature_model: str = 'hubert'
     state_dict_path: str = '/cs/labs/adiyoss/shared/pretrained_weights/hubert/hubert_base_ls960.pt'
     features_factor: float = 0.01
+
 
 @dataclass
 class DemucsConfig:
@@ -25,3 +27,12 @@ class DemucsConfig:
     rescale: float = 0.1
     scale_factor: int = 1
     skips: bool = False
+
+
+@dataclass
+class MelSpecConfig:
+    use_melspec: bool = False
+    sample_rate: int = 16000
+    n_fft: int = 512
+    n_mels: int = 128
+    hop_length: int = 256
