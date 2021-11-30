@@ -12,11 +12,13 @@ import wandb
 
 from denoiser.executor import start_ddp_workers
 from denoiser.batch_solvers.batch_solver_factory import BatchSolverFactory
+from denoiser.models.dataclasses import MelSpecConfig
 
 logger = logging.getLogger(__name__)
 
 WANDB_PROJECT_NAME = 'Coupling Speech Denoising and Bandwidth Extension'
 WANDB_ENTITY = 'huji-dl-audio-lab'
+
 
 def run(args):
     import torch
@@ -41,24 +43,26 @@ def run(args):
     assert args.experiment.batch_size % distrib.world_size == 0
     args.experiment.batch_size //= distrib.world_size
 
+    mel_config = MelSpecConfig(**args.experiment.mel) if hasattr(args.experiment, "mel") else None
+
     target_training_length = int(args.experiment.segment * args.experiment.sample_rate)
     training_stride = int(args.experiment.stride * args.experiment.sample_rate)
     kwargs = {"matching": args.dset.matching, "sample_rate": args.experiment.sample_rate}
     # Building datasets and loaders
     tr_dataset = NoisyCleanSet(args.dset.train, batch_solver.estimate_valid_length, clean_length=target_training_length,
-                               stride=training_stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, is_training=True,
-                               **kwargs)
+                               stride=training_stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor,
+                               is_training=True, **kwargs, mel_config=mel_config)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.experiment.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
         cv_dataset = NoisyCleanSet(args.dset.valid, batch_solver.estimate_valid_length,
-                                   scale_factor=args.experiment.scale_factor, **kwargs)
+                                   scale_factor=args.experiment.scale_factor, **kwargs, mel_config=mel_config)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         cv_loader = None
     if args.dset.test:
         tt_dataset = NoisyCleanSet(args.dset.test, batch_solver.estimate_valid_length,
-                                   scale_factor=args.experiment.scale_factor, with_path=True, **kwargs)
+                                   scale_factor=args.experiment.scale_factor, with_path=True, **kwargs, mel_config=mel_config)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         tt_loader = None
