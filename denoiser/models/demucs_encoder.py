@@ -5,6 +5,9 @@ from torch import nn
 from denoiser.models.demucs import  rescale_module
 from denoiser.resample import upsample2
 from denoiser.utils import capture_init
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DemucsEncoder(nn.Module):
     """
@@ -115,6 +118,7 @@ class DemucsEncoder(nn.Module):
         elif self.resample == 4:
             x = upsample2(x)
             x = upsample2(x)
+
         if self.skips:
             skips_signals = []
             for encode in self.encoder:
@@ -122,8 +126,8 @@ class DemucsEncoder(nn.Module):
                 skips_signals.append(x)
 
             return x, skips_signals
-
         else:
             for encode in self.encoder:
+                logger.info(f'x shape: {x.shape}')
                 x = encode(x)
             return x

@@ -90,7 +90,7 @@ def _main(args):
 
     logger.info("For logs, checkpoints and samples check %s", os.getcwd())
     logger.debug(args)
-    wandb.init(project=WANDB_PROJECT_NAME, entity=WANDB_ENTITY, config=_get_wandb_config(args), group=args.experiment.experiment_name)
+    wandb.init(mode="disabled",project=WANDB_PROJECT_NAME, entity=WANDB_ENTITY, config=_get_wandb_config(args), group=args.experiment.experiment_name)
     if args.ddp and args.rank is None:
         start_ddp_workers()
     else:

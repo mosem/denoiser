@@ -9,7 +9,8 @@ stride: 2    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
 batch_size: 2
 
-scale_factor: 2
+scale_factor: 1
+resample: 1
 
 autoencoder:
   skips: false
@@ -23,21 +24,21 @@ demucs_encoder:
   hidden: 12
   max_hidden: 10000
   glu: true
-  depth: 5
+  depth: 4
   kernel_size: 8
   stride: ${experiment.stride}
-  resample: 1
+  resample: ${experiment.resample}
   growth: 2
   rescale: 0.1
   scale_factor: ${experiment.scale_factor}
   skips: ${experiment.autoencoder.skips}
 
 seanet_decoder:
-  n_in_channels: 192
-  ngf: 8
+  n_in_channels: 96
+  ngf: 2
   n_residual_layers: 3
-  resample: 1
-  ratios: [ 8,8,2,2 ]
+  resample: ${experiment.resample}
+  ratios: [ 2,2,2,2 ]
   scale_factor: ${experiment.scale_factor}
 
 blstm:
