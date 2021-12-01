@@ -28,7 +28,7 @@ class Autoencoder(nn.Module):
         decoder_output_length = self.decoder.estimate_output_length(attention_output_length)
         logger.info(f'decoder_output_length: {decoder_output_length}')
         encoder_ratio = input_length / encoder_output_length
-        
+
         return decoder_output_length
 
     def forward(self, signal):
