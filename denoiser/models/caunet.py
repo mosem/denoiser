@@ -157,7 +157,7 @@ class Caunet(nn.Module):
             valid_frame_size = (valid_frame_size + 2 * self.padding_size - self.kernel[1] + 1) * self.stride_size
         return valid_frame_size
 
-    def estimate_valid_length(self, length):
+    def estimate_output_length(self, length):
         """
         Return the nearest valid length to use with the model so that
         there is no time steps left over in a convolutions, e.g. for all

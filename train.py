@@ -45,19 +45,19 @@ def run(args):
     training_stride = int(args.experiment.stride * args.experiment.sample_rate)
     kwargs = {"matching": args.dset.matching, "sample_rate": args.experiment.sample_rate}
     # Building datasets and loaders
-    tr_dataset = NoisyCleanSet(args.dset.train, batch_solver.estimate_valid_length, clean_length=target_training_length,
+    tr_dataset = NoisyCleanSet(args.dset.train, batch_solver.estimate_output_length, clean_length=target_training_length,
                                stride=training_stride, pad=args.experiment.pad, scale_factor=args.experiment.scale_factor, is_training=True,
                                **kwargs)
     tr_loader = distrib.loader(
         tr_dataset, batch_size=args.experiment.batch_size, shuffle=True, num_workers=args.num_workers)
     if args.dset.valid:
-        cv_dataset = NoisyCleanSet(args.dset.valid, batch_solver.estimate_valid_length,
+        cv_dataset = NoisyCleanSet(args.dset.valid, batch_solver.estimate_output_length,
                                    scale_factor=args.experiment.scale_factor, **kwargs)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, num_workers=args.num_workers)
     else:
         cv_loader = None
     if args.dset.test:
-        tt_dataset = NoisyCleanSet(args.dset.test, batch_solver.estimate_valid_length,
+        tt_dataset = NoisyCleanSet(args.dset.test, batch_solver.estimate_output_length,
                                    scale_factor=args.experiment.scale_factor, with_path=True, **kwargs)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, num_workers=args.num_workers)
     else:

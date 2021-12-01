@@ -53,7 +53,7 @@ class BatchSolver(ABC):
         return self._losses_names
 
     @abstractmethod
-    def estimate_valid_length(self, input_length):
+    def estimate_output_length(self, input_length):
         """
         estimates the input length that will run smoothly through full pipeline.
         """
