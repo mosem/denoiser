@@ -31,7 +31,10 @@ class AdversarialBS(GeneratorBS):
         prediction = generator(noisy)
 
         # get features regularization loss if specified
-        estimate, estimated_embedded_dim = prediction if self.include_ft else prediction, None
+        if self.include_ft:
+            estimate, estimated_embedded_dim = prediction
+        else:
+            estimate, estimated_embedded_dim = prediction, None
         features_loss = self.get_features_loss(estimated_embedded_dim , clean)
 
         discriminator_fake_detached = discriminator(estimate.detach())
