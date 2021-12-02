@@ -97,9 +97,9 @@ class BatchSolver(ABC):
 
             # stretch the latent signal to match the extracted features dims
             # -- stretch time dim
-            latent_signal = F.interpolate(latent_signal, features.shape[-1], mode='bilinear').permute(0, 2, 1)
+            latent_signal = F.interpolate(latent_signal, features.shape[-1], mode='linear').permute(0, 2, 1)
             # -- stretch channel dim
-            latent_signal = F.interpolate(latent_signal, features.shape[-2], mode='bilinear').permute(0, 2, 1)
+            latent_signal = F.interpolate(latent_signal, features.shape[-2], mode='linear').permute(0, 2, 1)
 
             # compare the loss
             return F.l1_loss(features, latent_signal) * self.ft_factor
