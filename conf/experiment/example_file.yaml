@@ -12,7 +12,7 @@ batch_size: 16
 scale_factor: 1
 
 # models related
-model: demucs # demucs/demucs_adversarial/demucs_hifi/demucs_hifi_features
+model: demucs # demucs/demucs_adversarial
 demucs:
   chin: 1
   chout: 1

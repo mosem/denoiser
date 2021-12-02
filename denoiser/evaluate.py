@@ -29,9 +29,8 @@ def evaluate(args, model, data_loader, epoch):
     total_stoi = 0
     total_cnt = 0
     updates = 5
-
     model.eval()
-
+    include_ft = args.experiment.features_model.include_ft if hasattr(args.experiment, "features_model") else False
     files_to_log = []
 
     pendings = []
@@ -49,9 +48,9 @@ def evaluate(args, model, data_loader, epoch):
                 # If device is CPU, we do parallel evaluation in each CPU worker.
                 if args.device == 'cpu':
                     pendings.append(
-                        pool.submit(estimate_and_run_metrics, clean, model, noisy, args, filename))
+                        pool.submit(estimate_and_run_metrics, clean, model, noisy, args, filename, include_ft))
                 else:
-                    estimate = get_estimate(model, noisy)
+                    estimate = get_estimate(model, noisy)[0] if include_ft else get_estimate(model, noisy)
                     noisy = upsample_noisy(args, noisy)
                     estimate = estimate.cpu()
                     clean = clean.cpu()
@@ -85,10 +84,10 @@ def log_to_wandb(signal, pesq, stoi, snr, filename, epoch, sr):
               step=epoch)
 
 
-def estimate_and_run_metrics(clean, model, noisy, args, filename):
+def estimate_and_run_metrics(clean, model, noisy, args, filename, include_ft=False):
     estimate = get_estimate(model, noisy)
     noisy = upsample_noisy(args, noisy)
-    return run_metrics(clean, estimate, noisy.shape[-1], args, filename)
+    return run_metrics(clean, estimate[0] if include_ft else estimate, noisy.shape[-1], args, filename)
 
 
 def run_metrics(clean, estimate, noisy_len, args, filename):

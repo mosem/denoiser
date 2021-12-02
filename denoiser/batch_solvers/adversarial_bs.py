@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 
 from denoiser.batch_solvers.generator_bs import GeneratorBS
+from denoiser.models.dataclasses import FeaturesConfig
 
 GENERATOR_KEY = 'generator'
 DISCRIMINATOR_KEY = 'discriminator'
@@ -10,8 +11,8 @@ DISCRIMINATOR_OPTIMIZER_KEY = 'discriminator_optimizer'
 
 class AdversarialBS(GeneratorBS):
 
-    def __init__(self, args, generator, discriminator):
-        super().__init__(args, generator)
+    def __init__(self, args, generator, discriminator, features_config: FeaturesConfig=None):
+        super().__init__(args, generator, features_config)
         if torch.cuda.is_available():
             discriminator.cuda()
         self._models.update({DISCRIMINATOR_KEY: discriminator})
@@ -20,21 +21,28 @@ class AdversarialBS(GeneratorBS):
         self._optimizers.update(({DISCRIMINATOR_OPTIMIZER_KEY: disc_optimizer}))
         self._losses_names += [DISCRIMINATOR_KEY]
 
-
     def run(self, data, cross_valid=False):
         noisy, clean = data
 
         generator = self._models[GENERATOR_KEY]
         discriminator = self._models[DISCRIMINATOR_KEY]
 
-        estimate = generator(noisy)
+        prediction = generator(noisy)
+
+        # get features regularization loss if specified
+        if self.include_ft:
+            estimate, latent_signal = prediction
+        else:
+            estimate, latent_signal = prediction, None
+        features_loss = self.get_features_loss(latent_signal , clean)
+
         discriminator_fake_detached = discriminator(estimate.detach())
         discriminator_real = discriminator(clean)
         discriminator_fake = discriminator(estimate)
 
         loss_discriminator = self._get_discriminator_loss(discriminator_fake_detached, discriminator_real)
 
-        total_loss_generator = self._get_total_generator_loss(discriminator_fake, discriminator_real)
+        total_loss_generator = features_loss + self._get_total_generator_loss(discriminator_fake, discriminator_real)
 
         losses = {self._losses_names[0]: total_loss_generator.item(), self._losses_names[1]: loss_discriminator.item()}
 
