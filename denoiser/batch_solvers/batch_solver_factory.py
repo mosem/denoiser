@@ -74,7 +74,5 @@ class BatchSolverFactory:
                 decoder = SeanetDecoder(**args.experiment.seanet_decoder)
                 generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder)
                 return GeneratorBS(args, generator)
-            elif args.experiment.model == "demucs_hifi":
-                return DemucsHifiBS(args)
             else:
                 raise ValueError("Given model name is not supported")
