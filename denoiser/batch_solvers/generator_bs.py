@@ -55,11 +55,11 @@ class GeneratorBS(BatchSolver):
 
     def _get_loss(self, clean, prediction):
         if self.include_ft:
-            estimate, features = prediction
-            loss = self.get_features_loss(features, clean)
+            estimate, latent_signal = prediction
+
         else:
-            estimate = prediction
-            loss = 0
+            estimate, latent_signal = prediction, None
+        loss = self.get_features_loss(latent_signal, clean)
         with torch.autograd.set_detect_anomaly(True):
             if self.args.loss == 'l1':
                 loss += F.l1_loss(clean, estimate)

@@ -88,11 +88,18 @@ class BatchSolver(ABC):
         """
         pass
 
-    def get_features_loss(self, estimated_embedded_dim, signal_to_extract_features_from):
-        if not self.include_ft or estimated_embedded_dim is None:
+    def get_features_loss(self, latent_signal, reference_signal):
+        if not self.include_ft or latent_signal is None:
             return 0
         with torch.no_grad():
-            features = self.ft_model.extract_feats(signal_to_extract_features_from)
-            estimated_embedded_dim = F.interpolate(estimated_embedded_dim, features.shape[-1]).permute(0, 2, 1)
-            estimated_embedded_dim = F.interpolate(estimated_embedded_dim, features.shape[-2]).permute(0, 2, 1)
-            return F.l1_loss(features, estimated_embedded_dim) * self.ft_factor
+            # extract features from the reference signal
+            features = self.ft_model.extract_feats(reference_signal)
+
+            # stretch the latent signal to match the extracted features dims
+            # -- stretch time dim
+            latent_signal = F.interpolate(latent_signal, features.shape[-1], mode='bilinear').permute(0, 2, 1)
+            # -- stretch channel dim
+            latent_signal = F.interpolate(latent_signal, features.shape[-2], mode='bilinear').permute(0, 2, 1)
+
+            # compare the loss
+            return F.l1_loss(features, latent_signal) * self.ft_factor

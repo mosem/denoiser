@@ -21,7 +21,6 @@ class AdversarialBS(GeneratorBS):
         self._optimizers.update(({DISCRIMINATOR_OPTIMIZER_KEY: disc_optimizer}))
         self._losses_names += [DISCRIMINATOR_KEY]
 
-
     def run(self, data, cross_valid=False):
         noisy, clean = data
 
@@ -32,10 +31,10 @@ class AdversarialBS(GeneratorBS):
 
         # get features regularization loss if specified
         if self.include_ft:
-            estimate, estimated_embedded_dim = prediction
+            estimate, latent_signal = prediction
         else:
-            estimate, estimated_embedded_dim = prediction, None
-        features_loss = self.get_features_loss(estimated_embedded_dim , clean)
+            estimate, latent_signal = prediction, None
+        features_loss = self.get_features_loss(latent_signal , clean)
 
         discriminator_fake_detached = discriminator(estimate.detach())
         discriminator_real = discriminator(clean)
