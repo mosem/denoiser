@@ -60,6 +60,7 @@ class DemucsEncoder(nn.Module):
         self.resample = resample
         self.scale_factor = scale_factor
         self.skips = skips
+        self.padding = (kernel_size-1)//2
 
         self.encoder = nn.ModuleList()
         activation = nn.GLU(1) if glu else nn.ReLU()
@@ -68,7 +69,7 @@ class DemucsEncoder(nn.Module):
         for index in range(depth):
             encode = []
             encode += [
-                nn.Conv1d(chin, hidden, kernel_size, stride),
+                nn.Conv1d(chin, hidden, kernel_size, stride, padding=self.padding),
                 nn.ReLU(),
                 nn.Conv1d(hidden, hidden * ch_scale, 1), activation,
             ]
@@ -97,7 +98,7 @@ class DemucsEncoder(nn.Module):
         length = math.ceil(input_length * self.scale_factor)
         length = math.ceil(length * self.resample)
         for idx in range(self.depth):
-            length = math.ceil((length - self.kernel_size) / self.stride) + 1
+            length = math.ceil((length +2*self.padding - self.kernel_size) / self.stride) + 1
             length = max(length, 1)
         return int(length)
 
@@ -128,6 +129,6 @@ class DemucsEncoder(nn.Module):
             return x, skips_signals
         else:
             for encode in self.encoder:
-                logger.info(f'x shape: {x.shape}')
+                # logger.info(f'x shape: {x.shape}')
                 x = encode(x)
             return x

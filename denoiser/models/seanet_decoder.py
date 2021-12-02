@@ -78,14 +78,14 @@ class SeanetDecoder(nn.Module):
         length = input_length
         depth = len(self.ratios)
         for idx in range(depth):
-            logger.info(f'length: {length}')
+            # logger.info(f'length: {length}')
             stride = self.ratios[idx]
             kernel_size = 2 * stride
             padding = stride // 2 + stride % 2
             output_padding = stride % 2
             length = (length - 1) * stride + kernel_size - 2 * padding + output_padding
         length = int(math.ceil(length / self.resample))
-        logger.info(f'length: {length}')
+        # logger.info(f'length: {length}')
         return int(length)
 
     def forward(self, signal, skips=None):
@@ -95,7 +95,7 @@ class SeanetDecoder(nn.Module):
         x = signal
 
         for j, decode in enumerate(self.decoder):
-            logger.info(f'x shape: {x.shape}')
+            # logger.info(f'x shape: {x.shape}')
             if skips is not None:
                 skip = skips.pop(-1)
                 x = x + skip

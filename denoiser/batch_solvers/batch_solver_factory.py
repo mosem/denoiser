@@ -1,4 +1,3 @@
-from denoiser.batch_solvers.demucs_hifi_bs import DemucsHifiBS
 from denoiser.batch_solvers.generator_bs import GeneratorBS
 from denoiser.batch_solvers.adversarial_bs import AdversarialBS
 from denoiser.models.demucs_decoder import DemucsDecoder
