@@ -56,7 +56,7 @@ class AdversarialBS(GeneratorBS):
         # train all epochs before disc_first_epoch simply with an l1/l2/huber loss
         else:
             loss = super()._get_loss(clean, prediction)
-            losses_dict = {self._losses_names[0]: loss.item()}
+            losses_dict = {self._losses_names[0]: loss.item(), self._losses_names[1]: 0}
             losses = (loss, 0)
 
         if not cross_valid:
