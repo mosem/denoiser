@@ -92,7 +92,7 @@ def _main(args):
     logger.debug(args)
     wandb_mode = os.environ['WANDB_MODE'] if 'WANDB_MODE' in os.environ.keys() else args.wandb.mode
     wandb.init(mode=wandb_mode, project=WANDB_PROJECT_NAME, entity=WANDB_ENTITY, config=_get_wandb_config(args),
-               group=args.experiment.experiment_name)
+               group=args.experiment.experiment_name, resume=(args.continue_from != ""))
     if args.ddp and args.rank is None:
         start_ddp_workers()
     else:
