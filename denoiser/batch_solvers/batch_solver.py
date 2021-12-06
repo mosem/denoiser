@@ -71,7 +71,7 @@ class BatchSolver(ABC):
         pass
 
     @abstractmethod
-    def run(self, data, cross_valid=False):
+    def run(self, data, cross_valid=False, epoch=0):
         """
         run on single batch
         """
