@@ -16,6 +16,7 @@ class AdversarialBS(GeneratorBS):
         if torch.cuda.is_available():
             discriminator.cuda()
         self._models.update({DISCRIMINATOR_KEY: discriminator})
+
         disc_optimizer = torch.optim.Adam(discriminator.parameters(), lr=self.args.lr, betas=(0.9, self.args.beta2))
         self._optimizers.update(({DISCRIMINATOR_OPTIMIZER_KEY: disc_optimizer}))
         self._losses_names += [DISCRIMINATOR_KEY]
@@ -32,41 +33,29 @@ class AdversarialBS(GeneratorBS):
 
         # get features regularization loss if specified
         if self.include_ft:
-            estimate, features = prediction
-            features_loss = self.get_features_loss(features, clean)
+            estimate, latent_signal = prediction
         else:
-            estimate = prediction
-            features_loss = 0
+            estimate, latent_signal = prediction, None
+        features_loss = self.get_features_loss(latent_signal , clean)
 
         if epoch >= self.disc_first_epoch:
             discriminator_fake_detached = discriminator(estimate.detach())
             discriminator_real = discriminator(clean)
             discriminator_fake = discriminator(estimate)
 
-            loss_discriminator = features_loss + self._get_discriminator_loss(discriminator_fake_detached, discriminator_real)
+            loss_discriminator = self._get_discriminator_loss(discriminator_fake_detached, discriminator_real)
 
-            total_loss_generator = self._get_total_generator_loss(discriminator_fake, discriminator_real)
+
+
+            total_loss_generator = features_loss + self._get_total_generator_loss(discriminator_fake, discriminator_real)
 
             losses_dict = {self._losses_names[0]: total_loss_generator.item(), self._losses_names[1]: loss_discriminator.item()}
 
             losses = (total_loss_generator, loss_discriminator)
 
-        # train all of the first epochs simply with an l1 loss
+        # train all epochs before disc_first_epoch simply with an l1/l2/huber loss
         else:
-            loss = features_loss
-            if self.args.loss == 'l1':
-                loss += F.l1_loss(clean, estimate)
-            elif self.args.loss == 'l2':
-                loss += F.mse_loss(clean, estimate)
-            elif self.args.loss == 'huber':
-                loss += F.smooth_l1_loss(clean, estimate)
-            else:
-                raise ValueError(f"Invalid loss {self.args.loss}")
-            # MultiResolution STFT loss
-            if self.args.stft_loss:
-                sc_loss, mag_loss = self.mrstftloss(estimate.squeeze(1), clean.squeeze(1))
-                loss += sc_loss + mag_loss
-
+            loss = super()._get_loss(clean, prediction)
             losses_dict = {self._losses_names[0]: loss.item(), self._losses_names[1]: 0}
             losses = (loss, 0)
 

@@ -95,7 +95,7 @@ class Seanet(nn.Module):
 
         self.apply(weights_init)
 
-    def estimate_valid_length(self, length):
+    def estimate_output_length(self, length):
         """
         Return the nearest valid length to use with the model so that
         there is no time steps left over in a convolutions, e.g. for all

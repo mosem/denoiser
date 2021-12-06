@@ -64,7 +64,7 @@ class BatchSolver(ABC):
         return self._losses_names
 
     @abstractmethod
-    def estimate_valid_length(self, input_length):
+    def estimate_output_length(self, input_length):
         """
         estimates the input length that will run smoothly through full pipeline.
         """
@@ -88,12 +88,18 @@ class BatchSolver(ABC):
         """
         pass
 
-    def get_features_loss(self, estimated_embedded_dim, signal_to_extract_features_from):
-        if not self.include_ft:
+    def get_features_loss(self, latent_signal, reference_signal):
+        if not self.include_ft or latent_signal is None:
             return 0
         with torch.no_grad():
-            y_ft = self.ft_model.extract_feats(signal_to_extract_features_from)
-            estimated_embedded_dim = F.interpolate(estimated_embedded_dim, y_ft.shape[-1]).permute(0, 2, 1)
-            estimated_embedded_dim = F.interpolate(estimated_embedded_dim, y_ft.shape[-2]).permute(0, 2, 1)
-            return F.l1_loss(y_ft, estimated_embedded_dim) * self.ft_factor
+            # extract features from the reference signal
+            features = self.ft_model.extract_feats(reference_signal)
 
+            # stretch the latent signal to match the extracted features dims
+            # -- stretch time dim
+            latent_signal = F.interpolate(latent_signal, features.shape[-1], mode='linear').permute(0, 2, 1)
+            # -- stretch channel dim
+            latent_signal = F.interpolate(latent_signal, features.shape[-2], mode='linear').permute(0, 2, 1)
+
+            # compare the loss
+            return F.l1_loss(features, latent_signal) * self.ft_factor
