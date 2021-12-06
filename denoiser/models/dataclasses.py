@@ -45,7 +45,7 @@ class DemucsEncoderConfig:
 
 @dataclass
 class DemucsDecoderConfig:
-    chin: int = 1
+    cout: int = 1
     hidden: int = 48
     max_hidden: int = 10000
     glu: bool = True
