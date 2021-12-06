@@ -53,22 +53,9 @@ class AdversarialBS(GeneratorBS):
 
             losses = (total_loss_generator, loss_discriminator)
 
-        # train all of the first epochs simply with an l1 loss
+        # train all epochs before disc_first_epoch simply with an l1/l2/huber loss
         else:
-            loss = features_loss
-            if self.args.loss == 'l1':
-                loss += F.l1_loss(clean, estimate)
-            elif self.args.loss == 'l2':
-                loss += F.mse_loss(clean, estimate)
-            elif self.args.loss == 'huber':
-                loss += F.smooth_l1_loss(clean, estimate)
-            else:
-                raise ValueError(f"Invalid loss {self.args.loss}")
-            # MultiResolution STFT loss
-            if self.args.stft_loss:
-                sc_loss, mag_loss = self.mrstftloss(estimate.squeeze(1), clean.squeeze(1))
-                loss += sc_loss + mag_loss
-
+            loss = super()._get_loss(clean, prediction)
             losses_dict = {self._losses_names[0]: loss.item(), self._losses_names[1]: 0}
             losses = (loss, 0)
 
