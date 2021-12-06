@@ -25,3 +25,34 @@ class DemucsConfig:
     rescale: float = 0.1
     scale_factor: int = 1
     skips: bool = False
+
+@dataclass
+class DemucsEncoderConfig:
+    chin: int = 1
+    hidden: int = 48
+    max_hidden: int = 10000
+    causal: bool = True
+    glu: bool = True
+    depth: int = 5
+    kernel_size: int = 8
+    stride: int = 2
+    resample: int = 1
+    growth: int = 2
+    rescale: float = 0.1
+    scale_factor: int = 1
+    skips: bool = False
+
+
+@dataclass
+class DemucsDecoderConfig:
+    chin: int = 1
+    hidden: int = 48
+    max_hidden: int = 10000
+    glu: bool = True
+    depth: int = 5
+    kernel_size: int = 8
+    stride: int = 2
+    resample: int = 1
+    growth: int = 2
+    rescale: float = 0.1
+    scale_factor: int = 1
