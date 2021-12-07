@@ -1,5 +1,5 @@
 # @package experiment
-experiment_name: demucs_adversarial_1
+experiment_name: demucs_with_features
 
 # Dataset related
 sample_rate: 16000 # target sample rate #should be included in training cfg
@@ -8,9 +8,10 @@ segment: 2
 stride: 2    # in seconds, how much to stride between training examples
 pad: true   # if training sample is too short, pad it
 batch_size: 16
-scale_factor: 2
-discriminator_first_epoch: 0
 
+scale_factor: 2
+
+# models related
 model: demucs
 demucs:
   chin: 1
@@ -29,17 +30,8 @@ demucs:
   rescale: 0.1
   scale_factor: ${experiment.scale_factor}
 
-adversarial: True
-discriminator_model: standard # standard/laplacian
-features_loss_lambda: 100
-discriminator:
-  n_layers: 4
-  num_D: 3
-  downsampling_factor: 4
-  ndf: 16
-
 features_model:
-  include_ft: False
+  include_ft: True
   feature_model: 'hubert'
   state_dict_path: '/cs/labs/adiyoss/shared/pretrained_weights/hubert/hubert_base_ls960.pt'
-  features_factor: 0.01
+  features_factor: 0.1
