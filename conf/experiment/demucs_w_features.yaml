@@ -1,5 +1,5 @@
 # @package experiment
-experiment_name: demucs_1
+experiment_name: demucs_with_features
 
 # Dataset related
 sample_rate: 16000 # target sample rate #should be included in training cfg
@@ -23,7 +23,7 @@ demucs:
   glu: true
   depth: 5
   kernel_size: 8
-  stride: 2
+  stride: ${experiment.stride}
   normalize: true
   resample: 1
   growth: 2
@@ -31,14 +31,7 @@ demucs:
   scale_factor: ${experiment.scale_factor}
 
 features_model:
-  include_ft: False
+  include_ft: True
   feature_model: 'hubert'
   state_dict_path: '/cs/labs/adiyoss/shared/pretrained_weights/hubert/hubert_base_ls960.pt'
-  features_factor: 0.01
-
-mel:
-  use_melspec: False
-  sample_rate: 16000
-  n_fft: 512
-  n_mels: 128
-  hop_length: 256
+  features_factor: 0.1

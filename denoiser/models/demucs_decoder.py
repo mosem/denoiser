@@ -2,6 +2,7 @@ import math
 
 from torch import nn
 
+from denoiser.models.dataclasses import DemucsDecoderConfig
 from denoiser.models.demucs import rescale_module
 from denoiser.resample import downsample2
 from denoiser.utils import capture_init
@@ -31,49 +32,39 @@ class DemucsDecoder(nn.Module):
     """
 
     @capture_init
-    def __init__(self,
-                 chout=1,
-                 hidden=48,
-                 depth=5,
-                 kernel_size=8,
-                 stride=4,
-                 resample=4,
-                 growth=2,
-                 max_hidden=10_000,
-                 glu=True,
-                 rescale=0.1,
-                 scale_factor=1):
+    def __init__(self, demucs_config: DemucsDecoderConfig):
 
         super().__init__()
-        if resample not in [1, 2, 4]:
+        if demucs_config.resample not in [1, 2, 4]:
             raise ValueError("Resample should be 1, 2 or 4.")
 
-        self.chout = chout
-        self.hidden = hidden
-        self.depth = depth
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.resample = resample
-        self.scale_factor = scale_factor
+        self.chout = demucs_config.chout
+        self.hidden = demucs_config.hidden
+        self.depth = demucs_config.depth
+        self.kernel_size = demucs_config.kernel_size
+        self.stride = demucs_config.stride
+        self.resample = demucs_config.resample
+        self.scale_factor = demucs_config.scale_factor
 
         self.decoder = nn.ModuleList()
-        activation = nn.GLU(1) if glu else nn.ReLU()
-        ch_scale = 2 if glu else 1
+        activation = nn.GLU(1) if demucs_config.glu else nn.ReLU()
+        ch_scale = 2 if demucs_config.glu else 1
+        hidden, chout = demucs_config.hidden, demucs_config.chout
 
-        for index in range(depth):
+        for index in range(demucs_config.depth):
             decode = []
             decode += [
                 nn.Conv1d(hidden, ch_scale * hidden, 1), activation,
-                nn.ConvTranspose1d(hidden, chout, kernel_size, stride),
+                nn.ConvTranspose1d(hidden, chout, demucs_config.kernel_size, demucs_config.stride),
             ]
             if index > 0:
                 decode.append(nn.ReLU())
             self.decoder.insert(0, nn.Sequential(*decode))
             chout = hidden
-            hidden = min(int(growth * hidden), max_hidden)
+            hidden = min(int(demucs_config.growth * hidden), demucs_config.max_hidden)
 
-        if rescale:
-            rescale_module(self, reference=rescale)
+        if demucs_config.rescale:
+            rescale_module(self, reference=demucs_config.rescale)
 
     def estimate_output_length(self, input_length):
         """
