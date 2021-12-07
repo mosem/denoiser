@@ -56,3 +56,11 @@ class DemucsDecoderConfig:
     growth: int = 2
     rescale: float = 0.1
     scale_factor: int = 1
+
+@dataclass
+class MelSpecConfig:
+    use_melspec: bool = False
+    sample_rate: int = 16000
+    n_fft: int = 512
+    n_mels: int = 128
+    hop_length: int = 256

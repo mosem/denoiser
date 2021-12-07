@@ -16,6 +16,9 @@ import torchaudio
 from torch.nn import functional as F
 
 import logging
+
+from denoiser.models.dataclasses import MelSpecConfig
+
 logger = logging.getLogger(__name__)
 
 Info = namedtuple("Info", ["length", "sample_rate", "channels"])
@@ -50,7 +53,7 @@ def find_audio_files(path, exts=[".wav"], progress=True):
 
 class Audioset:
     def __init__(self, files=None, length=None, stride=None,
-                 pad=True, with_path=False, sample_rate=None):
+                 pad=True, with_path=False, sample_rate=None, mel_config: MelSpecConfig=None):
         """
         files should be a list [(file, length)]
         """
@@ -60,6 +63,12 @@ class Audioset:
         self.length = length
         self.with_path = with_path
         self.sample_rate = sample_rate
+        self.use_mel = mel_config.use_melspec if mel_config is not None else False
+        if self.use_mel:
+            self.mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate=mel_config.sample_rate,
+                                                                 n_fft=mel_config.n_fft,
+                                                                 n_mels=mel_config.n_mels,
+                                                                 hop_length=mel_config.hop_length)
 
         for file, file_length in self.files:
             if length is None:
@@ -98,6 +107,10 @@ class Audioset:
                                        f"{self.sample_rate}, but got {sr}")
             if num_frames:
                 out = F.pad(out, (0, num_frames - out.shape[-1]))
+            if self.use_mel:
+                if len(out.shape) == 3:
+                    out = out.squeeze(1)
+                out = self.mel_spec(out)[..., :-1]
             if self.with_path:
                 return out, file
             else:

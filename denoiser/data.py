@@ -12,6 +12,7 @@ import os
 import re
 
 from .audio import Audioset
+from .models.dataclasses import MelSpecConfig
 from .resample import downsample2
 from torch.nn import functional as F
 
@@ -79,7 +80,7 @@ def pad_signal_to_valid_length(signal, calc_valid_length_func, scale_factor):
 
 class NoisyCleanSet:
     def __init__(self, json_dir, calc_valid_length_func, matching="sort", clean_length=None, stride=None,
-                 pad=True, sample_rate=None, scale_factor=1, with_path=False, is_training=False):
+                 pad=True, sample_rate=None, scale_factor=1, with_path=False, is_training=False, mel_config:MelSpecConfig=None):
         """__init__.
         :param json_dir: directory containing both clean.json and noisy.json
         :param matching: matching function for the files
@@ -109,8 +110,8 @@ class NoisyCleanSet:
 
         match_files(noisy, clean, matching)
         kw = {'length': self.valid_length, 'stride': stride, 'pad': pad, 'with_path': with_path}
-        self.clean_set = Audioset(clean, sample_rate=sample_rate, **kw)
-        self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw)
+        self.clean_set = Audioset(clean, sample_rate=sample_rate, **kw, mel_config=mel_config)
+        self.noisy_set = Audioset(noisy, sample_rate=sample_rate, **kw, mel_config=mel_config)
 
         assert len(self.clean_set) == len(self.noisy_set)
 
