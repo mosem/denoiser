@@ -22,7 +22,7 @@ demucs:
   glu: true
   depth: 5
   kernel_size: 8
-  stride: ${experiment.stride}
+  stride: 2
   normalize: true
   resample: 1
   growth: 2
