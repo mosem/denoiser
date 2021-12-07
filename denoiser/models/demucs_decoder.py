@@ -2,7 +2,7 @@ import math
 
 from torch import nn
 
-from denoiser.models.dataclasses import DemucsConfig
+from denoiser.models.dataclasses import DemucsDecoderConfig
 from denoiser.models.demucs import rescale_module
 from denoiser.resample import downsample2
 from denoiser.utils import capture_init
@@ -32,7 +32,7 @@ class DemucsDecoder(nn.Module):
     """
 
     @capture_init
-    def __init__(self, demucs_config:DemucsConfig):
+    def __init__(self, demucs_config: DemucsDecoderConfig):
 
         super().__init__()
         if demucs_config.resample not in [1, 2, 4]:
