@@ -14,6 +14,8 @@ resample: 1
 
 autoencoder:
   skips: false
+  input_sr: 8000
+  target_sr: ${experiment.sample_rate}
   normalize: true
   floor: 1e-3
 

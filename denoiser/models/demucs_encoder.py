@@ -95,8 +95,8 @@ class DemucsEncoder(nn.Module):
         If the mixture has a valid length, the estimated sources
         will have exactly the same length.
         """
-        length = math.ceil(input_length * self.scale_factor)
-        length = math.ceil(length * self.resample)
+        # length = math.ceil(input_length * self.scale_factor)
+        length = math.ceil(input_length * self.resample)
         for idx in range(self.depth):
             length = math.ceil((length +2*self.padding - self.kernel_size) / self.stride) + 1
             length = max(length, 1)
@@ -108,11 +108,11 @@ class DemucsEncoder(nn.Module):
 
         x = signal
 
-        if self.scale_factor == 2:
-            x = upsample2(x)
-        elif self.scale_factor == 4:
-            x = upsample2(x)
-            x = upsample2(x)
+        # if self.scale_factor == 2:
+        #     x = upsample2(x)
+        # elif self.scale_factor == 4:
+        #     x = upsample2(x)
+        #     x = upsample2(x)
 
         if self.resample == 2:
             x = upsample2(x)

@@ -13,6 +13,8 @@ scale_factor: 2
 
 autoencoder:
   skips: true
+  input_sr: ${experiment.sample_rate} / ${experiment.scale_factor}
+  target_sr: ${experiment.sample_rate}
   normalize: true
   floor: 1e-3
 

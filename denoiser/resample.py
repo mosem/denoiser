@@ -8,7 +8,9 @@
 import math
 
 import torch as th
+from torch import nn
 from torch.nn import functional as F
+from torchaudio.transforms import Resample
 
 
 def sinc(t):
@@ -73,3 +75,15 @@ def downsample2(x, zeros=56):
     out = xeven + F.conv1d(xodd.view(-1, 1, time), kernel, padding=zeros)[..., :-1].view(
         *other, time)
     return out.view(*other, -1).mul(0.5)
+
+
+class ResampleTransform(nn.Module):
+
+    def __init__(self, input_sr, new_sr):
+        super().__init__()
+        self.input_sr = input_sr
+        self.new_sr = new_sr
+        self.transform = Resample(self.input_sr, self.new_sr)
+
+    def forward(self, x):
+        return self.transform(x)
