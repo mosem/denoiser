@@ -53,8 +53,9 @@ class Demucs(nn.Module):
 
     """
     @capture_init
-    def __init__(self,demucs_config: DemucsConfig,
-                 include_ft_in_output=False):
+    def __init__(self, demucs_config: DemucsConfig,
+                 include_ft_in_output=False,
+                 get_ft_after_lstm=False):
 
         super().__init__()
         if demucs_config.resample not in [1, 2, 4]:
@@ -72,6 +73,7 @@ class Demucs(nn.Module):
         self.normalize = demucs_config.normalize
         self.scale_factor = demucs_config.scale_factor
         self.include_features_in_output = include_ft_in_output
+        self.get_ft_after_lstm = get_ft_after_lstm
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -150,8 +152,9 @@ class Demucs(nn.Module):
         for encode in self.encoder:
             x = encode(x)
             skips.append(x)
-        latent = self.lstm(x)
-        x = latent
+        pre_lstm = x
+        post_lstm = self.lstm(x)
+        x = post_lstm
         for decode in self.decoder:
             skip = skips.pop(-1)
             x = x + skip[..., :x.shape[-1]]
@@ -165,5 +168,5 @@ class Demucs(nn.Module):
             pass
 
         if self.include_features_in_output:
-            return std * x, latent
+            return std * x, post_lstm if self.get_ft_after_lstm else pre_lstm
         return std * x
