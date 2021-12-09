@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 
 from denoiser.batch_solvers.generator_bs import GeneratorBS
-from denoiser.models.dataclasses import FeaturesConfig
+from denoiser.models.ft_conditioner import FtConditioner
 
 GENERATOR_KEY = 'generator'
 DISCRIMINATOR_KEY = 'discriminator'
@@ -11,8 +11,8 @@ DISCRIMINATOR_OPTIMIZER_KEY = 'discriminator_optimizer'
 
 class AdversarialBS(GeneratorBS):
 
-    def __init__(self, args, generator, discriminator, features_config: FeaturesConfig=None):
-        super().__init__(args, generator, features_config)
+    def __init__(self, args, generator, discriminator, features_module: FtConditioner=None):
+        super().__init__(args, generator, features_module)
         if torch.cuda.is_available():
             discriminator.cuda()
         self._models.update({DISCRIMINATOR_KEY: discriminator})

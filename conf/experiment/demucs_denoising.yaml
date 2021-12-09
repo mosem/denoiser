@@ -34,7 +34,11 @@ features_model:
   feature_model: 'hubert'
   state_dict_path: '/cs/labs/adiyoss/shared/pretrained_weights/hubert/hubert_base_ls960.pt'
   features_factor: 0.01
+  features_dim: 768
   get_ft_after_lstm: True
+  use_as_conditioning: False
+  merge_method: 'inter'
+  features_dim_for_conditioning: 128
 
 mel:
   use_melspec: False
