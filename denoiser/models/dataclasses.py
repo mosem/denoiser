@@ -6,6 +6,7 @@ class FeaturesConfig:
     feature_model: str = 'hubert'
     state_dict_path: str = '/cs/labs/adiyoss/shared/pretrained_weights/hubert/hubert_base_ls960.pt'
     features_factor: float = 0.01
+    get_ft_after_lstm: bool = True
 
 @dataclass
 class DemucsConfig:
