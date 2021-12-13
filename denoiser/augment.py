@@ -235,6 +235,7 @@ class Augment(object):
                                              target_sample_rate=args.experiment.sample_rate) if args.bandmask else None
         self.s = Shift(args.shift, args.shift_same, args.experiment.scale_factor) if args.shift else None
         self.re = RevEcho(args.revecho, target_sample_rate=args.experiment.sample_rate, scale_factor=args.experiment.scale_factor) if args.revecho else None
+        self.augment = self.r is not None or self.s is not None or self.b is not None or self.re is not None
 
     def augment_data(self, noisy, clean):
         if not self.augment:
