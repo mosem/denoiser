@@ -253,11 +253,11 @@ class Augment(object):
         if self.r is not None:
             sources, target = self.r(sources, clean)
         if self.b is not None:
-            sources, target = self.b(sources, clean)
+            sources, target = self.b(sources, target)
         if self.s is not None:
-            sources, target = self.s(sources, clean)
+            sources, target = self.s(sources, target)
         if self.re is not None:
-            sources, target = self.re(sources, clean)
+            sources, target = self.re(sources, target)
         source_noise, source_clean = sources
         source_noisy = source_noise + source_clean
         return source_noisy, target
