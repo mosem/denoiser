@@ -33,6 +33,7 @@ checkpoint_file: checkpoint.th
 best_file: best.th  # will contain only best model at any point
 history_file: history.json
 samples_dir: samples
+keep_history: true
 
 # Other stuff
 seed: 2036
