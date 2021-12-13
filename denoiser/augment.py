@@ -228,6 +228,7 @@ class Shift(nn.Module):
 class Augment(object):
 
     def __init__(self, args):
+        self.args = args
         augments = []
         if args.remix:
             augments.append(Remix())
