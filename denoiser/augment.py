@@ -230,17 +230,11 @@ class Augment(object):
     def __init__(self, args):
         self.args = args
         augments = []
-        if args.remix:
-            augments.append(Remix())
-        if args.bandmask:
-            augments.append(BandMask(args.bandmask, scale_factor=args.experiment.scale_factor,
-                                             target_sample_rate=args.experiment.sample_rate))
-        if args.shift:
-            augments.append(Shift(args.shift, args.shift_same, args.experiment.scale_factor))
-        if args.revecho:
-            augments.append(RevEcho(args.revecho, target_sample_rate=args.experiment.sample_rate, scale_factor=args.experiment.scale_factor))
-        self.augment = th.nn.Sequential(*augments) if augments else None
-
+        self.r = Remix() if args.remix else None
+        self.b = BandMask(args.bandmask, scale_factor=args.experiment.scale_factor,
+                                             target_sample_rate=args.experiment.sample_rate) if args.bandmask else None
+        self.s = Shift(args.shift, args.shift_same, args.experiment.scale_factor) if args.shift else None
+        self.re = RevEcho(args.revecho, target_sample_rate=args.experiment.sample_rate, scale_factor=args.experiment.scale_factor) if args.revecho else None
 
     def augment_data(self, noisy, clean):
         if not self.augment:
@@ -255,7 +249,14 @@ class Augment(object):
             clean_downsampled = downsample2(clean_downsampled)
         noise = noisy - clean_downsampled
         sources = th.stack([noise, clean_downsampled])
-        sources, target = self.augment(sources, clean)
+        if self.r is not None:
+            sources, target = self.r(sources, clean)
+        if self.b is not None:
+            sources, target = self.b(sources, clean)
+        if self.s is not None:
+            sources, target = self.s(sources, clean)
+        if self.re is not None:
+            sources, target = self.re(sources, clean)
         source_noise, source_clean = sources
         source_noisy = source_noise + source_clean
         return source_noisy, target
