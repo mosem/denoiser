@@ -220,7 +220,7 @@ class Solver(object):
                 noisy = noisy[...:len_noisy]
             elif noisy.shape[-1] < len_noisy:
                 n = (len_noisy - noisy.shape[-1]) / 2
-                noisy = torch.nn.functional.pad(noisy, (np.floor(n),np.ceil(n))).to(self.device)
+                noisy = torch.nn.functional.pad(noisy, (int(np.floor(n)), int(np.ceil(n)))).to(self.device)
 
             losses = self.batch_solver.run((noisy, clean), cross_valid, epoch)
             for k in self.batch_solver.get_losses_names():
