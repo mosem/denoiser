@@ -13,6 +13,7 @@ import time
 
 import torch
 import wandb
+import numpy as np
 
 from . import distrib
 from .augment import Augment
@@ -212,8 +213,14 @@ class Solver(object):
         for i, (noisy, clean) in enumerate(logprog):
             noisy = noisy.to(self.device)
             clean = clean.to(self.device)
+            len_noisy = noisy.shape[-1]
             if not cross_valid:
                 noisy, clean = self.augment.augment_data(noisy, clean)
+            if noisy.shape[-1] > len_noisy:
+                noisy = noisy[...:len_noisy]
+            elif noisy.shape[-1] < len_noisy:
+                n = (len_noisy - noisy.shape[-1]) / 2
+                noisy = torch.nn.ConstantPad1d((np.floor(n),np.ceil(n)), 0).to(self.device)
 
             losses = self.batch_solver.run((noisy, clean), cross_valid, epoch)
             for k in self.batch_solver.get_losses_names():
