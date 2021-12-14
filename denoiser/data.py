@@ -68,11 +68,16 @@ def match_files(noisy, clean, matching="sort"):
         raise ValueError(f"Invalid value for matching {matching}")
 
 
-def pad_signal_to_valid_length(signal, calc_valid_length_func, scale_factor):
-    valid_length = calc_valid_length_func(math.ceil(signal.shape[-1] / scale_factor))
+def pad_signal_to_valid_output_length(signal, calc_valid_length_func, scale_factor):
+    signal_len = signal.shape[-1]
+    rescaled_output_length = scale_factor * math.ceil(signal.shape[-1] / scale_factor)
+    valid_output_length = calc_valid_length_func(rescaled_output_length)
+    logger.info(f'signal length: {signal_len}')
+    logger.info(f'rescaled_output_length: {rescaled_output_length}')
+    logger.info(f'valid_output_length: {valid_output_length}')
 
-    if valid_length > signal.shape[-1]:
-        signal = F.pad(signal, (0, valid_length - signal.shape[-1]))
+    if valid_output_length > signal.shape[-1]:
+        signal = F.pad(signal, (0, valid_output_length - signal.shape[-1]))
 
     return signal
 
@@ -96,7 +101,11 @@ class NoisyCleanSet:
 
         if self.is_training:
             input_training_length = math.ceil(self.clean_length / self.scale_factor)
-            self.valid_length = self.calc_valid_length_func(input_training_length)
+            rescaled_output_length = self.scale_factor* math.ceil(self.clean_length / self.scale_factor)
+            valid_output_length = self.calc_valid_length_func(rescaled_output_length)
+            # self.valid_length = self.calc_valid_length_func(input_training_length)
+            self.valid_length = valid_output_length
+            logger.info(f'valid length: {self.valid_length}')
         else:
             self.valid_length = None
 
@@ -116,8 +125,8 @@ class NoisyCleanSet:
 
     def _process_data(self, noisy, clean):
         if not self.is_training:
-            noisy = pad_signal_to_valid_length(noisy, self.calc_valid_length_func, self.scale_factor)
-            clean = pad_signal_to_valid_length(clean, self.calc_valid_length_func, self.scale_factor)
+            noisy = pad_signal_to_valid_output_length(noisy, self.calc_valid_length_func, self.scale_factor)
+            clean = pad_signal_to_valid_output_length(clean, self.calc_valid_length_func, self.scale_factor)
 
         if self.scale_factor == 2:
             noisy = downsample2(noisy)

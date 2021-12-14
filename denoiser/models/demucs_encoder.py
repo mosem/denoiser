@@ -60,7 +60,8 @@ class DemucsEncoder(nn.Module):
         self.resample = resample
         self.scale_factor = scale_factor
         self.skips = skips
-        self.padding = (kernel_size-1)//2
+        # self.padding = (kernel_size-1)//2
+        self.padding = 0
 
         self.encoder = nn.ModuleList()
         activation = nn.GLU(1) if glu else nn.ReLU()
@@ -95,12 +96,26 @@ class DemucsEncoder(nn.Module):
         If the mixture has a valid length, the estimated sources
         will have exactly the same length.
         """
-        # length = math.ceil(input_length * self.scale_factor)
-        length = math.ceil(input_length * self.resample)
-        for idx in range(self.depth):
-            length = math.ceil((length +2*self.padding - self.kernel_size) / self.stride) + 1
-            length = max(length, 1)
+        length = input_length
+        for i in range(self.depth):
+            length = math.floor((length + 2 * self.padding - self.kernel_size) / self.stride + 1)
         return int(length)
+
+        # length = math.ceil(input_length * self.scale_factor)
+        # length = math.ceil(input_length * self.resample)
+        # for idx in range(self.depth):
+        #     length = math.ceil((length +2*self.padding - self.kernel_size) / self.stride) + 1
+        #     length = max(length, 1)
+        # return int(length)
+
+
+    def calculate_input_range(self, out_len):
+        min_len = out_len
+        max_len = out_len
+        for i in range(self.depth):
+            min_len = (min_len - 1) * self.stride - 2 * self.padding + self.kernel_size
+            max_len = max_len * self.stride - 2 * self.padding + self.kernel_size - 1
+        return min_len, max_len
 
     def forward(self, signal):
         if signal.dim() == 2:

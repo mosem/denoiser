@@ -76,8 +76,7 @@ class SeanetDecoder(nn.Module):
         will have exactly the same length.
         """
         length = input_length
-        depth = len(self.ratios)
-        for idx in range(depth):
+        for idx in range(len(self.ratios)):
             # logger.info(f'length: {length}')
             stride = self.ratios[idx]
             kernel_size = 2 * stride
@@ -86,7 +85,18 @@ class SeanetDecoder(nn.Module):
             length = (length - 1) * stride + kernel_size - 2 * padding + output_padding
         length = int(math.ceil(length / self.resample))
         # logger.info(f'length: {length}')
-        return int(length)
+        return length
+
+
+    def calculate_input_length(self, out_len):
+        length = out_len
+        for i in range(len(self.ratios)):
+            stride = self.ratios[i]
+            kernel_size = 2 * stride
+            padding = stride // 2 + stride % 2
+            output_padding = stride % 2
+            length = (length + 2 * padding - kernel_size - output_padding) / stride + 1
+        return length
 
     def forward(self, signal, skips=None):
         if signal.dim() == 2:

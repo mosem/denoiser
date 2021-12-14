@@ -32,8 +32,8 @@ class GeneratorBS(BatchSolver):
         generator.load_state_dict(best_states[GENERATOR_KEY])
         return generator
 
-    def estimate_valid_length(self, input_length):
-        return self._models[GENERATOR_KEY].estimate_valid_length(input_length)
+    def estimate_valid_length(self, output_length):
+        return self._models[GENERATOR_KEY].calculate_valid_output_length(output_length)
 
     def run(self, data, cross_valid=False):
         noisy, clean = data
