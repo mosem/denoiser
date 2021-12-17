@@ -9,7 +9,7 @@ import random
 import torch as th
 from torch import nn
 from torch.nn import functional as F
-
+import numpy as np
 from . import dsp
 from .resample import downsample2
 
@@ -115,7 +115,6 @@ class RevEcho(nn.Module):
                 frac *= attenuation
         return reverb
 
-
     def forward(self, sources, target):
         if random.random() >= self.proba:
             return sources, target
@@ -203,24 +202,14 @@ class Shift(nn.Module):
     def forward(self, sources, target):
         n_sources, batch, channels, length = sources.shape
         _ , _, target_length = target.shape
-        length = length - self.shift
-        target_length = target_length - self.shift*self.target_scale_factor
+        target_scale = target_length / length
         if self.shift > 0:
-            if not self.training:
-                sources = sources[..., :length]
-                target = target[..., :target_length]
-            else:
-                offsets = th.randint(
-                    self.shift,
-                    [1 if self.same else n_sources, batch, 1, 1], device=sources.device)
-                sources_offsets = offsets.expand(n_sources, -1, channels, -1)
-                sources_indexes = th.arange(length, device=sources.device)
-                sources = sources.gather(3, sources_indexes + sources_offsets)
-
-                target_offsets = offsets.squeeze(dim=0) if self.same else th.randint(self.shift, [batch,1,1], device=target.device)
-                target_offsets = target_offsets.expand(-1,channels, -1)
-                target_indexes = th.arange(target_length, device=target.device)
-                target = target.gather(2, target_indexes + target_offsets)
+            for i in range(batch):
+                offset = np.random.randint(self.shift)
+                sources[:, i, :, :] = th.roll(sources[:, i, :, :], shifts=offset, dims=2)
+                sources[:, i, :, :offset] *= 0
+                target[i, :, :] = th.roll(target[i, :, :], shifts=int(offset*target_scale), dims=1)
+                target[i, :, :int(offset*target_scale)] *= 0
         out = sources, target
         return out
 
@@ -228,18 +217,14 @@ class Shift(nn.Module):
 class Augment(object):
 
     def __init__(self, args):
+        self.args = args
         augments = []
-        if args.remix:
-            augments.append(Remix())
-        if args.bandmask:
-            augments.append(BandMask(args.bandmask, scale_factor=args.experiment.scale_factor,
-                                             target_sample_rate=args.experiment.sample_rate))
-        if args.shift:
-            augments.append(Shift(args.shift, args.shift_same, args.experiment.scale_factor))
-        if args.revecho:
-            augments.append(RevEcho(args.revecho, target_sample_rate=args.experiment.sample_rate, scale_factor=args.experiment.scale_factor))
-        self.augment = th.nn.Sequential(*augments) if augments else None
-
+        self.r = Remix() if args.remix else None
+        self.b = BandMask(args.bandmask, scale_factor=args.experiment.scale_factor,
+                                             target_sample_rate=args.experiment.sample_rate) if args.bandmask else None
+        self.s = Shift(args.shift, args.shift_same, args.experiment.scale_factor) if args.shift else None
+        self.re = RevEcho(args.revecho, target_sample_rate=args.experiment.sample_rate, scale_factor=args.experiment.scale_factor) if args.revecho else None
+        self.augment = self.r is not None or self.s is not None or self.b is not None or self.re is not None
 
     def augment_data(self, noisy, clean):
         if not self.augment:
@@ -254,7 +239,14 @@ class Augment(object):
             clean_downsampled = downsample2(clean_downsampled)
         noise = noisy - clean_downsampled
         sources = th.stack([noise, clean_downsampled])
-        sources, target = self.augment(sources, clean)
+        if self.r is not None:
+            sources, target = self.r(sources, clean)
+        if self.b is not None:
+            sources, target = self.b(sources, target)
+        if self.s is not None:
+            sources, target = self.s(sources, target)
+        if self.re is not None:
+            sources, target = self.re(sources, target)
         source_noise, source_clean = sources
         source_noisy = source_noise + source_clean
         return source_noisy, target
