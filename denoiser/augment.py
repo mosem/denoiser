@@ -9,7 +9,7 @@ import random
 import torch as th
 from torch import nn
 from torch.nn import functional as F
-
+import numpy as np
 from . import dsp
 from .resample import downsample2
 
@@ -115,7 +115,6 @@ class RevEcho(nn.Module):
                 frac *= attenuation
         return reverb
 
-
     def forward(self, sources, target):
         if random.random() >= self.proba:
             return sources, target
@@ -203,26 +202,13 @@ class Shift(nn.Module):
     def forward(self, sources, target):
         n_sources, batch, channels, length = sources.shape
         _ , _, target_length = target.shape
-        length = length - self.shift
-        target_length = target_length - self.shift*self.target_scale_factor
-        if self.shift > 0:
-            if not self.training:
-                sources = sources[..., :length]
-                target = target[..., :target_length]
-            else:
-                offsets = th.randint(
-                    self.shift,
-                    [1 if self.same else n_sources, batch, 1, 1], device=sources.device)
-                sources_offsets = offsets.expand(n_sources, -1, channels, -1)
-                sources_indexes = th.arange(length, device=sources.device)
-                sources = sources.gather(3, sources_indexes + sources_offsets)
-
-                target_offsets = offsets.squeeze(dim=0) if self.same else th.randint(self.shift, [batch,1,1], device=target.device)
-                target_offsets = target_offsets.expand(-1,channels, -1)
-                target_indexes = th.arange(target_length, device=target.device)
-                target = target.gather(2, target_indexes + target_offsets)
-        out = sources, target
-        return out
+        target_scale = target_length / length
+        shift_length = np.random.randint(self.shift // 2, self.shift+1, 1)
+        output_sources = th.roll(sources, shifts=shift_length, dims=-1)
+        output_sources[..., :shift_length] *= 0
+        output_targets = th.roll(sources, shifts=shift_length*target_scale, dims=-1)
+        output_targets[..., :shift_length*target_scale] *= 0
+        return output_sources, output_targets
 
 
 class Augment(object):
