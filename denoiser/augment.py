@@ -206,9 +206,9 @@ class Shift(nn.Module):
         if self.shift > 0:
             for i in range(batch):
                 offset = np.random.randint(self.shift)
-                sources[:, i, :, :] = th.roll(sources[:, i, :, :], shifts=offset, dims=3)
+                sources[:, i, :, :] = th.roll(sources[:, i, :, :], shifts=offset, dims=2)
                 sources[:, i, :, :offset] *= 0
-                target[i, :, :] = th.roll(target[i, :, :], shifts=int(offset*target_scale), dims=2)
+                target[i, :, :] = th.roll(target[i, :, :], shifts=int(offset*target_scale), dims=1)
                 target[i, :, :int(offset*target_scale)] *= 0
         out = sources, target
         return out
