@@ -202,35 +202,14 @@ class Shift(nn.Module):
     def forward(self, sources, target):
         n_sources, batch, channels, length = sources.shape
         _ , _, target_length = target.shape
-        print("\n\n-------")
-        print(f"in sources shape: {sources.shape}")
-        print(f"in target shape: {target.shape}")
         target_scale = target_length / length
-        shift_length = np.random.randint(self.shift // 2, self.shift+1, 1)
-        length = length - self.shift
-        target_length = target_length - self.shift*self.target_scale_factor
         if self.shift > 0:
             offset = np.random.randint(self.shift)
             sources = th.roll(sources, shifts=offset, dims=3)
             sources[:, :, :, :offset] *= 0
             target = th.roll(target, shifts=int(offset*target_scale), dims=2)
             target[:, :, :int(offset*target_scale)] *= 0
-            # offsets = th.randint(
-            #     high=self.shift,
-            #     size=[1 if self.same else n_sources, batch, 1, 1], device=sources.device)
-            # sources_offsets = offsets.expand(n_sources, -1, channels, -1)
-            # sources_indexes = th.arange(length, device=sources.device)
-            # sources = sources.gather(3, sources_indexes + sources_offsets)
-            #
-            # target_offsets = offsets.squeeze(dim=0) if self.same else th.randint(self.shift, [batch, 1, 1], device=target.device)
-            # target_offsets = target_offsets.expand(-1, channels, -1)
-            # target_indexes = th.arange(target_length, device=target.device)
-            # target = target.gather(2, target_indexes + target_offsets)
         out = sources, target
-
-        print(f"out sources shape: {sources.shape}")
-        print(f"out target shape: {target.shape}")
-        print("-------\n\n")
         return out
 
 
