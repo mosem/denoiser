@@ -203,7 +203,7 @@ class Shift(nn.Module):
         n_sources, batch, channels, length = sources.shape
         _ , _, target_length = target.shape
         target_scale = target_length / length
-        shift_length = np.random.randint(self.shift // 2, self.shift+1, 1)
+        shift_length = np.random.randint(self.shift // 2, self.shift+1)
         output_sources = th.roll(sources, shifts=shift_length, dims=-1)
         output_sources[..., :shift_length] *= 0
         output_targets = th.roll(sources, shifts=shift_length*target_scale, dims=-1)
@@ -214,6 +214,7 @@ class Shift(nn.Module):
 class Augment(object):
 
     def __init__(self, args):
+        np.random.seed(args.seed)
         self.args = args
         augments = []
         self.r = Remix() if args.remix else None
