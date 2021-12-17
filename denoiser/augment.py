@@ -206,8 +206,8 @@ class Shift(nn.Module):
         shift_length = np.random.randint(self.shift // 2, self.shift+1)
         output_sources = th.roll(sources, shifts=shift_length, dims=-1)
         output_sources[..., :shift_length] *= 0
-        output_targets = th.roll(sources, shifts=shift_length*target_scale, dims=-1)
-        output_targets[..., :shift_length*target_scale] *= 0
+        output_targets = th.roll(sources, shifts=int(shift_length*target_scale), dims=-1)
+        output_targets[..., :int(shift_length*target_scale)] *= 0
         return output_sources, output_targets
 
 
