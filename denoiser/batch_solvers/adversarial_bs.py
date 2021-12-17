@@ -36,7 +36,7 @@ class AdversarialBS(GeneratorBS):
             estimate, latent_signal = prediction
         else:
             estimate, latent_signal = prediction, None
-        features_loss = self.get_features_loss(latent_signal , clean)
+        features_loss = self.get_features_loss(latent_signal, clean)
 
         if epoch >= self.disc_first_epoch:
             discriminator_fake_detached = discriminator(estimate.detach())

@@ -3,6 +3,7 @@ from denoiser.batch_solvers.adversarial_bs import AdversarialBS
 from denoiser.models.dataclasses import FeaturesConfig, DemucsConfig, DemucsEncoderConfig, DemucsDecoderConfig
 from denoiser.models.demucs_decoder import DemucsDecoder
 from denoiser.models.demucs_encoder import DemucsEncoder
+from denoiser.models.ft_conditioner import FtConditioner
 from denoiser.models.modules import Discriminator, LaplacianDiscriminator, BLSTM, OneDimDualTransformer
 from denoiser.models.demucs import Demucs
 from denoiser.models.caunet import Caunet
@@ -17,6 +18,7 @@ class BatchSolverFactory:
         ft_config = FeaturesConfig(**args.experiment.features_model) if hasattr(args.experiment, "features_model") else None
         include_ft = ft_config.include_ft if ft_config is not None else False
         get_ft_after_lstm = ft_config.get_ft_after_lstm if ft_config is not None else False
+        ft_conditioner = FtConditioner(args.device, ft_config)
         if 'adversarial' in args.experiment and args.experiment.adversarial:
             if args.experiment.model == "demucs":
                 generator = Demucs(DemucsConfig(**args.experiment.demucs), include_ft_in_output=include_ft)
@@ -42,12 +44,12 @@ class BatchSolverFactory:
             else:
                 discriminator = Discriminator(**args.experiment.discriminator)
 
-            return AdversarialBS(args, generator, discriminator, ft_config)
+            return AdversarialBS(args, generator, discriminator, ft_conditioner)
         else:
             if args.experiment.model == "demucs":
                 generator = Demucs(DemucsConfig(**args.experiment.demucs), include_ft_in_output=include_ft,
                                    get_ft_after_lstm=get_ft_after_lstm)
-                return GeneratorBS(args, generator, ft_config)
+                return GeneratorBS(args, generator, ft_conditioner)
             elif args.experiment.model == "demucs_skipless":
                 encoder = DemucsEncoder(DemucsEncoderConfig(**args.experiment.demucs_encoder))
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
