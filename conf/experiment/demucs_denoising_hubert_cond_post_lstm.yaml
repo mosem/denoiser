@@ -1,5 +1,5 @@
 # @package experiment
-experiment_name: demucs_denoising
+experiment_name: demucs_denoising_hubert_cond_post_lstm
 
 # Dataset related
 sample_rate: 16000 # target sample rate #should be included in training cfg
