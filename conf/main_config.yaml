@@ -74,7 +74,8 @@ world_size:
 # Hydra config
 hydra:
   run:
-    dir: ./outputs/${experiment.experiment_name}_${now:%Y-%m-%d_%H-%M-%S}
+    dir: ./outputs/${experiment.experiment_name}
+#    dir: ./outputs/${experiment.experiment_name}_${now:%Y-%m-%d_%H-%M-%S}
   job:
     config:
       # configuration for the ${hydra.job.override_dirname} runtime variable
