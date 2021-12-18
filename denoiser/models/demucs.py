@@ -155,8 +155,9 @@ class Demucs(nn.Module):
             x = encode(x)
             skips.append(x)
         pre_lstm = x
-        post_lstm = self.lstm(x)
-        self.ft_module(post_lstm) if self.ft_module is not None else post_lstm
+        pre_lstm = self.ft_module(pre_lstm) if self.ft_module is not None and not self.get_ft_after_lstm else pre_lstm
+        post_lstm = self.lstm(pre_lstm)
+        post_lstm = self.ft_module(post_lstm) if self.ft_module is not None and self.get_ft_after_lstm else post_lstm
         x = post_lstm
         for decode in self.decoder:
             skip = skips.pop(-1)

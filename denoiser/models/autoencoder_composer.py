@@ -37,13 +37,15 @@ class Autoencoder(nn.Module):
 
         if self.skips:
             pre_attn, skips_signals = self.encoder(signal)
+            pre_attn = self.ft_module(pre_attn) if self.ft_module is not None and not self.post_attn else pre_attn
             post_attn = self.attention_module(pre_attn)
-            post_attn = self.ft_module(post_attn) if self.ft_module is not None else post_attn
+            post_attn = self.ft_module(post_attn) if self.ft_module is not None and self.post_attn else post_attn
             out = self.decoder(post_attn, skips_signals)
         else:
             pre_attn = self.encoder(signal)
+            pre_attn = self.ft_module(pre_attn) if self.ft_module is not None and not self.post_attn else pre_attn
             post_attn = self.attention_module(pre_attn)
-            post_attn = self.ft_module(post_attn) if self.ft_module is not None else post_attn
+            post_attn = self.ft_module(post_attn) if self.ft_module is not None and self.post_attn else post_attn
             out = self.decoder(post_attn)
 
         if self.include_features_in_output:
