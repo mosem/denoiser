@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 from denoiser.models.ft_conditioner import FtConditioner
 from denoiser.utils import capture_init
@@ -35,17 +36,24 @@ class Autoencoder(nn.Module):
         else:
             std = 1
 
+        input_signal = signal
+        if self.ft_module is not None and self.ft_module.use_as_conditioning:
+            with torch.no_grad():
+                features = self.ft_module.extract_feats(input_signal.detach())
+        else:
+            features = None
+
         if self.skips:
             pre_attn, skips_signals = self.encoder(signal)
-            pre_attn = self.ft_module(pre_attn) if self.ft_module is not None and not self.post_attn else pre_attn
+            pre_attn = self.ft_module(pre_attn, features) if self.ft_module is not None and not self.post_attn else pre_attn
             post_attn = self.attention_module(pre_attn)
-            post_attn = self.ft_module(post_attn) if self.ft_module is not None and self.post_attn else post_attn
+            post_attn = self.ft_module(post_attn, features) if self.ft_module is not None and self.post_attn else post_attn
             out = self.decoder(post_attn, skips_signals)
         else:
             pre_attn = self.encoder(signal)
-            pre_attn = self.ft_module(pre_attn) if self.ft_module is not None and not self.post_attn else pre_attn
+            pre_attn = self.ft_module(pre_attn, features) if self.ft_module is not None and not self.post_attn else pre_attn
             post_attn = self.attention_module(pre_attn)
-            post_attn = self.ft_module(post_attn) if self.ft_module is not None and self.post_attn else post_attn
+            post_attn = self.ft_module(post_attn, features) if self.ft_module is not None and self.post_attn else post_attn
             out = self.decoder(post_attn)
 
         if self.include_features_in_output:

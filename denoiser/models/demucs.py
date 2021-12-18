@@ -7,6 +7,7 @@
 
 import math
 
+import torch
 from torch import nn
 
 from denoiser.models.dataclasses import FeaturesConfig, DemucsConfig
@@ -138,40 +139,46 @@ class Demucs(nn.Module):
             signal = signal / (self.floor + std)
         else:
             std = 1
-        x = signal
+        signal = signal
+        input_signal = signal
+        if self.ft_module is not None and self.ft_module.use_as_conditioning:
+            with torch.no_grad():
+                features = self.ft_module.extract_feats(input_signal.detach())
+        else:
+            features = None
 
         if self.scale_factor == 2:
-            x = upsample2(x)
+            signal = upsample2(signal)
         elif self.scale_factor == 4:
-            x = upsample2(x)
-            x = upsample2(x)
+            signal = upsample2(signal)
+            signal = upsample2(signal)
 
         if self.resample == 2:
-            x = upsample2(x)
+            signal = upsample2(signal)
         elif self.resample == 4:
-            x = upsample2(x)
-            x = upsample2(x)
+            signal = upsample2(signal)
+            signal = upsample2(signal)
         skips = []
         for encode in self.encoder:
-            x = encode(x)
-            skips.append(x)
-        pre_lstm = x
-        pre_lstm = self.ft_module(pre_lstm) if self.ft_module is not None and not self.get_ft_after_lstm else pre_lstm
+            signal = encode(signal)
+            skips.append(signal)
+        pre_lstm = signal
+        pre_lstm = self.ft_module(pre_lstm, features) if self.ft_module is not None and not self.get_ft_after_lstm else pre_lstm
         post_lstm = self.lstm(pre_lstm)
-        post_lstm = self.ft_module(post_lstm) if self.ft_module is not None and self.get_ft_after_lstm else post_lstm
-        x = post_lstm
+        post_lstm = self.ft_module(post_lstm, features) if self.ft_module is not None and self.get_ft_after_lstm else post_lstm
+        signal = post_lstm
         for decode in self.decoder:
             skip = skips.pop(-1)
-            x = x + skip[..., :x.shape[-1]]
-            x = decode(x)
+            signal = signal + skip[..., :signal.shape[-1]]
+            signal = decode(signal)
         if self.resample == 2:
-            x = downsample2(x)
+            signal = downsample2(signal)
         elif self.resample == 4:
-            x = downsample2(x)
-            x = downsample2(x)
+            signal = downsample2(signal)
+            signal = downsample2(signal)
         else:
             pass
 
         if self.include_features_in_output:
-            return std * x, post_lstm if self.get_ft_after_lstm else pre_lstm
-        return std * x
+            return std * signal, post_lstm if self.get_ft_after_lstm else pre_lstm
+        return std * signal

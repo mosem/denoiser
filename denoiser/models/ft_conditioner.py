@@ -27,10 +27,10 @@ class FtConditioner(nn.Module):
     def extract_feats(self, reference_signal):
         return self.ft_model.extract_feats(reference_signal)
 
-    def forward(self, x):
+    def forward(self, x, features=None):
         if self.use_as_conditioning:
             with torch.no_grad():
-                features = self.extract_feats(x.detach())
+                features = self.extract_feats(x.detach()) if features is None else features
             if self.merge_method == 'inter':
                 x_res = F.interpolate(features.permute(0, 2, 1), x.shape[0]).permute(2, 0, 1)
             elif self.merge_method == 'attn':
