@@ -76,6 +76,7 @@ class Demucs(nn.Module):
                                           features_module.include_ft and \
                                           not features_module.use_as_conditioning
         self.get_ft_after_lstm = features_module is not None and features_module.get_ft_after_lstm
+        self.ft_module = features_module
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
