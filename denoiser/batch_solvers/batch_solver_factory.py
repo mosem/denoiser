@@ -16,22 +16,20 @@ class BatchSolverFactory:
     @staticmethod
     def get_bs(args):
         ft_config = FeaturesConfig(**args.experiment.features_model) if hasattr(args.experiment, "features_model") else None
-        include_ft = ft_config.include_ft if ft_config is not None else False
-        get_ft_after_lstm = ft_config.get_ft_after_lstm if ft_config is not None else False
         ft_conditioner = FtConditioner(args.device, ft_config)
         if 'adversarial' in args.experiment and args.experiment.adversarial:
             if args.experiment.model == "demucs":
-                generator = Demucs(DemucsConfig(**args.experiment.demucs), include_ft_in_output=include_ft)
+                generator = Demucs(DemucsConfig(**args.experiment.demucs), features_module=ft_config)
             elif args.experiment.model == "demucs_skipless":
                 encoder = DemucsEncoder(DemucsEncoderConfig(**args.experiment.demucs_encoder))
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
                 decoder = DemucsDecoder(DemucsDecoderConfig(**args.experiment.demucs_decoder))
-                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder, include_ft_in_output=include_ft)
+                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder, features_module=ft_config)
             elif args.experiment.model == "demucs_with_transformer":
                 encoder = DemucsEncoder(DemucsEncoderConfig(**args.experiment.demucs_encoder))
                 attention = OneDimDualTransformer(dim=encoder.get_n_chout(), **args.experiment.transformer)
                 decoder = DemucsDecoder(DemucsDecoderConfig(**args.experiment.demucs_decoder))
-                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder, include_ft_in_output=include_ft)
+                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder, features_module=ft_config)
             elif args.experiment.model == "seanet":
                 generator = Seanet(**args.experiment.seanet)
             elif args.experiment.model == "caunet":
@@ -47,20 +45,19 @@ class BatchSolverFactory:
             return AdversarialBS(args, generator, discriminator, ft_conditioner)
         else:
             if args.experiment.model == "demucs":
-                generator = Demucs(DemucsConfig(**args.experiment.demucs), include_ft_in_output=include_ft,
-                                   get_ft_after_lstm=get_ft_after_lstm)
+                generator = Demucs(DemucsConfig(**args.experiment.demucs), features_module=ft_config)
                 return GeneratorBS(args, generator, ft_conditioner)
             elif args.experiment.model == "demucs_skipless":
                 encoder = DemucsEncoder(DemucsEncoderConfig(**args.experiment.demucs_encoder))
                 attention = BLSTM(dim=encoder.get_n_chout(), **args.experiment.blstm)
                 decoder = DemucsDecoder(DemucsDecoderConfig(**args.experiment.demucs_decoder))
-                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder, include_ft_in_output=include_ft)
+                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder, features_module=ft_config)
                 return GeneratorBS(args, generator)
             elif args.experiment.model == "demucs_with_transformer":
                 encoder = DemucsEncoder(DemucsEncoderConfig(**args.experiment.demucs_encoder))
                 attention = OneDimDualTransformer(dim=encoder.get_n_chout(), **args.experiment.transformer)
                 decoder = DemucsDecoder(DemucsDecoderConfig(**args.experiment.demucs_decoder))
-                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder, include_ft_in_output=include_ft)
+                generator = Autoencoder(encoder, attention, decoder, **args.experiment.autoencoder, features_module=ft_config)
                 return GeneratorBS(args, generator)
             elif args.experiment.model == "seanet":
                 generator = Seanet(**args.experiment.seanet)
