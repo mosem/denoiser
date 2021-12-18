@@ -37,7 +37,6 @@ class FtConditioner(nn.Module):
                 x_res = x.permute(1, 0, 2)
                 alpha = F.softmax((features.unsqueeze(1) * x_res.unsqueeze(2)).sum(dim=-1), dim=2)
                 x_res = torch.bmm(alpha, features).permute(1, 0, 2)
-            print(f"x: {x.shape}, x_res: {x_res.shape}")
             x = torch.cat([x, x_res], dim=2)
             x = self.proj(x)
         return x
