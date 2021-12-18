@@ -31,6 +31,7 @@ class FtConditioner(nn.Module):
         if self.use_as_conditioning:
             with torch.no_grad():
                 features = self.extract_feats(x.detach()) if features is None else features
+            print(f"inputs -- x: {x.shape}, features: {features.shape}")
             if self.merge_method == 'inter':
                 x_res = F.interpolate(features.permute(0, 2, 1), x.shape[0]).permute(2, 0, 1)
             elif self.merge_method == 'attn':
