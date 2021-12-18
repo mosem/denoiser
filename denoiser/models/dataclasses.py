@@ -8,7 +8,7 @@ class FeaturesConfig:
     features_factor: float = 0.01
     features_dim: int = 768
     get_ft_after_lstm: bool = True
-    use_as_conditioning: bool =False
+    use_as_conditioning: bool = False
     merge_method: str = 'inter'
     features_dim_for_conditioning: int = 128
 

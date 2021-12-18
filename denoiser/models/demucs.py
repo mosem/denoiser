@@ -10,6 +10,7 @@ import math
 from torch import nn
 
 from denoiser.models.dataclasses import FeaturesConfig, DemucsConfig
+from denoiser.models.ft_conditioner import FtConditioner
 from denoiser.models.modules import BLSTM
 from denoiser.resample import downsample2, upsample2
 from denoiser.utils import capture_init
@@ -54,8 +55,7 @@ class Demucs(nn.Module):
     """
     @capture_init
     def __init__(self, demucs_config: DemucsConfig,
-                 include_ft_in_output=False,
-                 get_ft_after_lstm=False):
+                 features_module: FtConditioner = None):
 
         super().__init__()
         if demucs_config.resample not in [1, 2, 4]:
@@ -72,8 +72,10 @@ class Demucs(nn.Module):
         self.resample = demucs_config.resample
         self.normalize = demucs_config.normalize
         self.scale_factor = demucs_config.scale_factor
-        self.include_features_in_output = include_ft_in_output
-        self.get_ft_after_lstm = get_ft_after_lstm
+        self.include_features_in_output = features_module is not None and \
+                                          features_module.include_ft and \
+                                          not features_module.use_as_conditioning
+        self.get_ft_after_lstm = features_module is not None and features_module.get_ft_after_lstm
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -154,6 +156,7 @@ class Demucs(nn.Module):
             skips.append(x)
         pre_lstm = x
         post_lstm = self.lstm(x)
+        self.ft_module(post_lstm) if self.ft_module is not None else post_lstm
         x = post_lstm
         for decode in self.decoder:
             skip = skips.pop(-1)
