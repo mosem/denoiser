@@ -32,7 +32,7 @@ class FtConditioner(nn.Module):
             with torch.no_grad():
                 features = self.extract_feats(x.detach()) if features is None else features
             if self.merge_method == 'inter':
-                x_res = F.interpolate(features.permute(0, 2, 1), x.shape[-1]).permute(0, 2, 1)
+                x_res = F.interpolate(features.permute(0, 2, 1), x.shape[1]).permute(0, 2, 1)
             elif self.merge_method == 'attn':
                 x_res = x.permute(1, 0, 2)
                 alpha = F.softmax((features.unsqueeze(1) * x_res.unsqueeze(2)).sum(dim=-1), dim=2)
