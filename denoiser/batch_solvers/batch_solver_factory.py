@@ -16,6 +16,7 @@ class BatchSolverFactory:
     def get_bs(args):
         ft_config = FeaturesConfig(**args.experiment.features_model) if hasattr(args.experiment, "features_model") else None
         include_ft = ft_config.include_ft if ft_config is not None else False
+        get_ft_after_lstm = ft_config.get_ft_after_lstm if ft_config is not None else False
         if 'adversarial' in args.experiment and args.experiment.adversarial:
             if args.experiment.model == "demucs":
                 generator = Demucs(DemucsConfig(**args.experiment.demucs), include_ft_in_output=include_ft)
@@ -44,7 +45,8 @@ class BatchSolverFactory:
             return AdversarialBS(args, generator, discriminator, ft_config)
         else:
             if args.experiment.model == "demucs":
-                generator = Demucs(DemucsConfig(**args.experiment.demucs), include_ft_in_output=include_ft)
+                generator = Demucs(DemucsConfig(**args.experiment.demucs), include_ft_in_output=include_ft,
+                                   get_ft_after_lstm=get_ft_after_lstm)
                 return GeneratorBS(args, generator, ft_config)
             elif args.experiment.model == "demucs_skipless":
                 encoder = DemucsEncoder(DemucsEncoderConfig(**args.experiment.demucs_encoder))
