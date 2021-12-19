@@ -18,7 +18,7 @@ class GeneratorBS(BatchSolver):
         self.device = args.device
 
         if torch.cuda.is_available() and args.device == 'cuda':
-            generator.cuda()
+            generator.to('cuda')
         generator_optimizer = torch.optim.Adam(generator.parameters(), lr=args.lr, betas=(0.9, args.beta2))
 
         self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
