@@ -103,7 +103,7 @@ class Solver(object):
         elif self.continue_from:
             load_from = self.continue_from
             load_best = self.args.continue_best
-            keep_history = False
+            keep_history = self.args.keep_history
 
         if load_from:
             logger.info(f'Loading checkpoint model: {load_from}')
