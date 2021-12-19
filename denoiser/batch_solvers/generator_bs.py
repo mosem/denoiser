@@ -27,6 +27,7 @@ class GeneratorBS(BatchSolver):
         self._models.update({'generator': generator})
         self._optimizers.update({'generator_optimizer': generator_optimizer})
         self._losses_names += ['generator']
+        self.including_augmentations = args.remix or args.bandmask or args.shift or args.revecho
 
     def get_generator_for_evaluation(self, best_states):
         generator = self._models[GENERATOR_KEY]
@@ -38,7 +39,7 @@ class GeneratorBS(BatchSolver):
 
     def run(self, data, cross_valid=False, epoch=0):
         noisy, clean = data
-        estimate = self._models[GENERATOR_KEY](noisy)
+        estimate = self._models[GENERATOR_KEY](noisy, clean.shape[-1] if self.including_augmentations else None)
         loss = self._get_loss(clean, estimate)
         if not cross_valid:
             self._optimize(loss)

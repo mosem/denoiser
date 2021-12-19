@@ -21,7 +21,7 @@ class AdversarialBS(GeneratorBS):
         self._optimizers.update(({DISCRIMINATOR_OPTIMIZER_KEY: disc_optimizer}))
         self._losses_names += [DISCRIMINATOR_KEY]
         self.disc_first_epoch = args.experiment.discriminator_first_epoch if hasattr(args.experiment, "discriminator_first_epoch") else 0
-
+        self.including_augmentations = args.remix or args.bandmask or args.shift or args.revecho
 
     def run(self, data, cross_valid=False, epoch=0):
         noisy, clean = data
@@ -29,7 +29,7 @@ class AdversarialBS(GeneratorBS):
         generator = self._models[GENERATOR_KEY]
         discriminator = self._models[DISCRIMINATOR_KEY]
 
-        prediction = generator(noisy)
+        prediction = generator(noisy, clean.shape[-1] if self.including_augmentations else None)
 
         # get features regularization loss if specified
         if self.include_ft:
@@ -44,8 +44,6 @@ class AdversarialBS(GeneratorBS):
             discriminator_fake = discriminator(estimate)
 
             loss_discriminator = self._get_discriminator_loss(discriminator_fake_detached, discriminator_real)
-
-
 
             total_loss_generator = features_loss + self._get_total_generator_loss(discriminator_fake, discriminator_real)
 

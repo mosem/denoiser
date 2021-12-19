@@ -202,14 +202,17 @@ class Shift(nn.Module):
     def forward(self, sources, target):
         n_sources, batch, channels, length = sources.shape
         _ , _, target_length = target.shape
+        length = length - self.shift
         target_scale = target_length / length
         if self.shift > 0:
-            for i in range(batch):
-                offset = np.random.randint(self.shift)
-                sources[:, i, :, :] = th.roll(sources[:, i, :, :], shifts=offset, dims=2)
-                sources[:, i, :, :offset] *= 0
-                target[i, :, :] = th.roll(target[i, :, :], shifts=int(offset*target_scale), dims=1)
-                target[i, :, :int(offset*target_scale)] *= 0
+            offsets = th.randint(
+                self.shift,
+                [1 if self.same else n_sources, batch, 1, 1], device=sources.device)
+            offsets = offsets.expand(sources, -1, channels, -1)
+            indexes = th.arange(length, device=sources.device)
+            sources = sources.gather(3, indexes + offsets)
+            target = target.gather(3, indexes + (offsets * target_scale).int())
+
         out = sources, target
         return out
 
