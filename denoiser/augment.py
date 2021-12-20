@@ -12,6 +12,7 @@ from torch.nn import functional as F
 from . import dsp
 from .resample import downsample2
 
+
 class Remix(nn.Module):
     """Remix.
     Mixes different noises with clean speech within a given batch
@@ -24,7 +25,6 @@ class Remix(nn.Module):
         perm = th.argsort(th.rand(bs, device=device), dim=0)
         out = th.stack([noise[perm], clean_source]), target
         return out
-
 
 
 class RevEcho(nn.Module):
@@ -247,8 +247,6 @@ class Augment(object):
             sources, target = self.b(sources, target)
         if self.s is not None:
             sources, target = self.s(sources, target)
-        # if self.re is not None:
-        #     sources, target = self.re(sources, target)
         source_noise, source_clean = sources
         source_noisy = source_noise + source_clean
         return source_noisy, target
