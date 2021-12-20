@@ -9,7 +9,6 @@ import random
 import torch as th
 from torch import nn
 from torch.nn import functional as F
-import numpy as np
 from . import dsp
 from .resample import downsample2
 
@@ -26,7 +25,6 @@ class Remix(nn.Module):
         perm = th.argsort(th.rand(bs, device=device), dim=0)
         out = th.stack([noise[perm], clean_source]), target
         return out
-
 
 
 class RevEcho(nn.Module):
@@ -203,13 +201,19 @@ class Shift(nn.Module):
         n_sources, batch, channels, length = sources.shape
         _ , _, target_length = target.shape
         target_scale = target_length / length
+        target_length -= int(self.shift * target_scale)
+        length = length - self.shift
         if self.shift > 0:
-            for i in range(batch):
-                offset = np.random.randint(self.shift)
-                sources[:, i, :, :] = th.roll(sources[:, i, :, :], shifts=offset, dims=2)
-                sources[:, i, :, :offset] *= 0
-                target[i, :, :] = th.roll(target[i, :, :], shifts=int(offset*target_scale), dims=1)
-                target[i, :, :int(offset*target_scale)] *= 0
+            offsets = th.randint(
+                self.shift,
+                [1 if self.same else n_sources, batch, 1, 1], device=sources.device)
+            offsets = offsets.expand(n_sources, -1, channels, -1)
+            indexes = th.arange(length, device=sources.device)
+            target_indexes = th.arange(target_length, device=sources.device)
+            sources = sources.gather(3, indexes + offsets)
+            offsets = (offsets * target_scale).int()
+            target = (target.gather(2, target_indexes + offsets[1]))
+
         out = sources, target
         return out
 
@@ -218,13 +222,11 @@ class Augment(object):
 
     def __init__(self, args):
         self.args = args
-        augments = []
         self.r = Remix() if args.remix else None
         self.b = BandMask(args.bandmask, scale_factor=args.experiment.scale_factor,
                                              target_sample_rate=args.experiment.sample_rate) if args.bandmask else None
         self.s = Shift(args.shift, args.shift_same, args.experiment.scale_factor) if args.shift else None
-        self.re = RevEcho(args.revecho, target_sample_rate=args.experiment.sample_rate, scale_factor=args.experiment.scale_factor) if args.revecho else None
-        self.augment = self.r is not None or self.s is not None or self.b is not None or self.re is not None
+        self.augment = self.r is not None or self.s is not None or self.b is not None
 
     def augment_data(self, noisy, clean):
         if not self.augment:
@@ -245,8 +247,6 @@ class Augment(object):
             sources, target = self.b(sources, target)
         if self.s is not None:
             sources, target = self.s(sources, target)
-        if self.re is not None:
-            sources, target = self.re(sources, target)
         source_noise, source_clean = sources
         source_noisy = source_noise + source_clean
         return source_noisy, target

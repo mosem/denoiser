@@ -119,6 +119,7 @@ class Demucs(nn.Module):
         If the mixture has a valid length, the estimated sources
         will have exactly the same length.
         """
+        length -= self.shift
         length = math.ceil(length * self.scale_factor)
         length = math.ceil(length * self.resample)
         for idx in range(self.depth):
@@ -126,10 +127,10 @@ class Demucs(nn.Module):
             length = max(length, 1)
         for idx in range(self.depth):
             length = (length - 1) * self.stride + self.kernel_size
-        length = int(math.ceil(length / self.resample))
+        length = int(math.ceil(length / self.resample)) + self.scale_factor * self.shift
         return int(length)
 
-    def forward(self, signal):
+    def forward(self, signal, expected_size: int=None):
         if signal.dim() == 2:
             signal = signal.unsqueeze(1)
 
@@ -178,6 +179,9 @@ class Demucs(nn.Module):
             signal = downsample2(signal)
         else:
             pass
+
+        if expected_size is not None:  # force trimming in case of augmentations
+            signal = signal[..., :expected_size]
 
         if self.include_features_in_output:
             return std * signal, post_lstm if self.get_ft_after_lstm else pre_lstm

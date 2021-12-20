@@ -30,6 +30,7 @@ class DemucsConfig:
     rescale: float = 0.1
     scale_factor: int = 1
     skips: bool = False
+    shift: int = 0
 
 @dataclass
 class DemucsEncoderConfig:
