@@ -39,7 +39,7 @@ features_model:
   get_ft_after_lstm: True
   use_as_conditioning: True
   merge_method: 'inter'
-  features_dim_for_conditioning: 128
+  features_dim_for_conditioning: 218
 
 mel:
   use_melspec: False
