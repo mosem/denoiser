@@ -43,7 +43,7 @@ class Autoencoder(nn.Module):
             out = self.decoder(post_attn)
 
         if expected_size is not None:  # force trimming in case of augmentations
-            out = out[...:expected_size]
+            out = out[..., :expected_size]
 
         if self.include_features_in_output:
             return std*out, post_attn if self.post_attn else pre_attn
