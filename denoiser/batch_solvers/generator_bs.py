@@ -61,6 +61,10 @@ class GeneratorBS(BatchSolver):
 
         else:
             estimate, latent_signal = prediction, None
+
+        if estimate.shape[-1] < clean.shape[-1]:  # in case of augmentations
+            clean = clean[..., :estimate.shape[-1]]
+
         loss = self.get_features_loss(latent_signal, clean)
         with torch.autograd.set_detect_anomaly(True):
             if self.args.loss == 'l1':
