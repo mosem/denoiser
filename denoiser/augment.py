@@ -12,7 +12,7 @@ from torch.nn import functional as F
 import numpy as np
 from . import dsp
 from .resample import downsample2
-
+import logging
 
 class Remix(nn.Module):
     """Remix.
@@ -233,8 +233,8 @@ class Augment(object):
         if not self.augment:
             return noisy, clean
 
-        print("---------")
-        print(f"noisy: {noisy.shape}, clean {clean.shape}")
+        logging.info("---------")
+        logging.info(f"noisy: {noisy.shape}, clean {clean.shape}")
 
         if self.args.experiment.scale_factor == 1:
             clean_downsampled = clean
@@ -247,13 +247,13 @@ class Augment(object):
         sources = th.stack([noise, clean_downsampled])
         if self.r is not None:
             sources, target = self.r(sources, clean)
-        print(f"r -- noisy: {sources[0].shape}, clean {target.shape}")
+        logging.info(f"r -- noisy: {sources[0].shape}, clean {target.shape}")
         if self.b is not None:
             sources, target = self.b(sources, target)
-        print(f"b -- noisy: {sources[0].shape}, clean {target.shape}")
+        logging.info(f"b -- noisy: {sources[0].shape}, clean {target.shape}")
         if self.s is not None:
             sources, target = self.s(sources, target)
-        print(f"s -- noisy: {sources[0].shape}, clean {target.shape}")
+        logging.info(f"s -- noisy: {sources[0].shape}, clean {target.shape}")
         # if self.re is not None:
         #     sources, target = self.re(sources, target)
         source_noise, source_clean = sources
