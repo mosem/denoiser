@@ -221,17 +221,20 @@ class Augment(object):
 
     def __init__(self, args):
         self.args = args
-        augments = []
         self.r = Remix() if args.remix else None
         self.b = BandMask(args.bandmask, scale_factor=args.experiment.scale_factor,
                                              target_sample_rate=args.experiment.sample_rate) if args.bandmask else None
         self.s = Shift(args.shift, args.shift_same, args.experiment.scale_factor) if args.shift else None
-        self.re = RevEcho(args.revecho, target_sample_rate=args.experiment.sample_rate, scale_factor=args.experiment.scale_factor) if args.revecho else None
-        self.augment = self.r is not None or self.s is not None or self.b is not None or self.re is not None
+        # self.re = RevEcho(args.revecho, target_sample_rate=args.experiment.sample_rate, scale_factor=args.experiment.scale_factor) if args.revecho else None
+        # self.augment = self.r is not None or self.s is not None or self.b is not None or self.re is not None
+        self.augment = self.r is not None or self.s is not None or self.b is not None
 
     def augment_data(self, noisy, clean):
         if not self.augment:
             return noisy, clean
+
+        print("---------")
+        print(f"noisy: {noisy.shape}, clean {clean.shape}")
 
         if self.args.experiment.scale_factor == 1:
             clean_downsampled = clean
@@ -244,12 +247,15 @@ class Augment(object):
         sources = th.stack([noise, clean_downsampled])
         if self.r is not None:
             sources, target = self.r(sources, clean)
+        print(f"r -- noisy: {sources[0].shape}, clean {clean.shape}")
         if self.b is not None:
             sources, target = self.b(sources, target)
+        print(f"b -- noisy: {sources[0].shape}, clean {clean.shape}")
         if self.s is not None:
             sources, target = self.s(sources, target)
-        if self.re is not None:
-            sources, target = self.re(sources, target)
+        print(f"s -- noisy: {sources[0].shape}, clean {clean.shape}")
+        # if self.re is not None:
+        #     sources, target = self.re(sources, target)
         source_noise, source_clean = sources
         source_noisy = source_noise + source_clean
         return source_noisy, target
