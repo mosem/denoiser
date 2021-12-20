@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 
 from denoiser.batch_solvers.generator_bs import GeneratorBS
-from denoiser.models.dataclasses import FeaturesConfig
+from denoiser.models.ft_conditioner import FtConditioner
 
 GENERATOR_KEY = 'generator'
 DISCRIMINATOR_KEY = 'discriminator'
@@ -11,8 +11,8 @@ DISCRIMINATOR_OPTIMIZER_KEY = 'discriminator_optimizer'
 
 class AdversarialBS(GeneratorBS):
 
-    def __init__(self, args, generator, discriminator, features_config: FeaturesConfig=None):
-        super().__init__(args, generator, features_config)
+    def __init__(self, args, generator, discriminator, features_module: FtConditioner=None):
+        super().__init__(args, generator, features_module)
         if torch.cuda.is_available():
             discriminator.cuda()
         self._models.update({DISCRIMINATOR_KEY: discriminator})
@@ -40,7 +40,7 @@ class AdversarialBS(GeneratorBS):
         if estimate.shape[-1] < clean.shape[-1]:  # in case of augmentations
             clean = clean[..., :estimate.shape[-1]]
 
-        features_loss = self.get_features_loss(latent_signal , clean)
+        features_loss = self.get_features_loss(latent_signal, clean)
 
         if epoch >= self.disc_first_epoch:
             discriminator_fake_detached = discriminator(estimate.detach())

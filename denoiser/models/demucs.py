@@ -7,9 +7,11 @@
 
 import math
 
+import torch
 from torch import nn
 
 from denoiser.models.dataclasses import FeaturesConfig, DemucsConfig
+from denoiser.models.ft_conditioner import FtConditioner
 from denoiser.models.modules import BLSTM
 from denoiser.resample import downsample2, upsample2
 from denoiser.utils import capture_init
@@ -54,8 +56,7 @@ class Demucs(nn.Module):
     """
     @capture_init
     def __init__(self, demucs_config: DemucsConfig,
-                 include_ft_in_output=False,
-                 get_ft_after_lstm=False):
+                 features_module: FtConditioner = None):
 
         super().__init__()
         if demucs_config.resample not in [1, 2, 4]:
@@ -73,8 +74,11 @@ class Demucs(nn.Module):
         self.normalize = demucs_config.normalize
         self.scale_factor = demucs_config.scale_factor
         self.shift = demucs_config.shift
-        self.include_features_in_output = include_ft_in_output
-        self.get_ft_after_lstm = get_ft_after_lstm
+        self.include_features_in_output = features_module is not None and \
+                                          features_module.include_ft and \
+                                          not features_module.use_as_conditioning
+        self.get_ft_after_lstm = features_module is not None and features_module.get_ft_after_lstm
+        self.ft_module = features_module
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -137,41 +141,49 @@ class Demucs(nn.Module):
             signal = signal / (self.floor + std)
         else:
             std = 1
-        x = signal
+        signal = signal
+        input_signal = signal
+        if self.ft_module is not None and self.ft_module.use_as_conditioning:
+            with torch.no_grad():
+                features = self.ft_module.extract_feats(input_signal.detach())
+        else:
+            features = None
 
         if self.scale_factor == 2:
-            x = upsample2(x)
+            signal = upsample2(signal)
         elif self.scale_factor == 4:
-            x = upsample2(x)
-            x = upsample2(x)
+            signal = upsample2(signal)
+            signal = upsample2(signal)
 
         if self.resample == 2:
-            x = upsample2(x)
+            signal = upsample2(signal)
         elif self.resample == 4:
-            x = upsample2(x)
-            x = upsample2(x)
+            signal = upsample2(signal)
+            signal = upsample2(signal)
         skips = []
         for encode in self.encoder:
-            x = encode(x)
-            skips.append(x)
-        pre_lstm = x
-        post_lstm = self.lstm(x)
-        x = post_lstm
+            signal = encode(signal)
+            skips.append(signal)
+        pre_lstm = signal
+        pre_lstm = self.ft_module(pre_lstm, features) if self.ft_module is not None and not self.get_ft_after_lstm else pre_lstm
+        post_lstm = self.lstm(pre_lstm)
+        post_lstm = self.ft_module(post_lstm, features) if self.ft_module is not None and self.get_ft_after_lstm else post_lstm
+        signal = post_lstm
         for decode in self.decoder:
             skip = skips.pop(-1)
-            x = x + skip[..., :x.shape[-1]]
-            x = decode(x)
+            signal = signal + skip[..., :signal.shape[-1]]
+            signal = decode(signal)
         if self.resample == 2:
-            x = downsample2(x)
+            signal = downsample2(signal)
         elif self.resample == 4:
-            x = downsample2(x)
-            x = downsample2(x)
+            signal = downsample2(signal)
+            signal = downsample2(signal)
         else:
             pass
 
         if expected_size is not None:  # force trimming in case of augmentations
-            x = x[..., :expected_size]
+            signal = signal[..., :expected_size]
 
         if self.include_features_in_output:
-            return std * x, post_lstm if self.get_ft_after_lstm else pre_lstm
-        return std * x
+            return std * signal, post_lstm if self.get_ft_after_lstm else pre_lstm
+        return std * signal

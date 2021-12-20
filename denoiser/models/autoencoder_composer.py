@@ -1,6 +1,6 @@
+import torch
 from torch import nn
-
-from denoiser.models.dataclasses import FeaturesConfig
+from denoiser.models.ft_conditioner import FtConditioner
 from denoiser.utils import capture_init
 
 
@@ -8,7 +8,7 @@ class Autoencoder(nn.Module):
 
     @capture_init
     def __init__(self, encoder, attention_module, decoder, skips, normalize, floor=1e-3,
-                 include_ft_in_output=False, get_ft_after_attn_module=False):
+                 features_module: FtConditioner = None):
         super().__init__()
         self.encoder = encoder
         self.attention_module = attention_module
@@ -16,8 +16,11 @@ class Autoencoder(nn.Module):
         self.skips = skips
         self.floor = floor
         self.normalize = normalize
-        self.include_features_in_output = include_ft_in_output
-        self.post_attn = get_ft_after_attn_module
+        self.include_features_in_output = features_module is not None and \
+                                          features_module.include_ft and \
+                                          not features_module.use_as_conditioning
+        self.post_attn = features_module is not None and features_module.get_ft_after_lstm
+        self.ft_module = features_module
 
     def estimate_output_length(self, input_length):
         encoder_output_length = self.encoder.estimate_output_length(input_length)
@@ -33,18 +36,29 @@ class Autoencoder(nn.Module):
         else:
             std = 1
 
+        input_signal = signal
+        if self.ft_module is not None and self.ft_module.use_as_conditioning:
+            with torch.no_grad():
+                features = self.ft_module.extract_feats(input_signal.detach())
+        else:
+            features = None
+
         if self.skips:
-            latent, skips_signals = self.encoder(signal)
-            latent = self.attention_module(latent)
-            out = self.decoder(latent, skips_signals)
+            pre_attn, skips_signals = self.encoder(signal)
+            pre_attn = self.ft_module(pre_attn, features) if self.ft_module is not None and not self.post_attn else pre_attn
+            post_attn = self.attention_module(pre_attn)
+            post_attn = self.ft_module(post_attn, features) if self.ft_module is not None and self.post_attn else post_attn
+            out = self.decoder(post_attn, skips_signals)
         else:
             pre_attn = self.encoder(signal)
+            pre_attn = self.ft_module(pre_attn, features) if self.ft_module is not None and not self.post_attn else pre_attn
             post_attn = self.attention_module(pre_attn)
+            post_attn = self.ft_module(post_attn, features) if self.ft_module is not None and self.post_attn else post_attn
             out = self.decoder(post_attn)
 
         if expected_size is not None:  # force trimming in case of augmentations
             out = out[..., :expected_size]
 
         if self.include_features_in_output:
-            return std*out, post_attn if self.post_attn else pre_attn
+            return std * out, post_attn if self.post_attn else pre_attn
         return std * out

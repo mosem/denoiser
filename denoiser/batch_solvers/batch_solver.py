@@ -3,23 +3,23 @@ from abc import ABC, abstractmethod
 import torch
 import torchaudio
 import torch.nn.functional as F
+
+from denoiser.models.ft_conditioner import FtConditioner
 from denoiser.utils import serialize_model, copy_state, load_lexical_model
 from denoiser.models.dataclasses import FeaturesConfig
 
 
 class BatchSolver(ABC):
-    def __init__(self, args, features_config: FeaturesConfig=None):
+    def __init__(self, args, features_module: FtConditioner=None):
         self.args = args
         self._models = {}
         self._optimizers = {}
         self._losses_names = []
-        self.features_config = features_config
-        self.include_ft = features_config.include_ft if features_config is not None else False
+        self.features_config = features_module
+        self.include_ft = features_module.include_ft if features_module is not None else False
         if self.include_ft:
-            self.ft_model = load_lexical_model(features_config.feature_model,
-                                               features_config.state_dict_path,
-                                               args.device)
-            self.ft_factor = features_config.features_factor
+            self.ft_model = features_module
+            self.ft_factor = features_module.features_factor
 
     def train(self):
         for model in self.get_models().values():

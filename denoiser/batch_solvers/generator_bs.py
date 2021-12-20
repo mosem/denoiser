@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 
 from denoiser.batch_solvers.batch_solver import BatchSolver
-from denoiser.models.dataclasses import FeaturesConfig
+from denoiser.models.ft_conditioner import FtConditioner
 
 from denoiser.stft_loss import MultiResolutionSTFTLoss
 
@@ -11,10 +11,11 @@ from denoiser.stft_loss import MultiResolutionSTFTLoss
 GENERATOR_KEY = 'generator'
 GENERATOR_OPTIMIZER_KEY = 'generator_optimizer'
 
+
 class GeneratorBS(BatchSolver):
 
-    def __init__(self, args, generator, features_config: FeaturesConfig=None):
-        super(GeneratorBS, self).__init__(args, features_config)
+    def __init__(self, args, generator, feature_module: FtConditioner=None):
+        super(GeneratorBS, self).__init__(args, feature_module)
         self.device = args.device
 
         if torch.cuda.is_available() and args.device == 'cuda':
