@@ -9,10 +9,8 @@ import random
 import torch as th
 from torch import nn
 from torch.nn import functional as F
-import numpy as np
 from . import dsp
 from .resample import downsample2
-import logging
 
 class Remix(nn.Module):
     """Remix.
@@ -205,12 +203,6 @@ class Shift(nn.Module):
         target_scale = target_length / length
         target_length -= int(self.shift * target_scale)
         length = length - self.shift
-        logging.info(f"s -------- ")
-        logging.info(f"sources:\t{sources.shape}")
-        logging.info(f"target:\t{target.shape}")
-        logging.info(f"length:\t{length}")
-        logging.info(f"target_length:\t{target_length}")
-        logging.info(f"target_scale:\t{target_scale}")
         if self.shift > 0:
             offsets = th.randint(
                 self.shift,
@@ -218,12 +210,8 @@ class Shift(nn.Module):
             offsets = offsets.expand(n_sources, -1, channels, -1)
             indexes = th.arange(length, device=sources.device)
             target_indexes = th.arange(target_length, device=sources.device)
-            logging.info(f"offsets:\t{offsets.shape}")
-            logging.info(f"indexes:\t{indexes.shape}")
             sources = sources.gather(3, indexes + offsets)
             offsets = (offsets * target_scale).int()
-            logging.info(f"offsets:\t{offsets.shape}")
-            logging.info(f"target_indexes:\t{target_indexes.shape}")
             target = (target.gather(2, target_indexes + offsets[1]))
 
         out = sources, target
@@ -238,16 +226,11 @@ class Augment(object):
         self.b = BandMask(args.bandmask, scale_factor=args.experiment.scale_factor,
                                              target_sample_rate=args.experiment.sample_rate) if args.bandmask else None
         self.s = Shift(args.shift, args.shift_same, args.experiment.scale_factor) if args.shift else None
-        # self.re = RevEcho(args.revecho, target_sample_rate=args.experiment.sample_rate, scale_factor=args.experiment.scale_factor) if args.revecho else None
-        # self.augment = self.r is not None or self.s is not None or self.b is not None or self.re is not None
         self.augment = self.r is not None or self.s is not None or self.b is not None
 
     def augment_data(self, noisy, clean):
         if not self.augment:
             return noisy, clean
-
-        logging.info("---------")
-        logging.info(f"noisy: {noisy.shape}, clean {clean.shape}")
 
         if self.args.experiment.scale_factor == 1:
             clean_downsampled = clean
@@ -260,13 +243,10 @@ class Augment(object):
         sources = th.stack([noise, clean_downsampled])
         if self.r is not None:
             sources, target = self.r(sources, clean)
-        logging.info(f"r -- noisy: {sources.shape}, clean {target.shape}")
         if self.b is not None:
             sources, target = self.b(sources, target)
-        logging.info(f"b -- noisy: {sources.shape}, clean {target.shape}")
         if self.s is not None:
             sources, target = self.s(sources, target)
-        logging.info(f"s -- noisy: {sources.shape}, clean {target.shape}")
         # if self.re is not None:
         #     sources, target = self.re(sources, target)
         source_noise, source_clean = sources
