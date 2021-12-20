@@ -208,7 +208,7 @@ class Shift(nn.Module):
             offsets = th.randint(
                 self.shift,
                 [1 if self.same else n_sources, batch, 1, 1], device=sources.device)
-            offsets = offsets.expand(sources, -1, channels, -1)
+            offsets = offsets.expand(n_sources, -1, channels, -1)
             indexes = th.arange(length, device=sources.device)
             sources = sources.gather(3, indexes + offsets)
             target = target.gather(3, indexes + (offsets * target_scale).int())
