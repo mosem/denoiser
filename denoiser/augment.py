@@ -224,7 +224,7 @@ class Shift(nn.Module):
             offsets = (offsets * target_scale).int()
             logging.info(f"offsets:\t{offsets.shape}")
             logging.info(f"target_indexes:\t{target_indexes.shape}")
-            target = (target.gather(3, target_indexes + offsets[1]))
+            target = (target.gather(2, target_indexes + offsets[1]))
 
         out = sources, target
         return out
