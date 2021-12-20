@@ -247,13 +247,13 @@ class Augment(object):
         sources = th.stack([noise, clean_downsampled])
         if self.r is not None:
             sources, target = self.r(sources, clean)
-        print(f"r -- noisy: {sources[0].shape}, clean {clean.shape}")
+        print(f"r -- noisy: {sources[0].shape}, clean {target.shape}")
         if self.b is not None:
             sources, target = self.b(sources, target)
-        print(f"b -- noisy: {sources[0].shape}, clean {clean.shape}")
+        print(f"b -- noisy: {sources[0].shape}, clean {target.shape}")
         if self.s is not None:
             sources, target = self.s(sources, target)
-        print(f"s -- noisy: {sources[0].shape}, clean {clean.shape}")
+        print(f"s -- noisy: {sources[0].shape}, clean {target.shape}")
         # if self.re is not None:
         #     sources, target = self.re(sources, target)
         source_noise, source_clean = sources
