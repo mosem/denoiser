@@ -73,6 +73,7 @@ class Demucs(nn.Module):
         self.resample = demucs_config.resample
         self.normalize = demucs_config.normalize
         self.scale_factor = demucs_config.scale_factor
+        self.shift = demucs_config.shift
         self.include_features_in_output = features_module is not None and \
                                           features_module.include_ft and \
                                           not features_module.use_as_conditioning
