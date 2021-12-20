@@ -36,6 +36,10 @@ class AdversarialBS(GeneratorBS):
             estimate, latent_signal = prediction
         else:
             estimate, latent_signal = prediction, None
+
+        if estimate.shape[-1] < clean.shape[-1]:  # in case of augmentations
+            clean = clean[..., :estimate.shape[-1]]
+
         features_loss = self.get_features_loss(latent_signal , clean)
 
         if epoch >= self.disc_first_epoch:
