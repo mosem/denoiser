@@ -25,7 +25,7 @@ class Autoencoder(nn.Module):
         decoder_output_length = self.decoder.estimate_output_length(attention_output_length)
         return decoder_output_length
 
-    def forward(self, signal):
+    def forward(self, signal, expected_size: int=None):
         if self.normalize:
             mono = signal.mean(dim=1, keepdim=True)
             std = mono.std(dim=-1, keepdim=True)
@@ -42,6 +42,8 @@ class Autoencoder(nn.Module):
             post_attn = self.attention_module(pre_attn)
             out = self.decoder(post_attn)
 
+        if expected_size is not None:  # force trimming in case of augmentations
+            out = out[...:expected_size]
 
         if self.include_features_in_output:
             return std*out, post_attn if self.post_attn else pre_attn

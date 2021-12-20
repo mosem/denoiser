@@ -125,7 +125,7 @@ class Demucs(nn.Module):
         length = int(math.ceil(length / self.resample))
         return int(length)
 
-    def forward(self, signal):
+    def forward(self, signal, expected_size: int=None):
         if signal.dim() == 2:
             signal = signal.unsqueeze(1)
 
@@ -166,6 +166,9 @@ class Demucs(nn.Module):
             x = downsample2(x)
         else:
             pass
+
+        if expected_size is not None:  # force trimming in case of augmentations
+            x = x[...:expected_size]
 
         if self.include_features_in_output:
             return std * x, post_lstm if self.get_ft_after_lstm else pre_lstm
