@@ -1,3 +1,5 @@
+import logging
+
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -31,6 +33,7 @@ class FtConditioner(nn.Module):
         if self.use_as_conditioning:
             with torch.no_grad():
                 features = self.extract_feats(x.detach()) if features is None else features
+            logging.info(f"x: {x.shape},\t features: {features.shape}")
             if self.merge_method == 'inter':
                 x_res = F.interpolate(features.permute(0, 2, 1), x.shape[1]).permute(0, 2, 1)
             elif self.merge_method == 'attn':
