@@ -203,6 +203,7 @@ class Shift(nn.Module):
         n_sources, batch, channels, length = sources.shape
         _ , _, target_length = target.shape
         target_scale = target_length / length
+        target_length -= int(self.shift * target_scale)
         length = length - self.shift
         logging.info(f"s -------- ")
         logging.info(f"sources:\t{sources.shape}")
@@ -216,10 +217,11 @@ class Shift(nn.Module):
                 [1 if self.same else n_sources, batch, 1, 1], device=sources.device)
             offsets = offsets.expand(n_sources, -1, channels, -1)
             indexes = th.arange(length, device=sources.device)
+            target_indexes = th.arange(target_length, device=sources.device)
             logging.info(f"offsets:\t{offsets.shape}")
             logging.info(f"indexes:\t{indexes.shape}")
             sources = sources.gather(3, indexes + offsets)
-            target = target.gather(3, indexes + (offsets * target_scale).int())
+            target = target.gather(3, target_indexes + (offsets * target_scale).int())
 
         out = sources, target
         return out
