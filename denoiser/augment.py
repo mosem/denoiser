@@ -202,14 +202,22 @@ class Shift(nn.Module):
     def forward(self, sources, target):
         n_sources, batch, channels, length = sources.shape
         _ , _, target_length = target.shape
-        length = length - self.shift
         target_scale = target_length / length
+        length = length - self.shift
+        logging.info(f"s -------- ")
+        logging.info(f"sources:\t{sources.shape}")
+        logging.info(f"target:\t{target.shape}")
+        logging.info(f"length:\t{length}")
+        logging.info(f"target_length:\t{target_length}")
+        logging.info(f"target_scale:\t{target_scale}")
         if self.shift > 0:
             offsets = th.randint(
                 self.shift,
                 [1 if self.same else n_sources, batch, 1, 1], device=sources.device)
             offsets = offsets.expand(n_sources, -1, channels, -1)
             indexes = th.arange(length, device=sources.device)
+            logging.info(f"offsets:\t{offsets.shape}")
+            logging.info(f"indexes:\t{indexes.shape}")
             sources = sources.gather(3, indexes + offsets)
             target = target.gather(3, indexes + (offsets * target_scale).int())
 
@@ -247,13 +255,13 @@ class Augment(object):
         sources = th.stack([noise, clean_downsampled])
         if self.r is not None:
             sources, target = self.r(sources, clean)
-        logging.info(f"r -- noisy: {sources[0].shape}, clean {target.shape}")
+        logging.info(f"r -- noisy: {sources.shape}, clean {target.shape}")
         if self.b is not None:
             sources, target = self.b(sources, target)
-        logging.info(f"b -- noisy: {sources[0].shape}, clean {target.shape}")
+        logging.info(f"b -- noisy: {sources.shape}, clean {target.shape}")
         if self.s is not None:
             sources, target = self.s(sources, target)
-        logging.info(f"s -- noisy: {sources[0].shape}, clean {target.shape}")
+        logging.info(f"s -- noisy: {sources.shape}, clean {target.shape}")
         # if self.re is not None:
         #     sources, target = self.re(sources, target)
         source_noise, source_clean = sources
