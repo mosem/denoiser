@@ -72,6 +72,7 @@ class Demucs(nn.Module):
         self.resample = demucs_config.resample
         self.normalize = demucs_config.normalize
         self.scale_factor = demucs_config.scale_factor
+        self.shift = demucs_config.shift
         self.include_features_in_output = include_ft_in_output
         self.get_ft_after_lstm = get_ft_after_lstm
 
@@ -115,6 +116,7 @@ class Demucs(nn.Module):
         If the mixture has a valid length, the estimated sources
         will have exactly the same length.
         """
+        length -= self.shift
         length = math.ceil(length * self.scale_factor)
         length = math.ceil(length * self.resample)
         for idx in range(self.depth):
@@ -122,7 +124,7 @@ class Demucs(nn.Module):
             length = max(length, 1)
         for idx in range(self.depth):
             length = (length - 1) * self.stride + self.kernel_size
-        length = int(math.ceil(length / self.resample))
+        length = int(math.ceil(length / self.resample)) + self.scale_factor * self.shift
         return int(length)
 
     def forward(self, signal, expected_size: int=None):
