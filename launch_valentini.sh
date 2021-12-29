@@ -8,7 +8,7 @@
 
 python train.py \
   dset=valentini_dummy \
-  experiment=demucs_seanet_skipless_adversarial_1 \
+  experiment=seanet_1 \
   epochs=1 \
 
 

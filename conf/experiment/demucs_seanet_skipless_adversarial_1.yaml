@@ -40,7 +40,7 @@ seanet_decoder:
   ngf: 2
   n_residual_layers: 3
   resample: ${experiment.resample}
-  ratios: [2,2,4,8]
+  ratios: [8,8,2,2]
   scale_factor: ${experiment.scale_factor}
 
 blstm:

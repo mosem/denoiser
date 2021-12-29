@@ -95,32 +95,64 @@ class Seanet(nn.Module):
 
         self.apply(weights_init)
 
-    def estimate_valid_length(self, length):
-        """
-        Return the nearest valid length to use with the model so that
-        there is no time steps left over in a convolutions, e.g. for all
-        layers, size of the input - kernel_size % stride = 0.
+    # def estimate_valid_length(self, length):
+    #     """
+    #     Return the nearest valid length to use with the model so that
+    #     there is no time steps left over in a convolutions, e.g. for all
+    #     layers, size of the input - kernel_size % stride = 0.
+    #
+    #     If the mixture has a valid length, the estimated sources
+    #     will have exactly the same length.
+    #     """
+    #     length = math.ceil(length * self.scale_factor)
+    #     length = math.ceil(length * self.resample)
+    #     depth = len(self.ratios)
+    #     for idx in range(depth - 1, -1, -1):
+    #         stride = self.ratios[idx]
+    #         kernel_size = 2 * stride
+    #         padding = stride // 2 + stride % 2
+    #         length = math.ceil((length - kernel_size + 2 * padding) / stride) + 1
+    #         length = max(length, 1)
+    #     for idx in range(depth):
+    #         stride = self.ratios[idx]
+    #         kernel_size = 2 * stride
+    #         padding = stride // 2 + stride % 2
+    #         output_padding = stride % 2
+    #         length = (length - 1) * stride + kernel_size - 2 * padding + output_padding
+    #     length = int(math.ceil(length / self.resample))
+    #     return int(length)
 
-        If the mixture has a valid length, the estimated sources
-        will have exactly the same length.
-        """
-        length = math.ceil(length * self.scale_factor)
-        length = math.ceil(length * self.resample)
-        depth = len(self.ratios)
-        for idx in range(depth - 1, -1, -1):
-            stride = self.ratios[idx]
-            kernel_size = 2 * stride
-            padding = stride // 2 + stride % 2
-            length = math.ceil((length - kernel_size + 2 * padding) / stride) + 1
-            length = max(length, 1)
-        for idx in range(depth):
+    def _calculate_output_length(self, latent_len):
+        length = latent_len
+        for idx in range(len(self.ratios)):
+            # logger.info(f'length: {length}')
             stride = self.ratios[idx]
             kernel_size = 2 * stride
             padding = stride // 2 + stride % 2
             output_padding = stride % 2
             length = (length - 1) * stride + kernel_size - 2 * padding + output_padding
-        length = int(math.ceil(length / self.resample))
-        return int(length)
+        # logger.info(f'length: {length}')
+        return length
+
+    def _calculate_latent_length(self, out_len):
+        length = out_len
+        for i in range(len(self.ratios)):
+            stride = self.ratios[i]
+            kernel_size = 2 * stride
+            padding = stride // 2 + stride % 2
+            output_padding = stride % 2
+            length = (length + 2 * padding - kernel_size - output_padding) / stride + 1
+        return length
+
+    def calculate_valid_output_length(self, out_len):
+        out_len = self.resample*math.ceil(out_len/self.resample)
+        latent_len = self._calculate_latent_length(out_len)
+        min_valid_output_length = self._calculate_output_length(math.floor(latent_len))
+        max_valid_output_length = self._calculate_output_length(math.ceil(latent_len))
+        if out_len == min_valid_output_length:
+            return min_valid_output_length
+        else:
+            return max_valid_output_length
 
     def forward(self, signal):
 

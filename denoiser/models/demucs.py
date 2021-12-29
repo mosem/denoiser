@@ -134,6 +134,28 @@ class Demucs(nn.Module):
         length = int(math.ceil(length / self.resample))
         return int(length)
 
+    def _calculate_output_length(self, latent_len):
+        length = latent_len
+        for idx in range(self.depth):
+            length = (length - 1) * self.stride + self.kernel_size
+        return length
+
+    def _calculate_latent_length(self, out_len):
+        length = out_len
+        for idx in range(self.depth):
+            length = math.ceil((length - self.kernel_size) / self.stride) + 1
+        return length
+
+    def calculate_valid_output_length(self, out_len):
+        out_len = self.resample * math.ceil(out_len / self.resample)
+        latent_len = self._calculate_latent_length(out_len)
+        min_valid_output_length = self._calculate_output_length(math.floor(latent_len))
+        max_valid_output_length = self._calculate_output_length(math.ceil(latent_len))
+        if out_len == min_valid_output_length:
+            return min_valid_output_length
+        else:
+            return max_valid_output_length
+
     def forward(self, signal):
         if signal.dim() == 2:
             signal = signal.unsqueeze(1)

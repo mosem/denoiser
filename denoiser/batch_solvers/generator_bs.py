@@ -32,7 +32,7 @@ class GeneratorBS(BatchSolver):
         generator.load_state_dict(best_states[GENERATOR_KEY])
         return generator
 
-    def estimate_valid_length(self, output_length):
+    def calculate_valid_output_length(self, output_length):
         return self._models[GENERATOR_KEY].calculate_valid_output_length(output_length)
 
     def run(self, data, cross_valid=False):

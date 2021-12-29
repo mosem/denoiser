@@ -100,10 +100,8 @@ class NoisyCleanSet:
         self.is_training = is_training
 
         if self.is_training:
-            input_training_length = math.ceil(self.clean_length / self.scale_factor)
             rescaled_output_length = self.scale_factor* math.ceil(self.clean_length / self.scale_factor)
             valid_output_length = self.calc_valid_length_func(rescaled_output_length)
-            # self.valid_length = self.calc_valid_length_func(input_training_length)
             self.valid_length = valid_output_length
             logger.info(f'valid length: {self.valid_length}')
         else:

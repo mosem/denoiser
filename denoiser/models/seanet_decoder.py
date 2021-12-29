@@ -66,7 +66,7 @@ class SeanetDecoder(nn.Module):
 
         self.apply(weights_init)
 
-    def estimate_output_length(self, input_length):
+    def calculate_output_length(self, input_length):
         """
         Return the nearest valid length to use with the model so that
         there is no time steps left over in a convolutions, e.g. for all

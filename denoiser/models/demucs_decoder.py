@@ -55,6 +55,9 @@ class DemucsDecoder(nn.Module):
         self.stride = stride
         self.resample = resample
         self.scale_factor = scale_factor
+        # self.padding = (kernel_size-1)//2
+        self.padding = 0
+        self.output_padding = 0
 
         self.decoder = nn.ModuleList()
         activation = nn.GLU(1) if glu else nn.ReLU()
@@ -89,6 +92,12 @@ class DemucsDecoder(nn.Module):
             length = (length - 1) * self.stride + self.kernel_size
         length = int(math.ceil(length / self.resample))
         return int(length)
+
+    def calculate_input_length(self, out_len):
+        length = out_len
+        for i in range(self.depth):
+            length = (length + 2 * self.padding - self.kernel_size - self.output_padding) / self.stride + 1
+        return length
 
     def forward(self, signal, skips=None):
         if signal.dim() == 2:
